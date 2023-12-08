@@ -3813,6 +3813,8 @@ int RGWPutObj::init_processing(optional_yield y) {
   return RGWOp::init_processing(y);
 }
 
+// 얘는 put object시 rgw iam 권한 검사하는데 초점을 맞추고 있음.
+// 
 int RGWPutObj::verify_permission(optional_yield y)
 {
   if (! copy_source.empty()) {

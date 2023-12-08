@@ -1142,6 +1142,10 @@ bool verify_user_permission(const DoutPrefixProvider* dpp,
                             const uint64_t op,
                             bool mandatory_policy)
 {
+  string test = user_acl.get_owner().display_name;
+  ldpp_dout(dpp, 0) << "socks: " << test << dendl;
+
+
   auto identity_policy_res = eval_identity_or_session_policies(dpp, user_policies, s->env, op, res);
   if (identity_policy_res == Effect::Deny) {
     return false;
@@ -1336,6 +1340,7 @@ bool verify_bucket_permission_no_policy(const DoutPrefixProvider* dpp, req_state
                                             perm);
 }
 
+// 얘가 rgw_op에서 iam 권한 검사하고 문제 없을경우 넘어오는 함수
 bool verify_bucket_permission_no_policy(const DoutPrefixProvider* dpp, req_state * const s, const int perm)
 {
   perm_state_from_req_state ps(s);
@@ -1449,6 +1454,16 @@ static inline bool check_deferred_bucket_only_acl(const DoutPrefixProvider* dpp,
 	  && verify_bucket_permission_no_policy(dpp, s, user_acl, bucket_acl, perm));
 }
 
+/*
+  dpp: 로깅 및 디버깅을 위한 DoutPrefixProvider 포인터.
+  s: 사용자의 권한 상태를 나타내는 perm_state_base 구조체 포인터.
+  obj: 접근 권한을 확인하려는 rgw_obj 객체.
+  user_acl, bucket_acl, object_acl: 사용자, 버킷, 객체에 대한 RGWAccessControlPolicy 접근 제어 정책.
+  bucket_policy: 버킷에 대한 선택적인 Policy.
+  identity_policies, session_policies: 정체성 및 세션 관련 정책들의 벡터.
+  op: 수행하려는 작업을 나타내는 uint64_t 값.
+  -> chat gpt 피셜이라 틀릴 수 있음.
+*/
 bool verify_object_permission(const DoutPrefixProvider* dpp, struct perm_state_base * const s,
 			      const rgw_obj& obj,
                               const RGWAccessControlPolicy& user_acl,
@@ -1459,6 +1474,10 @@ bool verify_object_permission(const DoutPrefixProvider* dpp, struct perm_state_b
                               const vector<Policy>& session_policies,
                               const uint64_t op)
 {
+  string test = bucket_acl.get_owner().display_name;
+  ldpp_dout(dpp, 0) << "socks: " << test << dendl;
+  
+
   if (!verify_requester_payer_permission(s))
     return false;
 

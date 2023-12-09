@@ -1183,6 +1183,7 @@ struct req_state : DoutPrefixProvider {
   RGWAccessControlPolicy user_acl;
   RGWAccessControlPolicy bucket_acl;
   RGWAccessControlPolicy object_acl;
+  RGWAccessControlPolicy org_acl;
 
   rgw::IAM::Environment env;
   boost::optional<rgw::IAM::Policy> iam_policy;

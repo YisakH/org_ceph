@@ -273,6 +273,17 @@ void rgw::AppMain::cond_init_apis()
 
     std::map<std::string, bool> apis_map;
     for (auto &api : apis) {
+      ldpp_dout(dpp, 0) << "files : " << api << dendl;
+      /*
+        out/client.admin.320295.log:2023-12-09T12:43:53.473+0000 7fe268fb9c00  0 rgw main: files : s3
+        out/client.admin.320295.log:2023-12-09T12:43:53.473+0000 7fe268fb9c00  0 rgw main: files : s3website
+        out/client.admin.320295.log:2023-12-09T12:43:53.473+0000 7fe268fb9c00  0 rgw main: files : swift
+        out/client.admin.320295.log:2023-12-09T12:43:53.473+0000 7fe268fb9c00  0 rgw main: files : swift_auth
+        out/client.admin.320295.log:2023-12-09T12:43:53.473+0000 7fe268fb9c00  0 rgw main: files : admin
+        out/client.admin.320295.log:2023-12-09T12:43:53.473+0000 7fe268fb9c00  0 rgw main: files : sts
+        out/client.admin.320295.log:2023-12-09T12:43:53.473+0000 7fe268fb9c00  0 rgw main: files : iam
+        out/client.admin.320295.log:2023-12-09T12:43:53.473+0000 7fe268fb9c00  0 rgw main: files : notifications
+      */
       apis_map[api] = true;
     }
 
@@ -401,6 +412,9 @@ int rgw::AppMain::init_frontends2(RGWLib* rgwlib)
   vector<string> frontends_def;
   std::string frontend_defs_str =
     g_conf().get_val<string>("rgw_frontend_defaults");
+
+  // socks
+  ldpp_dout(dpp, 0) << "socks: " << frontend_defs_str << dendl;
   get_str_vec(frontend_defs_str, ",", frontends_def);
 
   service_map_meta["pid"] = stringify(getpid());

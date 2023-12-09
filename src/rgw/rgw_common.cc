@@ -18,6 +18,7 @@
 #include "rgw_http_errors.h"
 #include "rgw_arn.h"
 #include "rgw_data_sync.h"
+#include "rgw_org.h"
 
 #include "global/global_init.h"
 #include "common/ceph_crypto.h"
@@ -1315,6 +1316,9 @@ bool verify_bucket_permission_no_policy(const DoutPrefixProvider* dpp, struct pe
 					const RGWAccessControlPolicy& bucket_acl,
 					const int perm)
 {
+
+  //  if (verify_org)
+
   if ((perm & (int)s->perm_mask) != perm)
     return false;
 

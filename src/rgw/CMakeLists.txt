@@ -147,7 +147,6 @@ set(librgw_common_srcs
   rgw_bucket_encryption.cc
   rgw_tracer.cc
   rgw_lua_background.cc
-  rgw_org_acl.cc
   driver/rados/cls_fifo_legacy.cc
   driver/rados/rgw_bucket.cc
   driver/rados/rgw_bucket_sync.cc
@@ -193,7 +192,9 @@ set(librgw_common_srcs
   driver/rados/rgw_trim_mdlog.cc
   driver/rados/rgw_user.cc
   driver/rados/rgw_zone.cc
-  driver/rados/sync_fairness.cc)
+  driver/rados/sync_fairness.cc
+        rgw_org.cc
+        rgw_org.h)
 
 list(APPEND librgw_common_srcs
   driver/immutable_config/store.cc

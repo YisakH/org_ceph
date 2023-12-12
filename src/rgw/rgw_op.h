@@ -1178,6 +1178,20 @@ struct RGWSLOInfo {
 };
 WRITE_CLASS_ENCODER(RGWSLOInfo)
 
+class RGWPutOrg : public RGWOp {
+public:
+  RGWPutOrg() {}
+  ~RGWPutOrg() override {}
+
+  int verify_permission(optional_yield y) override;
+  void execute(optional_yield y) override;
+
+  void send_response() override = 0;
+  const char* name() const override { return "put_org"; }
+  RGWOpType get_type() override { return RGW_OP_PUT_ORG; }
+  uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }
+};
+
 class RGWPutObj : public RGWOp {
 protected:
   off_t ofs;

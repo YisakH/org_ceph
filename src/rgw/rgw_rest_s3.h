@@ -265,6 +265,15 @@ public:
   void send_response() override;
 };
 
+class RGWPutOrg_ObjStore_S3 : public RGWPutOrg_ObjStore {
+public:
+  RGWPutOrg_ObjStore_S3() {}
+  ~RGWPutOrg_ObjStore_S3() override {}
+
+  int get_params(optional_yield y) override;
+  void send_response() override;
+};
+
 class RGWPutObj_ObjStore_S3 : public RGWPutObj_ObjStore {
 private:
   std::map<std::string, std::string> crypt_http_responses;

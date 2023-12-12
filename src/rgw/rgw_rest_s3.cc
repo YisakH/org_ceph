@@ -5253,6 +5253,12 @@ RGWHandler_REST* RGWRESTMgr_S3::get_handler(rgw::sal::Driver* driver,
   if (s->info.args.exist_obj_excl_sub_resource()) {
     return nullptr;
   }
+
+  if(!rgw::sal::Bucket::empty(s->bucket.get()) &&
+     s->info.args.sub_resource_exists("notification")) {
+    return new RGWHandler_REST_Notifications_S3(auth_registry);
+  }
+  return new RGWHandler_REST_Org_S3(auth_registry);
   // has bucket
   return new RGWHandler_REST_Bucket_S3(auth_registry, enable_pubsub);
 }

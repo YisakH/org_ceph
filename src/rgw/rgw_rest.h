@@ -214,6 +214,13 @@ public:
   ~RGWDeleteBucket_ObjStore() override {}
 };
 
+class RGWPutOrg_ObjStore : public RGWPutOrg {
+public:
+  RGWPutOrg_ObjStore() {}
+  ~RGWPutOrg_ObjStore() override {}
+};
+
+
 class RGWPutObj_ObjStore : public RGWPutObj
 {
 public:

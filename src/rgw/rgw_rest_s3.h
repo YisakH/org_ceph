@@ -680,6 +680,17 @@ public:
   ~RGWHandler_REST_Service_S3() override = default;
 };
 
+class RGWHandler_REST_Org_S3 : public RGWHandler_REST_S3 {
+protected:
+  RGWOp *op_get() override;
+  RGWOp *op_head() override;
+  RGWOp *op_put() override;
+  RGWOp *op_delete() override;
+  RGWOp *op_post() override;
+public:
+   RGWHandler_REST_Org_S3(const rgw::auth::StrategyRegistry& auth_registry) :
+      RGWHandler_REST_S3(auth_registry) {}
+
 class RGWHandler_REST_Bucket_S3 : public RGWHandler_REST_S3 {
   const bool enable_pubsub;
 protected:

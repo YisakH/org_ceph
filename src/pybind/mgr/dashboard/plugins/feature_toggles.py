@@ -12,7 +12,7 @@ from ..controllers.nfs import NFSGaneshaExports, NFSGaneshaUi
 from ..controllers.rbd import Rbd, RbdSnapshot, RbdTrash
 from ..controllers.rbd_mirroring import RbdMirroringPoolMode, \
     RbdMirroringPoolPeer, RbdMirroringSummary
-from ..controllers.rgw import Rgw, RgwBucket, RgwDaemon, RgwUser
+from ..controllers.rgw import Rgw, RgwBucket, RgwDaemon, RgwUser, RgwOrg
 from . import PLUGIN_MANAGER as PM
 from . import interfaces as I  # noqa: E741,N812
 from .ttl_cache import ttl_cache
@@ -36,7 +36,7 @@ Feature2Controller = {
         RbdMirroringSummary, RbdMirroringPoolMode, RbdMirroringPoolPeer],
     Features.ISCSI: [Iscsi, IscsiTarget],
     Features.CEPHFS: [CephFS],
-    Features.RGW: [Rgw, RgwDaemon, RgwBucket, RgwUser],
+    Features.RGW: [Rgw, RgwDaemon, RgwBucket, RgwUser, RgwOrg],
     Features.NFS: [NFSGaneshaUi, NFSGaneshaExports],
 }
 

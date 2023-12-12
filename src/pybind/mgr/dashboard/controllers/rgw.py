@@ -223,8 +223,30 @@ class RgwSite(RgwRESTController):
         raise DashboardException(http_status_code=501, component='rgw', msg='Not Implemented')
 
 
+@APIRouter('/rgw/org', Scope.RGW)
+@APIDoc("RGW org based management api", "RgwWOrg")
+class RgwOrg(RgwRESTController):
+    
+    @RESTController.MethodMap(version=APIVersion(1, 1)) 
+    def create(self, org_name, daemon_name=None):
+        return self.proxy(daemon_name, 'PUT', 'org', {'org_name': org_name}, json_response=False)
+    
+    def get(self, org_name, daemon_name=None):
+        return self.proxy(daemon_name, 'GET', 'org', {'org_name': org_name})
+    
+
+
+@UIRouter('/rgw/org', Scope.RGW)
+class RgwOrgUi(RgwOrg):
+    @Endpoint('GET')
+    @ReadPermission
+    
+    def list(self, daemon_name=None):
+        return json.loads(self.proxy(daemon_name, 'GET', 'org', json_response=False))
+
+
 @APIRouter('/rgw/bucket', Scope.RGW)
-@APIDoc("RGW Bucket Management API", "RgwBucket")
+@APIDoc("RGW Bucket Management API", "RgwBucket2")
 class RgwBucket(RgwRESTController):
     def _append_bid(self, bucket):
         """

@@ -572,7 +572,7 @@ int AsioFrontend::init()
   auto& config = conf->get_config_map();
 
   if (auto i = config.find("prefix"); i != config.end()) {
-    uri_prefix = i->second;
+      uri_prefix = i->second;
   }
 
 // Setting global timeout

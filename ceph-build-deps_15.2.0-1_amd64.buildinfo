@@ -4,14 +4,14 @@ Binary: ceph-build-deps
 Architecture: amd64
 Version: 15.2.0-1
 Checksums-Md5:
- cc1302bb5bbe604f6dcfca1873ec2024 3100 ceph-build-deps_15.2.0-1_amd64.deb
+ e0acabf3c745f097f5ecdc329496e8f4 3102 ceph-build-deps_15.2.0-1_amd64.deb
 Checksums-Sha1:
- 098a16d2b813eff2d9b3674f273c554f7cf355a4 3100 ceph-build-deps_15.2.0-1_amd64.deb
+ 8b32a9245888448db9c294dde9f77a4fe050cd58 3102 ceph-build-deps_15.2.0-1_amd64.deb
 Checksums-Sha256:
- fbf07fb986739cd4eec930278a4bcbf5d622b02a31cbfac548ad3452448a4039 3100 ceph-build-deps_15.2.0-1_amd64.deb
+ ffe30b6ef750bbbf6115caee573b33d6447c31292900fa5373e279e375777488 3102 ceph-build-deps_15.2.0-1_amd64.deb
 Build-Origin: Ubuntu
 Build-Architecture: amd64
-Build-Date: Thu, 07 Dec 2023 02:48:20 +0000
+Build-Date: Sat, 09 Dec 2023 16:33:42 +0000
 Build-Tainted-By:
  merged-usr-via-aliased-dirs
  usr-local-has-programs
@@ -71,9 +71,9 @@ Installed-Build-Depends:
  libblkid1 (= 2.37.2-4ubuntu3),
  libbz2-1.0 (= 1.0.8-5build1),
  libc-bin (= 2.35-0ubuntu3.4),
- libc-dev-bin (= 2.35-0ubuntu3.4),
- libc6 (= 2.35-0ubuntu3.4),
- libc6-dev (= 2.35-0ubuntu3.4),
+ libc-dev-bin (= 2.35-0ubuntu3.5),
+ libc6 (= 2.35-0ubuntu3.5),
+ libc6-dev (= 2.35-0ubuntu3.5),
  libcap-ng0 (= 0.7.9-2.2build3),
  libcap2 (= 1:2.44-1ubuntu0.22.04.1),
  libcc1-0 (= 12.3.0-1ubuntu1~22.04),
@@ -146,7 +146,7 @@ Installed-Build-Depends:
  libuuid1 (= 2.37.2-4ubuntu3),
  libxml2 (= 2.9.13+dfsg-1ubuntu0.3),
  libzstd1 (= 1.4.8+dfsg-3build1),
- linux-libc-dev (= 5.15.0-89.99),
+ linux-libc-dev (= 5.15.0-91.101),
  login (= 1:4.8.1-2ubuntu2.1),
  lsb-base (= 11.1.0ubuntu4),
  lto-disabled-list (= 24),
@@ -175,6 +175,7 @@ Environment:
  LANG="C.UTF-8"
  LC_ADDRESS="C.UTF-8"
  LC_ALL="C.UTF-8"
+ LC_CTYPE="C.UTF-8"
  LC_IDENTIFICATION="C.UTF-8"
  LC_MEASUREMENT="C.UTF-8"
  LC_MONETARY="C.UTF-8"
@@ -183,4 +184,4 @@ Environment:
  LC_PAPER="C.UTF-8"
  LC_TELEPHONE="C.UTF-8"
  LC_TIME="C.UTF-8"
- SOURCE_DATE_EPOCH="1701917297"
+ SOURCE_DATE_EPOCH="1702139620"

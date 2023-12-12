@@ -104,6 +104,7 @@ void rgw::AppMain::init_frontends1(bool nfs)
   std::string fe_key = (nfs) ? "rgw_nfs_frontends" : "rgw_frontends";
   std::vector<std::string> frontends;
   std::string rgw_frontends_str = g_conf().get_val<string>(fe_key);
+  ldpp_dout(dpp, 0) << "socks:"<< rgw_frontends_str << dendl;
   g_conf().early_expand_meta(rgw_frontends_str, &cerr);
   get_str_vec(rgw_frontends_str, ",", frontends);
 
@@ -141,6 +142,9 @@ void rgw::AppMain::init_frontends1(bool nfs)
 
     RGWFrontendConfig *config = new RGWFrontendConfig(f);
     int r = config->init();
+
+
+
     if (r < 0) {
       delete config;
       cerr << "ERROR: failed to init config: " << f << std::endl;
@@ -459,6 +463,9 @@ int rgw::AppMain::init_frontends2(RGWLib* rgwlib)
     RGWFrontendConfig *config = fiter->second;
     string framework = config->get_framework();
 
+    // using freamework는 beast 하나.
+    // framework에는 beast만 담기고 반복문 종료
+
     auto def_iter = fe_def_map.find(framework);
     if (def_iter != fe_def_map.end()) {
       config->set_default_config(*def_iter->second);
@@ -518,6 +525,8 @@ int rgw::AppMain::init_frontends2(RGWLib* rgwlib)
     derr << "ERROR: failed to register to service map: " << cpp_strerror(-r) << dendl;
     /* ignore error */
   }
+
+  ldpp_dout(dpp, 0) << "socks : env.driver->get_name()" << env.driver->get_name() << dendl;
 
   if (env.driver->get_name() == "rados") {
     // add a watcher to respond to realm configuration changes

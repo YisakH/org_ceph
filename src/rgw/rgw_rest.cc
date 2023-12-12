@@ -2300,8 +2300,17 @@ RGWHandler_REST* RGWREST::get_handler(
     return nullptr;
   }
 
+  ldpp_dout(s, 0) << "socks: frontend_prefix : " << frontend_prefix << dendl;
+  ldpp_dout(s, 0) << "socks: decoded_uri : " << s->decoded_uri << dendl;
+  ldpp_dout(s, 0) << "socks: relative_uri : " << s->relative_uri << dendl;
+
   RGWRESTMgr *m = mgr.get_manager(s, frontend_prefix, s->decoded_uri,
                                   &s->relative_uri);
+
+  // TODO: get_manager가 정상 동작하도록 수정해야 함.
+  
+  ldpp_dout(s, 0) << "socks: RGWRESTMgr id : " << typeid(*m).name() << dendl;         
+
   if (! m) {
     *init_error = -ERR_METHOD_NOT_ALLOWED;
     return nullptr;
@@ -2317,6 +2326,7 @@ RGWHandler_REST* RGWREST::get_handler(
     return NULL;
   }
 
+  ldpp_dout(s, 0) << "socks: RGWHandler_REST id : " << typeid(*handler).name() << dendl;  
   ldpp_dout(s, 20) << __func__ << " handler=" << typeid(*handler).name() << dendl;
   
   *init_error = handler->init(driver, s, rio);

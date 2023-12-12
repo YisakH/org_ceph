@@ -44,6 +44,10 @@ int RGWFrontendConfig::parse_config(const string& config,
     config_map.emplace(std::move(key), std::move(val));
   }
 
+  for (const auto& kv :config_map){
+      dout(0) << "socks: " << kv.first << ": " << kv.second << dendl;
+  }
+
   return 0;
 }
 

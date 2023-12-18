@@ -36,6 +36,16 @@ struct rgw_http_error {
 
 void rgw_get_errno_s3(struct rgw_http_error *e, int err_no);
 
+class RGWGetOrg_ObjStore_S3 : public RGWGetOrg_ObjStore {
+public:
+  RGWGetOrg_ObjStore_S3() = default;
+  ~RGWGetOrg_ObjStore_S3() override = default;
+
+  int send_response_data(bufferlist &bl, off_t bl_ofs, off_t bl_len) override;
+  int get_params(optional_yield y) override;
+  int send_response_data_error(optional_yield y) override;
+};
+
 class RGWGetObj_ObjStore_S3 : public RGWGetObj_ObjStore
 {
 protected:
@@ -691,14 +701,20 @@ public:
 
 class RGWHandler_REST_Org_S3 : public RGWHandler_REST_S3 {
 protected:
-  RGWOp *op_get() override;
-  RGWOp *op_head() override;
-  RGWOp *op_put() override;
-  RGWOp *op_delete() override;
-  RGWOp *op_post() override;
+    RGWOp *op_get() override;
+
+    RGWOp *op_head() override;
+
+    RGWOp *op_put() override;
+
+    RGWOp *op_delete() override;
+
+    RGWOp *op_post() override;
+
 public:
-   RGWHandler_REST_Org_S3(const rgw::auth::StrategyRegistry& auth_registry) :
-      RGWHandler_REST_S3(auth_registry) {}
+    RGWHandler_REST_Org_S3(const rgw::auth::StrategyRegistry &auth_registry) :
+            RGWHandler_REST_S3(auth_registry) {}
+};
 
 class RGWHandler_REST_Bucket_S3 : public RGWHandler_REST_S3 {
   const bool enable_pubsub;

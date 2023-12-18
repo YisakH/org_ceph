@@ -18,7 +18,6 @@
 #include "rgw_http_errors.h"
 #include "rgw_arn.h"
 #include "rgw_data_sync.h"
-#include "rgw_org.h"
 
 #include "global/global_init.h"
 #include "common/ceph_crypto.h"

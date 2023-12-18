@@ -193,8 +193,7 @@ set(librgw_common_srcs
   driver/rados/rgw_user.cc
   driver/rados/rgw_zone.cc
   driver/rados/sync_fairness.cc
-        rgw_org.cc
-        rgw_org.h)
+)
 
 list(APPEND librgw_common_srcs
   driver/immutable_config/store.cc

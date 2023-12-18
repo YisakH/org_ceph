@@ -287,6 +287,10 @@ int RGWGetObj_ObjStore_S3Website::send_response_data_error(optional_yield y)
   return RGWGetObj_ObjStore_S3::send_response_data_error(y);
 }
 
+int RGWPutOrg_ObjStore_S3::get_params(optional_yield y) {
+    return RGWPutOrg_ObjStore::get_params(y);
+}
+
 int RGWGetObj_ObjStore_S3::get_params(optional_yield y)
 {
   // for multisite sync requests, only read the slo manifest itself, rather than
@@ -318,6 +322,14 @@ int RGWGetObj_ObjStore_S3::get_params(optional_yield y)
   }
 
   return RGWGetObj_ObjStore::get_params(y);
+}
+
+int RGWGetOrg_ObjStore_S3::send_response_data_error(optional_yield y)
+{
+    // TODO: socks 당연히 return 수정야해겠지?
+    bufferlist bl;
+    return 0;
+    //return send_response_data(bl, 0 , 0);
 }
 
 int RGWGetObj_ObjStore_S3::send_response_data_error(optional_yield y)
@@ -356,6 +368,15 @@ inline bool str_has_cntrl(const char* s) {
   std::string _s(s);
   return str_has_cntrl(_s);
 }
+
+int RGWGetOrg_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
+                                         off_t bl_len)
+{
+    // TODO: socks return 하는거 당연히 수해정야겠지?
+    return 0;
+}
+
+
 
 int RGWGetObj_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
 					      off_t bl_len)
@@ -4737,6 +4758,12 @@ RGWOp *RGWHandler_REST_Obj_S3::get_obj_op(bool get_data)
   return get_obj_op;
 }
 
+RGWOp *RGWHandler_REST_Org_S3::op_get()
+{
+    RGWGetOrg_ObjStore_S3 *get_org_op = new RGWGetOrg_ObjStore_S3;
+    return get_org_op;
+}
+
 RGWOp *RGWHandler_REST_Obj_S3::op_get()
 {
   if (is_acl_op()) {
@@ -5256,11 +5283,11 @@ RGWHandler_REST* RGWRESTMgr_S3::get_handler(rgw::sal::Driver* driver,
 
   if(!rgw::sal::Bucket::empty(s->bucket.get()) &&
      s->info.args.sub_resource_exists("notification")) {
-    return new RGWHandler_REST_Notifications_S3(auth_registry);
+    return new RGWHandler_REST_Bucket_S3(auth_registry, enable_pubsub);
   }
   return new RGWHandler_REST_Org_S3(auth_registry);
   // has bucket
-  return new RGWHandler_REST_Bucket_S3(auth_registry, enable_pubsub);
+  // return new RGWHandler_REST_Bucket_S3(auth_registry, enable_pubsub);
 }
 
 bool RGWHandler_REST_S3Website::web_dir() const {

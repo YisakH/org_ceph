@@ -115,6 +115,21 @@ public:
   }
 };
 
+class RGWGetOrg_ObjStore : public RGWGetOrg
+{
+protected:
+  bool sent_header;
+public:
+  RGWGetOrg_ObjStore() : sent_header(false) {}
+
+  void init(rgw::sal::Driver* driver, req_state *s, RGWHandler *h) override {
+    RGWGetOrg::init(driver, s, h);
+    sent_header = false;
+  }
+
+  int get_params(optional_yield y) override;
+};
+
 class RGWGetObj_ObjStore : public RGWGetObj
 {
 protected:
@@ -218,6 +233,7 @@ class RGWPutOrg_ObjStore : public RGWPutOrg {
 public:
   RGWPutOrg_ObjStore() {}
   ~RGWPutOrg_ObjStore() override {}
+  int get_params(optional_yield y) override;
 };
 
 

@@ -2339,3 +2339,7 @@ RGWHandler_REST* RGWREST::get_handler(
 
   return handler;
 } /* get stream handler */
+
+int RGWPutOrg_ObjStore::get_params(optional_yield y) {
+    return RGWPutOrg::get_params(y);
+}

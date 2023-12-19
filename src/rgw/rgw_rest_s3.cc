@@ -291,6 +291,10 @@ int RGWPutOrg_ObjStore_S3::get_params(optional_yield y) {
     return RGWPutOrg_ObjStore::get_params(y);
 }
 
+int RGWGetOrg_ObjStore_S3::get_params(optional_yield y){
+    return RGWGetOrg_ObjStore::get_params(y);
+}
+
 int RGWGetObj_ObjStore_S3::get_params(optional_yield y)
 {
   // for multisite sync requests, only read the slo manifest itself, rather than
@@ -2722,6 +2726,12 @@ static int get_success_retcode(int code)
   return 0;
 }
 
+void RGWPutOrg_ObjStore_S3::send_response()
+{
+    // TODO: socks 해야함
+    return;
+}
+
 void RGWPutObj_ObjStore_S3::send_response()
 {
   if (op_ret) {
@@ -4760,7 +4770,13 @@ RGWOp *RGWHandler_REST_Obj_S3::get_obj_op(bool get_data)
 
 RGWOp *RGWHandler_REST_Org_S3::op_get()
 {
-    RGWGetOrg_ObjStore_S3 *get_org_op = new RGWGetOrg_ObjStore_S3;
+    auto *get_org_op = new RGWGetOrg_ObjStore_S3;
+    return get_org_op;
+}
+
+RGWOp *RGWHandler_REST_Org_S3::op_put()
+{
+    auto *get_org_op = new RGWPutOrg_ObjStore_S3;
     return get_org_op;
 }
 

@@ -817,6 +817,11 @@ int recv_body(req_state* const s,
 
 }
 
+int RGWGetOrg_ObjStore::get_params(optional_yield y)
+{
+    return 0;
+}
+
 int RGWGetObj_ObjStore::get_params(optional_yield y)
 {
   range_str = s->info.env->get("HTTP_RANGE");
@@ -2341,5 +2346,5 @@ RGWHandler_REST* RGWREST::get_handler(
 } /* get stream handler */
 
 int RGWPutOrg_ObjStore::get_params(optional_yield y) {
-    return RGWPutOrg::get_params(y);
+    return 0;
 }

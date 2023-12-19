@@ -2174,6 +2174,12 @@ int RGWGetObj::get_lua_filter(std::unique_ptr<RGWGetObj_Filter>* filter, RGWGetO
   return 0;
 }
 
+bool RGWGetOrg::prefetch_data()
+{
+    // TODO: socks 수정해야함
+    return true;
+}
+
 bool RGWGetObj::prefetch_data()
 {
   /* HEAD request, stop prefetch*/
@@ -2189,6 +2195,11 @@ bool RGWGetObj::prefetch_data()
   }
 
   return get_data;
+}
+
+void RGWGetOrg::pre_exec()
+{
+    // TODO: socks 수정해야함
 }
 
 void RGWGetObj::pre_exec()
@@ -3813,6 +3824,18 @@ int RGWPutObj::init_processing(optional_yield y) {
   return RGWOp::init_processing(y);
 }
 
+int RGWPutOrg::verify_permission(optional_yield y)
+{
+    // TODO: socks 얘도 해야함
+    return 1;
+}
+
+int RGWGetOrg::verify_permission(optional_yield y)
+{
+    // TODO: socks 얘도 해야함
+    return 1;
+}
+
 // 얘는 put object시 rgw iam 권한 검사하는데 초점을 맞추고 있음.
 int RGWPutObj::verify_permission(optional_yield y)
 {
@@ -4113,6 +4136,16 @@ int RGWPutObj::get_lua_filter(std::unique_ptr<rgw::sal::DataProcessor>* filter, 
   }
   filter->reset(new rgw::lua::RGWPutObjFilter(s, script, cb));
   return 0;
+}
+
+void RGWGetOrg::execute(optional_yield y)
+{
+    // TODO: socks 수정해야함
+}
+
+void RGWPutOrg::execute(optional_yield y)
+{
+    // TODO: socks 수정해야함
 }
 
 void RGWPutObj::execute(optional_yield y)

@@ -5297,13 +5297,19 @@ RGWHandler_REST* RGWRESTMgr_S3::get_handler(rgw::sal::Driver* driver,
     return nullptr;
   }
 
-  if(!rgw::sal::Bucket::empty(s->bucket.get()) &&
-     s->info.args.sub_resource_exists("notification")) {
-    return new RGWHandler_REST_Bucket_S3(auth_registry, enable_pubsub);
+  if (strncmp(s->decoded_uri.c_str(), "/rgw/org", strlen("/rgw/org")) == 0){
+      return new RGWHandler_REST_Org_S3(auth_registry);
   }
-  return new RGWHandler_REST_Org_S3(auth_registry);
+
+  //if(!rgw::sal::Bucket::empty(s->bucket.get())) {
+  //  return new RGWHandler_REST_Bucket_S3(auth_registry, enable_pubsub);
+  //}
+  //return new RGWHandler_REST_Org_S3(auth_registry);
+
   // has bucket
-  // return new RGWHandler_REST_Bucket_S3(auth_registry, enable_pubsub);
+
+  ldpp_dout(s, 0) << "socks: bucket handler 호출될 때 decoded uri: " << s->decoded_uri << dendl;
+  return new RGWHandler_REST_Bucket_S3(auth_registry, enable_pubsub);
 }
 
 bool RGWHandler_REST_S3Website::web_dir() const {

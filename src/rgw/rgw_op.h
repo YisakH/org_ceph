@@ -1314,6 +1314,7 @@ public:
   int verify_permission(optional_yield y) override;
   void execute(optional_yield y) override;
 
+  int verify_requester(const rgw::auth::StrategyRegistry& auth_registry, optional_yield y) override;
   void send_response() override = 0;
   const char* name() const override { return "put_org"; }
   RGWOpType get_type() override { return RGW_OP_PUT_ORG; }

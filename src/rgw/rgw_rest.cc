@@ -1978,6 +1978,8 @@ RGWRESTMgr* RGWRESTMgr::get_resource_mgr(req_state* const s,
 {
   *out_uri = uri;
 
+  ldpp_dout(s, 0) << "socks : rgw_rest.cc : get_resource_mgr uri=" << uri  << " out_uri=" << out_uri << dendl;
+
   multimap<size_t, string>::reverse_iterator iter;
 
   for (iter = resources_by_size.rbegin(); iter != resources_by_size.rend(); ++iter) {
@@ -2291,6 +2293,7 @@ int RGWREST::preprocess(req_state *s, rgw::io::BasicClient* cio)
   return 0;
 }
 
+// 이건 7480으로 콜 하면 호출되는 듯
 RGWHandler_REST* RGWREST::get_handler(
   rgw::sal::Driver*  const driver,
   req_state* const s,
@@ -2305,16 +2308,16 @@ RGWHandler_REST* RGWREST::get_handler(
     return nullptr;
   }
 
-  ldpp_dout(s, 0) << "socks: frontend_prefix : " << frontend_prefix << dendl;
-  ldpp_dout(s, 0) << "socks: decoded_uri : " << s->decoded_uri << dendl;
-  ldpp_dout(s, 0) << "socks: relative_uri : " << s->relative_uri << dendl;
+  ldpp_dout(s, 0) << "socks: rgw_rest.cc : frontend_prefix(rgw_rest.cc) : " << frontend_prefix << dendl;
+  ldpp_dout(s, 0) << "socks: rgw_rest.cc : decoded_uri(rgw_rest.cc) : " << s->decoded_uri << dendl;
+  ldpp_dout(s, 0) << "socks: rgw_rest.cc : relative_uri(rgw_rest.cc) : " << s->relative_uri << dendl;
 
   RGWRESTMgr *m = mgr.get_manager(s, frontend_prefix, s->decoded_uri,
                                   &s->relative_uri);
 
   // TODO: get_manager가 정상 동작하도록 수정해야 함.
   
-  ldpp_dout(s, 0) << "socks: RGWRESTMgr id : " << typeid(*m).name() << dendl;         
+  ldpp_dout(s, 0) << "socks: rgw_rest.cc : RGWRESTMgr id : " << typeid(*m).name() << dendl;
 
   if (! m) {
     *init_error = -ERR_METHOD_NOT_ALLOWED;
@@ -2326,12 +2329,16 @@ RGWHandler_REST* RGWREST::get_handler(
   }
 
   RGWHandler_REST* handler = m->get_handler(driver, s, auth_registry, frontend_prefix);
+
+  if (strncmp(s->decoded_uri.c_str(), "/admin/org", strlen("/admin/org")) == 0){
+      handler = new RGWHandler_REST_Org_S3(auth_registry);
+  }
   if (! handler) {
     *init_error = -ERR_METHOD_NOT_ALLOWED;
     return NULL;
   }
 
-  ldpp_dout(s, 0) << "socks: RGWHandler_REST id : " << typeid(*handler).name() << dendl;  
+  ldpp_dout(s, 0) << "socks: rgw_rest.cc : RGWHandler_REST id in RGWREST::get_handler : " << typeid(*handler).name() << dendl;
   ldpp_dout(s, 20) << __func__ << " handler=" << typeid(*handler).name() << dendl;
   
   *init_error = handler->init(driver, s, rio);

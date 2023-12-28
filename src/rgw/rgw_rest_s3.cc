@@ -4777,6 +4777,7 @@ RGWOp *RGWHandler_REST_Org_S3::op_get()
 RGWOp *RGWHandler_REST_Org_S3::op_put()
 {
     auto *get_org_op = new RGWPutOrg_ObjStore_S3;
+    dout(0) << "socks : rgw_rest_s3.cc : op_put called" << dendl;
     return get_org_op;
 }
 
@@ -5239,6 +5240,7 @@ void parse_post_action(const std::string& post_body, req_state* s)
   s->info.args.append("PayloadHash", payload_hash);
 }
 
+// 이건 swagger에서 api call 하면 호출되는듯
 RGWHandler_REST* RGWRESTMgr_S3::get_handler(rgw::sal::Driver* driver,
 					    req_state* const s,
                                             const rgw::auth::StrategyRegistry& auth_registry,
@@ -5289,6 +5291,12 @@ RGWHandler_REST* RGWRESTMgr_S3::get_handler(rgw::sal::Driver* driver,
     // non-POST S3 service without a bucket
     return new RGWHandler_REST_Service_S3(auth_registry);
   }
+
+  string test = s->decoded_uri.c_str();
+    if (strncmp(s->decoded_uri.c_str(), "/admin/org", strlen("/admin/org")) == 0){
+        return new RGWHandler_REST_Org_S3(auth_registry);
+    }
+
   if (!rgw::sal::Object::empty(s->object.get())) {
     // has object
     return new RGWHandler_REST_Obj_S3(auth_registry);
@@ -5297,9 +5305,7 @@ RGWHandler_REST* RGWRESTMgr_S3::get_handler(rgw::sal::Driver* driver,
     return nullptr;
   }
 
-  if (strncmp(s->decoded_uri.c_str(), "/rgw/org", strlen("/rgw/org")) == 0){
-      return new RGWHandler_REST_Org_S3(auth_registry);
-  }
+
 
   //if(!rgw::sal::Bucket::empty(s->bucket.get())) {
   //  return new RGWHandler_REST_Bucket_S3(auth_registry, enable_pubsub);
@@ -5308,7 +5314,7 @@ RGWHandler_REST* RGWRESTMgr_S3::get_handler(rgw::sal::Driver* driver,
 
   // has bucket
 
-  ldpp_dout(s, 0) << "socks: bucket handler 호출될 때 decoded uri: " << s->decoded_uri << dendl;
+  ldpp_dout(s, 0) << "socks: bucket handler ㄹ호출될 때 decoded uri: " << s->decoded_uri << dendl;
   return new RGWHandler_REST_Bucket_S3(auth_registry, enable_pubsub);
 }
 

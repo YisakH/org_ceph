@@ -644,6 +644,11 @@ public:
     const rgw::auth::StrategyRegistry& auth_registry,
     const std::string& frontend_prefix
   ) {
+    // TODO: 이렇게 수정해도 되는지 확인 필요
+    // 혹은 override get_handler()를 사용하는 것이 더 나을수도
+    //if (strncmp(s->decoded_uri.c_str(), "/admin/org", strlen("/admin/org")) == 0){
+    //    return new RGWHandler_REST_Org_S3(auth_registry);
+    //}
     return nullptr;
   }
 

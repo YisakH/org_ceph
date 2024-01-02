@@ -274,7 +274,7 @@ target_link_libraries(rgw_common
     librados
     rt
     ICU::uc
-        RocksDB::RocksDB
+    RocksDB::RocksDB
     OATH::OATH
     dmclock::dmclock
     ${CURL_LIBRARIES}

@@ -42,9 +42,9 @@ public:
     }
 
     rocksdb::Status init();
-    int getData(std::string key, std::string &value);
-    int putData(std::string key, std::string value);
-    int deleteData(std::string key);
+    int getData(const std::string& key, std::string &value);
+    int putData(const std::string& key, const std::string& value);
+    int deleteData(const std::string& key);
 };
 
 class OrgPermission

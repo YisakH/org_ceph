@@ -6,14 +6,14 @@
 #include <sstream>
 
 rocksdb::Status DBManager::init(){
-        if(dbName == "RocksDB"){
+    if(dbName == "RocksDB"){
         options.create_if_missing = true;
         status = rocksdb::DB::Open(options, "/tmp/testdb", &db);
-        return status;
     }
+    return status;
 }
 
-int DBManager::getData(std::string key, std::string &value){
+int DBManager::getData(const std::string& key, std::string &value){
     status = db->Get(rocksdb::ReadOptions(), key, &value);
     if(status.ok()){
         return 0;
@@ -23,7 +23,12 @@ int DBManager::getData(std::string key, std::string &value){
     }
 }
 
-int DBManager::putData(std::string key, std::string value){
+int DBManager::putData(const std::string& key, const std::string& value){
+    std::string exiting_value;
+    rocksdb::Status s = db->Get(rocksdb::ReadOptions(), key, &exiting_value);
+    if(s.ok()){
+        return 2;
+    }
     status = db->Put(rocksdb::WriteOptions(), key, value);
     if(status.ok()){
         return 0;
@@ -33,7 +38,7 @@ int DBManager::putData(std::string key, std::string value){
     }
 }
 
-int DBManager::deleteData(std::string key){
+int DBManager::deleteData(const std::string& key){
     status = db->Delete(rocksdb::WriteOptions(), key);
     if(status.ok()){
         return 0;

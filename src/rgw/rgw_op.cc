@@ -4695,14 +4695,14 @@ void RGWPutOrg::execute(optional_yield y)
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : env = " << s->info.env->get_map() << dendl;
-  for (std::map<string, string>::const_iterator it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it) {
+  for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it) {
     dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
   }
   dout(0) << "socks : rgw_op.cc : request_params : " << s->info.request_params << dendl;
 
   auto dbm = new DBManager("RocksDB");
   dbm->init();
-  RGWOrg* org = new RGWOrg("test-user", "upper-test-user", 1);
+  auto* org = new RGWOrg("test-user", "upper-test-user", 1);
   int ret = org->putRGWOrg(*dbm);
 
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : rocksdb ret = " << ret << dendl;

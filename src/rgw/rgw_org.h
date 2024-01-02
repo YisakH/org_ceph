@@ -3,6 +3,8 @@
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/status.h"
+#include <mutex>
+#include <utility>
 
 namespace rocksdb{
   class DB;
@@ -25,23 +27,43 @@ namespace rocksdb{
 class DBManager
 {
 private:
+    // 복사 생성자 및 할당 연산자 삭제
+    DBManager(const DBManager&) = default;
+    DBManager& operator=(const DBManager&) = delete;
+
+    DBManager(std::string dbName, const std::string &ip, std::string port)
+            : DBManager(std::move(dbName)) {
+        this->ip = ip;
+        this->port = port;
+    }
+    DBManager(std::string dbName) : dbName(std::move(dbName)), db(nullptr) {
+        //if(dbName == "RocksDB"){
+            options.create_if_missing = true;
+            status = rocksdb::DB::Open(options, "/tmp/testdb", &db);
+        //}
+    }
+public:
     std::string dbName;
     std::string ip;
     std::string port;
     rocksdb::DB* db;
     rocksdb::Options options;
     rocksdb::Status status;
-public:
-
-    DBManager(const std::string &dbName, const std::string &ip, const std::string &port) : dbName(dbName), ip(ip),
-                                                                                           port(port) {}
-    DBManager(const std::string &dbName) : dbName(dbName) {}                                                                                       
-
     ~DBManager() {
         delete db;
     }
 
-    rocksdb::Status init();
+    static DBManager& getInstance(const std::string &dbName) {
+        static DBManager instance(dbName);
+        return instance;
+    }
+
+    rocksdb::DB* getDB() const {
+        return db;
+    }
+    rocksdb::Status getStatus() const {
+        return status;
+    }
     int getData(const std::string& key, std::string &value);
     int putData(const std::string& key, const std::string& value);
     int deleteData(const std::string& key);
@@ -60,7 +82,9 @@ OrgPermission() {
     w = false;
     x = false;
     g = false;
-}
+    }
+
+    OrgPermission(bool r, bool w, bool x, bool g) : r(r), w(w), x(x), g(g) {}
 };
 
 class RGWOrg
@@ -71,14 +95,17 @@ private:
     uint16_t tier;
     OrgPermission* orgPermission;
 public:
-    RGWOrg(const std::string &user, const std::string &authorizer, uint16_t tier,
-           OrgPermission* orgPermission) : user(user), authorizer(authorizer), tier(tier),
+    RGWOrg(std::string user, const std::string &authorizer, uint16_t tier,
+           OrgPermission* orgPermission) : user(std::move(user)), authorizer(authorizer), tier(tier),
                                                  orgPermission(orgPermission) {}
 
-    RGWOrg(const std::string &user, const std::string &authorizer, uint16_t tier) : user(user), authorizer(authorizer),
+    RGWOrg(std::string user, const std::string &authorizer, uint16_t tier) : user(std::move(user)), authorizer(authorizer),
                                                                                      tier(tier){
                                                                                         orgPermission = new OrgPermission();
                                                                                      }
+    RGWOrg(){
+        
+    }                                                                                 
     
     const std::string &getUser() const {
         return user;
@@ -114,5 +141,9 @@ public:
 
     int putRGWOrg(DBManager &dbManager);
 
-    int getRGWOrg(DBManager &dbManager, std::string user);
+    static int getRGWOrg(DBManager &dbManager, std::string user, RGWOrg *rgwOrg);
+
+    string toString() {
+        return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g);
+    }
 };

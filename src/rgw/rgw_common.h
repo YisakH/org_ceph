@@ -45,6 +45,7 @@
 #include "include/rados/librados.hpp"
 #include "rgw_public_access.h"
 #include "rgw_sal_fwd.h"
+#include "rgw_org.h"
 
 namespace ceph {
   class Formatter;
@@ -1183,7 +1184,9 @@ struct req_state : DoutPrefixProvider {
   RGWAccessControlPolicy user_acl;
   RGWAccessControlPolicy bucket_acl;
   RGWAccessControlPolicy object_acl;
-  RGWAccessControlPolicy org_acl;
+  
+  std::vector<std::pair<std::string, std::string>> http_params;
+  RGWOrg* rgwOrg;
 
   rgw::IAM::Environment env;
   boost::optional<rgw::IAM::Policy> iam_policy;

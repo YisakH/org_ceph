@@ -4771,6 +4771,7 @@ RGWOp *RGWHandler_REST_Obj_S3::get_obj_op(bool get_data)
 RGWOp *RGWHandler_REST_Org_S3::op_get()
 {
     auto *get_org_op = new RGWGetOrg_ObjStore_S3;
+    dout(0) << "socks : rgw_rest_s3.cc : op_get called" << dendl;
     return get_org_op;
 }
 

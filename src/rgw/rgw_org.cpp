@@ -5,13 +5,6 @@
 #include "../rocksdb/include/rocksdb/db.h"
 #include <sstream>
 
-rocksdb::Status DBManager::init(){
-    if(dbName == "RocksDB"){
-        options.create_if_missing = true;
-        status = rocksdb::DB::Open(options, "/tmp/testdb", &db);
-    }
-    return status;
-}
 
 int DBManager::getData(const std::string& key, std::string &value){
     status = db->Get(rocksdb::ReadOptions(), key, &value);
@@ -56,7 +49,7 @@ int RGWOrg::putRGWOrg(DBManager& dbManager){
     return dbManager.putData(user, value);
 }
 
-int RGWOrg::getRGWOrg(DBManager &dbManager, std::string user) {
+int RGWOrg::getRGWOrg(DBManager &dbManager, std::string user, RGWOrg *rgwOrg) {
     std::string value;
     int ret = dbManager.getData(user, value);
     if (ret == 0) {
@@ -65,17 +58,17 @@ int RGWOrg::getRGWOrg(DBManager &dbManager, std::string user) {
 
         try {
             std::getline(iss, token, ' ');
-            authorizer = token;
+            rgwOrg->authorizer = token;
             std::getline(iss, token, ' ');
-            tier = std::stoi(token);
+            rgwOrg->tier = std::stoi(token);
             std::getline(iss, token, ' ');
-            orgPermission->r = std::stoi(token) != 0;  // 문자열을 bool로 변환
+            rgwOrg->orgPermission->r = std::stoi(token) != 0;  // 문자열을 bool로 변환
             std::getline(iss, token, ' ');
-            orgPermission->w = std::stoi(token) != 0;  // 문자열을 bool로 변환
+            rgwOrg->orgPermission->w = std::stoi(token) != 0;  // 문자열을 bool로 변환
             std::getline(iss, token, ' ');
-            orgPermission->x = std::stoi(token) != 0;  // 문자열을 bool로 변환
+            rgwOrg->orgPermission->x = std::stoi(token) != 0;  // 문자열을 bool로 변환
             std::getline(iss, token, ' ');
-            orgPermission->g = std::stoi(token) != 0;  // 문자열을 bool로 변환
+            rgwOrg->orgPermission->g = std::stoi(token) != 0;  // 문자열을 bool로 변환
         } catch (const std::invalid_argument &e) {
             // 오류 처리 (예: 로그 출력, 오류 코드 반환 등)
             return -1;  // 또는 다른 오류 코드

@@ -262,6 +262,24 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
   return 0;
 }
 
+std::vector<std::pair<std::string, std::string>> parseStringToVector(const std::string& input) {
+    std::vector<std::pair<std::string, std::string>> result;
+    std::istringstream iss(input);
+    std::string pair;
+
+    // '&' 기준으로 문자열을 분리하여 key-value 쌍 추출
+    while (std::getline(iss, pair, '&')) {
+        size_t pos = pair.find('=');
+        if (pos != std::string::npos) {
+            std::string key = pair.substr(0, pos);
+            std::string value = pair.substr(pos + 1);
+            result.emplace_back(key, value);
+        }
+    }
+
+    return result;
+}
+
 int process_request(const RGWProcessEnv& penv,
                     RGWRequest* const req,
                     const std::string& frontend_prefix,
@@ -383,6 +401,8 @@ int process_request(const RGWProcessEnv& penv,
       goto done;
     }
 
+    s->http_params = parseStringToVector(s->info.request_params);
+
     s->trace = tracing::rgw::tracer.start_trace(op->name(), s->trace_enabled);
     s->trace->SetAttribute(tracing::rgw::TRANS_ID, s->trans_id);
 
@@ -469,3 +489,4 @@ done:
 
   return (ret < 0 ? ret : s->err.ret);
 } /* process_request */
+

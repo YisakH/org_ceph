@@ -3,8 +3,6 @@ if(NOT GPERF)
   message(FATAL_ERROR "Can't find gperf")
 endif()
 
-#find_package(RocksDB REQUIRED)
-
 if(WITH_RADOSGW_BACKTRACE_LOGGING)
   add_definitions(-D_BACKTRACE_LOGGING)
 endif(WITH_RADOSGW_BACKTRACE_LOGGING)

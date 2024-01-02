@@ -451,6 +451,8 @@ public:
       RGWGetObj_Filter* cb);
 
   dmc::client_id dmclock_client() override { return dmc::client_id::data; }
+
+  int verify_requester(const rgw::auth::StrategyRegistry& auth_registry, optional_yield y) override;
 };
 
 class RGWGetObj : public RGWOp {

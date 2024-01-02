@@ -3835,6 +3835,15 @@ static int select_bucket_placement(const DoutPrefixProvider *dpp,
   return 0;
 }
 
+std::string findValueForKey(const std::vector<std::pair<std::string, std::string>>& keyValuePairs, const std::string& key) {
+    for (const auto& pair : keyValuePairs) {
+        if (pair.first == key) {
+            return pair.second;
+        }
+    }
+    return ""; // Key를 찾지 못한 경우 빈 문자열 반환
+}
+
 void RGWCreateBucket::execute(optional_yield y)
 {
   op_ret = get_params(y);
@@ -4327,6 +4336,11 @@ int RGWPutObj::init_processing(optional_yield y)
   return RGWOp::init_processing(y);
 }
 
+int RGWGetOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
+{
+    return 1;
+}
+
 int RGWPutOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
 {
   return 1;
@@ -4686,12 +4700,23 @@ int RGWPutObj::get_lua_filter(std::unique_ptr<rgw::sal::DataProcessor> *filter, 
 
 void RGWGetOrg::execute(optional_yield y)
 {
-  // TODO: socks 수정해야함
+  auto& dbm = DBManager::getInstance("RocksDB");
+  if(!dbm.getStatus().ok()) {
+    dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
+    return;
+  }
+
+  const auto& user = findValueForKey(s->http_params, "user");
+
+  s->rgwOrg = new RGWOrg();
+  int ret = RGWOrg::getRGWOrg(dbm, user, s->rgwOrg);
+  dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb ret = " << ret << dendl;
+  dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb return value : " << s->rgwOrg->toString() << dendl;
 }
 
 void RGWPutOrg::execute(optional_yield y)
 {
-  
+  /*
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : env = " << s->info.env->get_map() << dendl;
@@ -4699,11 +4724,29 @@ void RGWPutOrg::execute(optional_yield y)
     dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
   }
   dout(0) << "socks : rgw_op.cc : request_params : " << s->info.request_params << dendl;
+  */
 
-  auto dbm = new DBManager("RocksDB");
-  dbm->init();
-  auto* org = new RGWOrg("test-user", "upper-test-user", 1);
-  int ret = org->putRGWOrg(*dbm);
+  
+
+  auto& dbm = DBManager::getInstance("RocksDB");
+  if(!dbm.getStatus().ok()) {
+    dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
+    return;
+  }
+  dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : get db succeded" << dendl;
+  
+  const auto& user = findValueForKey(s->http_params, "user");
+  const auto& authorizer = findValueForKey(s->http_params, "authorizer");
+  const int& tier = stoi(findValueForKey(s->http_params, "tier"));
+
+  const bool& r = findValueForKey(s->http_params, "r") == "true";
+  const bool& w = findValueForKey(s->http_params, "w") == "true";
+  const bool& x = findValueForKey(s->http_params, "x") == "true";
+  const bool& g = findValueForKey(s->http_params, "g") == "true";
+
+
+  auto* org = new RGWOrg(user, authorizer, tier, new OrgPermission(r, w, x, g));
+  int ret = org->putRGWOrg(dbm);
 
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : rocksdb ret = " << ret << dendl;
 }

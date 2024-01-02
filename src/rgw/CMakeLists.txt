@@ -3,6 +3,8 @@ if(NOT GPERF)
   message(FATAL_ERROR "Can't find gperf")
 endif()
 
+#find_package(RocksDB REQUIRED)
+
 if(WITH_RADOSGW_BACKTRACE_LOGGING)
   add_definitions(-D_BACKTRACE_LOGGING)
 endif(WITH_RADOSGW_BACKTRACE_LOGGING)
@@ -193,6 +195,8 @@ set(librgw_common_srcs
   driver/rados/rgw_user.cc
   driver/rados/rgw_zone.cc
   driver/rados/sync_fairness.cc
+        rgw_org.h
+        rgw_org.cpp
 )
 
 list(APPEND librgw_common_srcs
@@ -272,6 +276,7 @@ target_link_libraries(rgw_common
     librados
     rt
     ICU::uc
+        RocksDB::RocksDB
     OATH::OATH
     dmclock::dmclock
     ${CURL_LIBRARIES}
@@ -436,7 +441,8 @@ target_link_libraries(rgw_schedulers
   PUBLIC dmclock::dmclock spawn)
 
 set(radosgw_srcs
-  rgw_main.cc)
+  rgw_main.cc
+        rgw_org.h)
 
 add_executable(radosgw ${radosgw_srcs})
 
@@ -563,6 +569,7 @@ target_link_libraries(rgw
   ${CURL_LIBRARIES}
   ${EXPAT_LIBRARIES}
   OpenSSL::SSL
+  RocksDB::RocksDB
   PUBLIC
   RapidJSON::RapidJSON
   dmclock::dmclock)

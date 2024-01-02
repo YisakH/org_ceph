@@ -56,6 +56,7 @@
 #include "rgw_torrent.h"
 #include "rgw_lua_data_filter.h"
 #include "rgw_lua.h"
+#include "rgw_org.h"
 
 #include "services/svc_zone.h"
 #include "services/svc_quota.h"
@@ -4690,6 +4691,7 @@ void RGWGetOrg::execute(optional_yield y)
 
 void RGWPutOrg::execute(optional_yield y)
 {
+  
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : env = " << s->info.env->get_map() << dendl;
@@ -4697,7 +4699,13 @@ void RGWPutOrg::execute(optional_yield y)
     dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
   }
   dout(0) << "socks : rgw_op.cc : request_params : " << s->info.request_params << dendl;
-  // TODO: socks 수정해야함
+
+  auto dbm = new DBManager("RocksDB");
+  dbm->init();
+  RGWOrg* org = new RGWOrg("test-user", "upper-test-user", 1);
+  int ret = org->putRGWOrg(*dbm);
+
+  dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : rocksdb ret = " << ret << dendl;
 }
 
 void RGWPutObj::execute(optional_yield y)

@@ -376,8 +376,40 @@ inline bool str_has_cntrl(const char* s) {
 int RGWGetOrg_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
                                          off_t bl_len)
 {
-    // TODO: socks return 하는거 당연히 수해정야겠지?
-    return 0;
+  /*
+    if (sent_header)
+        goto send_data;
+
+    // Set the HTTP status code to 200 OK or appropriate error code
+    set_req_state_err(s, op_ret);
+    dump_errno(s);
+
+    // If there was an error in processing, no need to send the data
+    if (op_ret < 0)
+        return op_ret;
+
+    // Set Content-Length header
+    dump_content_length(s, bl_len);
+
+    // Set Content-Type header (modify as needed)
+    dump_header(s, "Content-Type", "binary/octet-stream");
+
+    // Finalize headers
+    end_header(s, this);
+
+    // Mark that the header has been sent
+    sent_header = true;
+
+    send_data:
+    // Send the response body
+    if (get_data && !op_ret) {
+        int r = dump_body(s, bl.c_str() + bl_ofs, bl_len);
+        if (r < 0)
+            return r;
+    }
+    */
+
+    return 0; // Success
 }
 
 
@@ -385,6 +417,7 @@ int RGWGetOrg_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
 int RGWGetObj_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
 					      off_t bl_len)
 {
+  
   const char *content_type = NULL;
   string content_type_str;
   map<string, string> response_attrs;
@@ -2728,8 +2761,29 @@ static int get_success_retcode(int code)
 
 void RGWPutOrg_ObjStore_S3::send_response()
 {
-    // TODO: socks 해야함
-    return;
+  /*
+    // Set the HTTP status code to 200 OK
+    set_req_state_err(s, 0);
+    dump_errno(s);
+
+    // The response string
+    std::string response_str = "hello";
+    bufferlist response_bl;
+    response_bl.append(response_str);
+
+    // Set Content-Length header
+    dump_content_length(s, response_bl.length());
+
+    // Set Content-Type header
+    dump_header(s, "Content-Type", "text/plain");
+
+    // Finalize headers
+    end_header(s, this);
+
+
+    dump_body(s, response_bl.c_str(), response_bl.length());
+    */
+   return;
 }
 
 void RGWPutObj_ObjStore_S3::send_response()

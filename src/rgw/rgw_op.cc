@@ -4749,6 +4749,7 @@ void RGWPutOrg::execute(optional_yield y)
   int ret = org->putRGWOrg(dbm);
 
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : rocksdb ret = " << ret << dendl;
+  //send_response();
 }
 
 void RGWPutObj::execute(optional_yield y)
@@ -5232,13 +5233,13 @@ void RGWPutObj::execute(optional_yield y)
     ldpp_dout(this, 1) << "ERROR: publishing notification failed, with error: " << ret << dendl;
     // too late to rollback operation, hence op_ret is not set here
   }
-
+  /*
   dout(0) << "socks : rgw_op.cc : RGWPutObj::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutObj::execute : env = " << s->info.env->get_map() << dendl;
   for (std::map<string, string>::const_iterator it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it) {
     dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
   }
-  dout(0) << "socks : rgw_op.cc : request_params : " << s->info.request_params << dendl;
+  dout(0) << "socks : rgw_op.cc : request_params : " << s->info.request_params << dendl;*/
 }
 
 int RGWPostObj::verify_permission(optional_yield y)

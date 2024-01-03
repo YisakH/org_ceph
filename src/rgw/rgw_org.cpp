@@ -52,11 +52,14 @@ int RGWOrg::putRGWOrg(DBManager& dbManager){
 int RGWOrg::getRGWOrg(DBManager &dbManager, std::string user, RGWOrg *rgwOrg) {
     std::string value;
     int ret = dbManager.getData(user, value);
+    rgwOrg->orgPermission = new OrgPermission();
     if (ret == 0) {
         std::istringstream iss(value);
         std::string token;
 
         try {
+            rgwOrg->user = user;
+
             std::getline(iss, token, ' ');
             rgwOrg->authorizer = token;
             std::getline(iss, token, ' ');

@@ -4712,6 +4712,10 @@ void RGWGetOrg::execute(optional_yield y)
   int ret = RGWOrg::getRGWOrg(dbm, user, s->rgwOrg);
   dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb ret = " << ret << dendl;
   dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb return value : " << s->rgwOrg->toString() << dendl;
+
+  bufferlist response_bl;
+  response_bl.append(s->rgwOrg->toString().c_str());
+  send_response_data(response_bl, 0, response_bl.length());
 }
 
 void RGWPutOrg::execute(optional_yield y)

@@ -1,3 +1,6 @@
+#ifndef RGW_ORG_H
+#define RGW_ORG_H
+
 
 #include <string>
 #include "rocksdb/db.h"
@@ -143,7 +146,9 @@ public:
 
     static int getRGWOrg(DBManager &dbManager, std::string user, RGWOrg *rgwOrg);
 
-    string toString() {
+    std::string toString() {
         return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g);
     }
 };
+
+#endif

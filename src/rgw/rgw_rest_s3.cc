@@ -376,7 +376,23 @@ inline bool str_has_cntrl(const char* s) {
 int RGWGetOrg_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
                                          off_t bl_len)
 {
-    // TODO: socks return 하는거 당연히 수해정야겠지?
+    // Set the HTTP status code based on the operation result
+    set_req_state_err(s, op_ret);
+    dump_errno(s);
+
+    // Check if the operation was successful
+    if (op_ret < 0)
+        return op_ret; // If not, return the error code
+
+    // Set content length and type headers
+    dump_content_length(s, bl_len);
+    const char* content_type = "binary/octet-stream"; // default content type
+    dump_header(s, "Content-Type", content_type);
+
+    // Finalize and send the headers
+    end_header(s, this);
+
+    dump_body(s, bl.c_str() + bl_ofs, bl_len);
     return 0;
 }
 
@@ -2728,8 +2744,20 @@ static int get_success_retcode(int code)
 
 void RGWPutOrg_ObjStore_S3::send_response()
 {
-    // TODO: socks 해야함
-    return;
+    // Set the HTTP status code to 200 OK
+    set_req_state_err(s, 0);
+    dump_errno(s);
+    // The response string
+    std::string response_str = "put org suceeded";
+    bufferlist response_bl;
+    response_bl.append(response_str);
+    // Set Content-Length header
+    dump_content_length(s, response_bl.length());
+    // Set Content-Type header
+    dump_header(s, "Content-Type", "text/plain");
+    // Finalize headers
+    end_header(s, this);
+    dump_body(s, response_bl.c_str(), response_bl.length());
 }
 
 void RGWPutObj_ObjStore_S3::send_response()

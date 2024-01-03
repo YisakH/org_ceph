@@ -290,6 +290,7 @@ target_link_libraries(rgw_common
 target_include_directories(rgw_common
   PUBLIC "${CMAKE_SOURCE_DIR}/src/rgw/services"
   PUBLIC "${CMAKE_SOURCE_DIR}/src/rgw"
+  PUBLIC "/ceph/org_ceph/src/rocksdb/include"
   PUBLIC "${LUA_INCLUDE_DIR}")
 
 if(WITH_RADOSGW_D4N)

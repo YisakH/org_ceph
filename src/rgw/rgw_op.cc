@@ -4739,11 +4739,16 @@ void RGWPutOrg::execute(optional_yield y)
   const auto& authorizer = findValueForKey(s->http_params, "authorizer");
   const int& tier = stoi(findValueForKey(s->http_params, "tier"));
 
+
+  dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : no error 1" << dendl;
+
   const bool& r = findValueForKey(s->http_params, "r") == "true";
   const bool& w = findValueForKey(s->http_params, "w") == "true";
   const bool& x = findValueForKey(s->http_params, "x") == "true";
   const bool& g = findValueForKey(s->http_params, "g") == "true";
 
+
+  dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : no error 2" << dendl;
 
   auto* org = new RGWOrg(user, authorizer, tier, new OrgPermission(r, w, x, g));
   int ret = org->putRGWOrg(dbm);

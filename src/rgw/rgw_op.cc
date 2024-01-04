@@ -4712,7 +4712,7 @@ void RGWDeleteOrg::execute(optional_yield y)
 {
   dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : op_delete called" << dendl;
 
-  auto& dbm = DBManager::getInstance("RocksDB");
+  auto& dbm = aclDB::getInstance();
   if(!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound()) {
     dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
     dbm.reOpenDB();
@@ -4723,7 +4723,7 @@ void RGWDeleteOrg::execute(optional_yield y)
   const auto& path = findValueForKey(s->http_params, "path");
   const auto& key = user + ":" + path;
 
-  int ret = RGWOrg::deleteRGWOrg(dbm, key)
+  int ret = RGWOrg::deleteRGWOrg(dbm, key);
 
   if(ret == 0) {
     dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : delete success" << dendl;
@@ -4745,24 +4745,38 @@ void RGWDeleteOrg::pre_exec()
 
 void RGWGetOrg::execute(optional_yield y)
 {
-  auto& dbm = DBManager::getInstance("RocksDB");
-  if(!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound()) {
-    dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
-    dbm.reOpenDB();
-    return;
+  int ret;
+  if (s->decoded_uri == "/admin/org/acl") {
+    const auto& user = findValueForKey(s->http_params, "user");
+    const auto& path = findValueForKey(s->http_params, "path");
+    
+    s->rgwOrg = getAcl(user, path);
+  } else if(s->decoded_uri == "/admin/org/tier") {
+    const auto& user = findValueForKey(s->http_params, "user");
+    uint16_t tier;
+
+    ret = getTier(user, &tier);
+  } else if(s->decoded_uri == "/admin/org/anc") {
+    const auto& user = findValueForKey(s->http_params, "user");
+
+    string* anc;
+    ret = getAnc(user, anc);
+
+  } else {
+    dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : wrong uri" << dendl;
   }
 
-  const auto& user = findValueForKey(s->http_params, "user");
-  const auto& path = findValueForKey(s->http_params, "path");
-  
 
-  s->rgwOrg = new RGWOrg();
-  int ret = RGWOrg::getFullMatchRgwOrg(dbm, user, path, s->rgwOrg);
-  dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb ret = " << ret << dendl;
-  dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb return value : " << s->rgwOrg->toString() << dendl;
 
   bufferlist response_bl;
-  response_bl.append(s->rgwOrg->toString().c_str());
+  if(s->rgwOrg == nullptr) {
+    dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb get error" << dendl;
+    response_bl.append("error occured! maybe there is no such key in rocksdb");
+  }else{
+    dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb return value : " << s->rgwOrg->toString() << dendl;
+    response_bl.append(s->rgwOrg->toString().c_str());
+  }
+  
   send_response_data(response_bl, 0, response_bl.length());
 }
 
@@ -4780,7 +4794,7 @@ void RGWPutOrg::execute(optional_yield y)
 
   
 
-  auto& dbm = DBManager::getInstance("RocksDB");
+  auto& dbm = aclDB::getInstance();
   if(!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound()) {
     
     dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;

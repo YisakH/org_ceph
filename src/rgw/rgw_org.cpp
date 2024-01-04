@@ -5,6 +5,7 @@
 #include "../rocksdb/include/rocksdb/db.h"
 #include <sstream>
 
+//TierDB RGWOrgTier::tierDb;
 
 int DBManager::getData(const std::string& key, std::string &value){
     status = db->Get(rocksdb::ReadOptions(), key, &value);
@@ -50,23 +51,23 @@ int RGWOrg::putRGWOrg(DBManager& dbManager){
     return dbManager.putData(key, value);
 }
 
-int RGWOrg::deleteRGWOrg(DBManager& dbManager, std::string key){
-    return dbManager.deleteData(key);
+int RGWOrg::deleteRGWOrg(aclDB& aclDB, std::string key){
+    return aclDB.deleteData(key);
 }
 
-int RGWOrg::getFullMatchRgwOrg(DBManager &dbManager, std::string user, std::string path, RGWOrg *rgwOrg) {
+int RGWOrg::getFullMatchRgwOrg(aclDB &aclDB, std::string user, std::string path, RGWOrg *rgwOrg) {
     std::istringstream iss(path);
     std::string segment;
     std::string accumulatedPath;
     std::string key;
-    int ret = 1;
+    int ret = -1;
     while (std::getline(iss, segment, '/')) {
         if (!segment.empty()) { // Skip empty segments (like the one before the first /)
             accumulatedPath += "/";
             
             accumulatedPath += segment;
             key = user + ":" + accumulatedPath;
-            int cur_ret = getRGWOrg(dbManager,key, rgwOrg);
+            int cur_ret = getRGWOrg(aclDB,key, rgwOrg);
             if(cur_ret == 0){
                 ret = 0;
             }
@@ -75,9 +76,9 @@ int RGWOrg::getFullMatchRgwOrg(DBManager &dbManager, std::string user, std::stri
     return ret;
 }
 
-int RGWOrg::getRGWOrg(DBManager &dbManager, std::string key, RGWOrg *rgwOrg) {
+int RGWOrg::getRGWOrg(aclDB &aclDB, std::string key, RGWOrg *rgwOrg) {
     std::string value;
-    int ret = dbManager.getData(key, value);
+    int ret = aclDB.getData(key, value);
     if(ret < 0){
         // key 존재하지 않음
         return ret;
@@ -93,30 +94,27 @@ int RGWOrg::getRGWOrg(DBManager &dbManager, std::string key, RGWOrg *rgwOrg) {
     std::getline(iss, token, ':');
     rgwOrg->orgPermission->path = token;
 
-    if (ret == 0) {
-        std::istringstream iss(value);
-        std::string token;
-
-        try {
-            std::getline(iss, token, ' ');
-            rgwOrg->authorizer = token;
-            std::getline(iss, token, ' ');
-            rgwOrg->tier = std::stoi(token);
-            std::getline(iss, token, ' ');
-            rgwOrg->orgPermission->r = std::stoi(token) != 0;  // 문자열을 bool로 변환
-            std::getline(iss, token, ' ');
-            rgwOrg->orgPermission->w = std::stoi(token) != 0;  // 문자열을 bool로 변환
-            std::getline(iss, token, ' ');
-            rgwOrg->orgPermission->x = std::stoi(token) != 0;  // 문자열을 bool로 변환
-            std::getline(iss, token, ' ');
-            rgwOrg->orgPermission->g = std::stoi(token) != 0;  // 문자열을 bool로 변환
-        } catch (const std::invalid_argument &e) {
-            // 오류 처리 (예: 로그 출력, 오류 코드 반환 등)
-            return -1;  // 또는 다른 오류 코드
-        } catch (const std::out_of_range &e) {
-            // 오류 처리
-            return -1;  // 또는 다른 오류 코드
-        }
+    std::istringstream iss2(value);
+    std::string token2;
+    try {
+        std::getline(iss2, token2, ' ');
+        rgwOrg->authorizer = token2;
+        std::getline(iss2, token2, ' ');
+        rgwOrg->tier = std::stoi(token2);
+        std::getline(iss2, token2, ' ');
+        rgwOrg->orgPermission->r = std::stoi(token2) != 0;  // 문자열을 bool로 변환
+        std::getline(iss2, token2, ' ');
+        rgwOrg->orgPermission->w = std::stoi(token2) != 0;  // 문자열을 bool로 변환
+        std::getline(iss2, token2, ' ');
+        rgwOrg->orgPermission->x = std::stoi(token2) != 0;  // 문자열을 bool로 변환
+        std::getline(iss2, token2, ' ');
+        rgwOrg->orgPermission->g = std::stoi(token2) != 0;  // 문자열을 bool로 변환
+    } catch (const std::invalid_argument &e) {
+        // 오류 처리 (예: 로그 출력, 오류 코드 반환 등)
+        return -1;  // 또는 다른 오류 코드
+    } catch (const std::out_of_range &e) {
+        // 오류 처리
+        return -1;  // 또는 다른 오류 코드
     }
     return ret;
 }

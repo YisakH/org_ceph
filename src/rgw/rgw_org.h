@@ -34,36 +34,36 @@ private:
     DBManager(const DBManager&) = default;
     DBManager& operator=(const DBManager&) = delete;
 
-    DBManager(std::string dbName, const std::string &ip, std::string port)
-            : DBManager(std::move(dbName)) {
+    DBManager(std::string dbPath, const std::string &ip, std::string port)
+            : DBManager(std::move(dbPath)) {
         this->ip = ip;
-        this->port = port;
+        this->port = std::move(port);
     }
-    DBManager(std::string dbName) : dbName(std::move(dbName)), db(nullptr) {
-        //if(dbName == "RocksDB"){
-            options.create_if_missing = true;
-            status = rocksdb::DB::Open(options, "/tmp/testdb", &db);
-        //}
-    }
+
+protected:
+
+
 public:
-    std::string dbName;
+    std::string dbPath;
     std::string ip;
     std::string port;
     rocksdb::DB* db;
     rocksdb::Options options;
     rocksdb::Status status;
+
     ~DBManager() {
         delete db;
     }
-
-    static DBManager& getInstance(const std::string &dbName) {
-        static DBManager instance(dbName);
-        return instance;
+    DBManager(std::string dbPath) : dbPath(std::move(dbPath)), db(nullptr) {
+        //if(dbName == "RocksDB"){
+        options.create_if_missing = true;
+        status = rocksdb::DB::Open(options, dbPath, &db);
+        //}
     }
 
     int reOpenDB() {
         delete db;
-        status = rocksdb::DB::Open(options, "/tmp/testdb", &db);
+        status = rocksdb::DB::Open(options, dbPath, &db);
         if(status.ok()){
             return 0;
         }
@@ -81,6 +81,42 @@ public:
     int getData(const std::string& key, std::string &value);
     int putData(const std::string& key, const std::string& value);
     int deleteData(const std::string& key);
+};
+
+// aclDB class
+class aclDB : public DBManager {
+public:
+    static aclDB& getInstance() {
+        static aclDB instance;
+        return instance;
+    }
+
+private:
+    aclDB() : DBManager("/tmp/org/aclDB") {}
+};
+
+// TierDB class
+class TierDB : public DBManager {
+public:
+    static TierDB& getInstance() {
+        static TierDB instance;
+        return instance;
+    }
+
+private:
+    TierDB() : DBManager("/tmp/org/TierDB") {}
+};
+
+// AncDB class
+class AncDB : public DBManager {
+public:
+    static AncDB& getInstance() {
+        static AncDB instance;
+        return instance;
+    }
+
+private:
+    AncDB() : DBManager("/tmp/org/AncDB") {}
 };
 
 class OrgPermission
@@ -158,15 +194,139 @@ public:
 
     int putRGWOrg(DBManager &dbManager);
 
-    static int getRGWOrg(DBManager &dbManager, std::string key, RGWOrg *rgwOrg);
+    static int getRGWOrg(aclDB &aclDb, std::string key, RGWOrg *rgwOrg);
 
-    static int deleteRGWOrg(DBManager &dbManager, std::string key);
+    static int deleteRGWOrg(aclDB &aclDB, std::string key);
 
     std::string toString() {
         return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g) + ", path: " + orgPermission->path;
     }
 
-    static int getFullMatchRgwOrg(DBManager &dbManager, std::string user, std::string path, RGWOrg *rgwOrg);
+    static int getFullMatchRgwOrg(aclDB &aclDB, std::string user, std::string path, RGWOrg *rgwOrg);
 };
+
+class RGWOrgTier
+{
+
+public:
+    // get user tier function
+    static int getUserTier(std::string user, uint16_t *tier){
+        std::string value;
+        TierDB &tierDb = TierDB::getInstance();
+        tierDb.getData(user, value);
+
+        if(tierDb.status.ok()){
+            *tier = std::stoi(value);
+            return 0;
+        }
+        else{
+            return -1;
+        }
+    }
+
+    static int putUserTier(std::string user, uint16_t tier){
+        std::string value = std::to_string(tier);
+        TierDB &tierDb = TierDB::getInstance();
+        tierDb.putData(user, value);
+
+        if(tierDb.status.ok()){
+            return 0;
+        }
+        else{
+            return -1;
+        }
+    }
+
+    static int deleteUserTier(std::string user){
+        TierDB &tierDb = TierDB::getInstance();
+        tierDb.deleteData(user);
+
+        if(tierDb.status.ok()){
+            return 0;
+        }
+        else{
+            return -1;
+        }
+    }
+};
+
+class RGWOrgAnc
+{
+
+    public:
+    static int getAnc(const std::string& user, std::string *anc){
+        std::string value;
+        AncDB &ancDB = AncDB::getInstance();
+
+        ancDB.getData(user, value);
+
+        if(ancDB.status.ok()){
+            *anc = value;
+            return 0;
+        }
+        else{
+            return -1;
+        }
+    }
+
+    static int putAnc(std::string user, std::string anc){
+        AncDB &ancDB = AncDB::getInstance();
+        ancDB.putData(user, anc);
+
+        if(ancDB.status.ok()){
+            return 0;
+        }
+        else{
+            return -1;
+        }
+    }
+
+    static int deleteAnc(std::string user){
+        AncDB &ancDB = AncDB::getInstance();
+        ancDB.deleteData(user);
+
+        if(ancDB.status.ok()){
+            return 0;
+        }
+        else{
+            return -1;
+        }
+    }
+};
+
+
+RGWOrg* getAcl(const auto& user, const auto& path){
+    auto& dbm = aclDB::getInstance();
+    RGWOrg *rgwOrg;
+    if(!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound()) {
+        dbm.reOpenDB();
+        return nullptr;
+    }
+    
+    rgwOrg = new RGWOrg();
+    int ret = RGWOrg::getFullMatchRgwOrg(dbm, user, path, rgwOrg);
+
+    if(ret < 0){
+        return nullptr;
+    }
+    else{
+        return rgwOrg;
+    }
+}
+
+int getTier(const auto& user, uint16_t *tier){
+    int ret = RGWOrgTier::getUserTier(user, tier);
+    if(ret < 0){
+        return -1;
+    }
+    else{
+        return 0;
+    }
+}
+
+int getAnc(const std::string& user, std::string *anc){
+    int ret = RGWOrgAnc::getAnc(user, anc);
+    return ret;
+}
 
 #endif

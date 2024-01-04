@@ -4336,6 +4336,16 @@ int RGWPutObj::init_processing(optional_yield y)
   return RGWOp::init_processing(y);
 }
 
+int RGWDeleteOrg::verify_permission(optional_yield y)
+{
+  return 1;
+}
+
+int RGWDeleteOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
+{
+  return 1;
+}
+
 int RGWGetOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
 {
     return 1;
@@ -4698,18 +4708,56 @@ int RGWPutObj::get_lua_filter(std::unique_ptr<rgw::sal::DataProcessor> *filter, 
   return 0;
 }
 
-void RGWGetOrg::execute(optional_yield y)
+void RGWDeleteOrg::execute(optional_yield y)
 {
+  dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : op_delete called" << dendl;
+
   auto& dbm = DBManager::getInstance("RocksDB");
-  if(!dbm.getStatus().ok()) {
-    dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
+  if(!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound()) {
+    dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
+    dbm.reOpenDB();
     return;
   }
 
   const auto& user = findValueForKey(s->http_params, "user");
+  const auto& path = findValueForKey(s->http_params, "path");
+  const auto& key = user + ":" + path;
+
+  int ret = RGWOrg::deleteRGWOrg(dbm, key)
+
+  if(ret == 0) {
+    dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : delete success" << dendl;
+  } else {
+    dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : delete failed" << dendl;
+  }
+}
+
+bool RGWDeleteOrg::prefetch_data()
+{
+  return true;
+}
+
+void RGWDeleteOrg::pre_exec()
+{
+  rgw_bucket_object_pre_exec(s);
+}
+
+
+void RGWGetOrg::execute(optional_yield y)
+{
+  auto& dbm = DBManager::getInstance("RocksDB");
+  if(!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound()) {
+    dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
+    dbm.reOpenDB();
+    return;
+  }
+
+  const auto& user = findValueForKey(s->http_params, "user");
+  const auto& path = findValueForKey(s->http_params, "path");
+  
 
   s->rgwOrg = new RGWOrg();
-  int ret = RGWOrg::getRGWOrg(dbm, user, s->rgwOrg);
+  int ret = RGWOrg::getFullMatchRgwOrg(dbm, user, path, s->rgwOrg);
   dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb ret = " << ret << dendl;
   dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb return value : " << s->rgwOrg->toString() << dendl;
 
@@ -4733,8 +4781,10 @@ void RGWPutOrg::execute(optional_yield y)
   
 
   auto& dbm = DBManager::getInstance("RocksDB");
-  if(!dbm.getStatus().ok()) {
+  if(!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound()) {
+    
     dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
+    dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : get db instance error. error_string : " << dbm.getStatus().ToString() << dendl;
     return;
   }
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : get db succeded" << dendl;
@@ -4750,11 +4800,12 @@ void RGWPutOrg::execute(optional_yield y)
   const bool& w = findValueForKey(s->http_params, "w") == "true";
   const bool& x = findValueForKey(s->http_params, "x") == "true";
   const bool& g = findValueForKey(s->http_params, "g") == "true";
+  const auto& path = findValueForKey(s->http_params, "path");
 
 
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : no error 2" << dendl;
 
-  auto* org = new RGWOrg(user, authorizer, tier, new OrgPermission(r, w, x, g));
+  auto* org = new RGWOrg(user, authorizer, tier, new OrgPermission(r, w, x, g, path));
   int ret = org->putRGWOrg(dbm);
 
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : rocksdb ret = " << ret << dendl;
@@ -4762,6 +4813,13 @@ void RGWPutOrg::execute(optional_yield y)
 
 void RGWPutObj::execute(optional_yield y)
 {
+  dout(0) << "socks : rgw_op.cc : RGWPutObj::execute : args = " << s->info.args.get_str() << dendl;
+  dout(0) << "socks : rgw_op.cc : RGWPutObj::execute : args = " << s->info.args.get_str() << dendl;
+  dout(0) << "socks : rgw_op.cc : RGWPutObj::execute : env = " << s->info.env->get_map() << dendl;
+  for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it) {
+    dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
+  }
+  dout(0) << "socks : rgw_op.cc : request_params : " << s->info.request_params << dendl;
   char supplied_md5_bin[CEPH_CRYPTO_MD5_DIGESTSIZE + 1];
   char supplied_md5[CEPH_CRYPTO_MD5_DIGESTSIZE * 2 + 1];
   char calc_md5[CEPH_CRYPTO_MD5_DIGESTSIZE * 2 + 1];

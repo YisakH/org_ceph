@@ -61,6 +61,17 @@ public:
         return instance;
     }
 
+    int reOpenDB() {
+        delete db;
+        status = rocksdb::DB::Open(options, "/tmp/testdb", &db);
+        if(status.ok()){
+            return 0;
+        }
+        else{
+            return -1;
+        }
+    }
+
     rocksdb::DB* getDB() const {
         return db;
     }
@@ -79,15 +90,18 @@ public:
     bool w;
     bool x;
     bool g;
+    std::string path;
 
 OrgPermission() {
     r = false;
     w = false;
     x = false;
     g = false;
+    path = "/";
     }
 
     OrgPermission(bool r, bool w, bool x, bool g) : r(r), w(w), x(x), g(g) {}
+    OrgPermission(bool r, bool w, bool x, bool g, std::string path) : r(r), w(w), x(x), g(g), path(path){}
 };
 
 class RGWOrg
@@ -144,11 +158,15 @@ public:
 
     int putRGWOrg(DBManager &dbManager);
 
-    static int getRGWOrg(DBManager &dbManager, std::string user, RGWOrg *rgwOrg);
+    static int getRGWOrg(DBManager &dbManager, std::string key, RGWOrg *rgwOrg);
+
+    static int deleteRGWOrg(DBManager &dbManager, std::string key);
 
     std::string toString() {
-        return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g);
+        return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g) + ", path: " + orgPermission->path;
     }
+
+    static int getFullMatchRgwOrg(DBManager &dbManager, std::string user, std::string path, RGWOrg *rgwOrg);
 };
 
 #endif

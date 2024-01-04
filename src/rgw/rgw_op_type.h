@@ -132,5 +132,7 @@ enum RGWOpType {
   RGW_OP_LIST_OIDC_PROVIDERS,
   /*Custom org*/
   RGW_OP_PUT_ORG,
+  RGW_OP_GET_ORG,
+  RGW_OP_DELETE_ORG,
 };
 

@@ -325,6 +325,137 @@ public:
   }
 };
 
+class RGWDeleteOrg : public RGWOp {
+  protected:
+  const char *range_str;
+  const char *if_mod;
+  const char *if_unmod;
+  const char *if_match;
+  const char *if_nomatch;
+  uint32_t mod_zone_id;
+  uint64_t mod_pg_ver;
+  off_t ofs;
+  uint64_t total_len;
+  off_t start;
+  off_t end;
+  ceph::real_time mod_time;
+  ceph::real_time lastmod;
+  ceph::real_time unmod_time;
+  ceph::real_time *mod_ptr;
+  ceph::real_time *unmod_ptr;
+  rgw::sal::Attrs attrs;
+  bool get_torrent = false;
+  bool get_data;
+  bool partial_content;
+  bool ignore_invalid_range;
+  bool range_parsed;
+  bool skip_manifest;
+  bool skip_decrypt{false};
+  bool sync_cloudtiered{false};
+  utime_t gc_invalidate_time;
+  bool is_slo;
+  std::string lo_etag;
+  bool rgwx_stat; /* extended rgw stat operation */
+  std::string version_id;
+  rgw_zone_set_entry dst_zone_trace;
+
+  // compression attrs
+  RGWCompressionInfo cs_info;
+  off_t first_block, last_block;
+  off_t q_ofs, q_len;
+  bool first_data;
+  uint64_t cur_ofs;
+  bufferlist waiting;
+  uint64_t action = 0;
+
+  bool get_retention;
+  bool get_legal_hold;
+
+  // optional partNumber param for s3
+  std::optional<int> multipart_part_num;
+  // PartsCount response when partNumber is specified
+  std::optional<int> multipart_parts_count;
+
+  int init_common();
+public:
+  RGWDeleteOrg() {
+    range_str = NULL;
+    if_mod = NULL;
+    if_unmod = NULL;
+    if_match = NULL;
+    if_nomatch = NULL;
+    mod_zone_id = 0;
+    mod_pg_ver = 0;
+    start = 0;
+    ofs = 0;
+    total_len = 0;
+    end = -1;
+    mod_ptr = NULL;
+    unmod_ptr = NULL;
+    get_data = false;
+    partial_content = false;
+    range_parsed = false;
+    skip_manifest = false;
+    is_slo = false;
+    first_block = 0;
+    last_block = 0;
+    q_ofs = 0;
+    q_len = 0;
+    first_data = true;
+    cur_ofs = 0;
+    get_retention = false;
+    get_legal_hold = false;
+ }
+
+  bool prefetch_data() override;
+
+  void set_get_data(bool get_data) {
+    this->get_data = get_data;
+  }
+
+  int verify_permission(optional_yield y) override;
+  void pre_exec() override;
+  void execute(optional_yield y) override;
+  int parse_range();
+  int read_user_manifest_part(
+    rgw::sal::Bucket* bucket,
+    const rgw_bucket_dir_entry& ent,
+    const RGWAccessControlPolicy& bucket_acl,
+    const boost::optional<rgw::IAM::Policy>& bucket_policy,
+    const off_t start_ofs,
+    const off_t end_ofs,
+    bool swift_slo);
+  int handle_user_manifest(const char *prefix, optional_yield y);
+  int handle_slo_manifest(bufferlist& bl, optional_yield y);
+
+  int get_data_cb(bufferlist& bl, off_t ofs, off_t len);
+
+  virtual int get_params(optional_yield y) = 0;
+  //virtual int send_response_data_error(optional_yield y) = 0;
+  //virtual int send_response_data(bufferlist& bl, off_t ofs, off_t len) = 0;
+  virtual void send_response() override = 0;
+
+  const char* name() const override { return "delete_org"; }
+  RGWOpType get_type() override { return RGW_OP_DELETE_OBJ; }
+  uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
+  virtual bool need_object_expiration() { return false; }
+  /**
+   * calculates filter used to decrypt RGW objects data
+   */
+  virtual int get_decrypt_filter(std::unique_ptr<RGWGetObj_Filter>* filter, RGWGetObj_Filter* cb, bufferlist* manifest_bl) {
+    *filter = nullptr;
+    return 0;
+  }
+
+  // get lua script to run as a "get object" filter
+  int get_lua_filter(std::unique_ptr<RGWGetObj_Filter>* filter,
+      RGWGetObj_Filter* cb);
+
+  dmc::client_id dmclock_client() override { return dmc::client_id::data; }
+
+  int verify_requester(const rgw::auth::StrategyRegistry& auth_registry, optional_yield y) override;
+};
+
 class RGWGetOrg : public RGWOp {
 protected:
   const char *range_str;
@@ -1307,6 +1438,8 @@ struct RGWSLOInfo {
   }
 };
 WRITE_CLASS_ENCODER(RGWSLOInfo)
+
+
 
 class RGWPutOrg : public RGWOp {
 public:

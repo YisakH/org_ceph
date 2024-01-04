@@ -816,6 +816,10 @@ int recv_body(req_state* const s,
   return len;
 
 }
+int RGWDeleteOrg_ObjStore::get_params(optional_yield y)
+{
+  return 0;
+}
 
 int RGWGetOrg_ObjStore::get_params(optional_yield y)
 {

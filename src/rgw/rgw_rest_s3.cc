@@ -287,6 +287,10 @@ int RGWGetObj_ObjStore_S3Website::send_response_data_error(optional_yield y)
   return RGWGetObj_ObjStore_S3::send_response_data_error(y);
 }
 
+int RGWDeleteOrg_ObjStore_S3::get_params(optional_yield y){
+    return RGWDeleteOrg_ObjStore::get_params(y);
+}
+
 int RGWPutOrg_ObjStore_S3::get_params(optional_yield y) {
     return RGWPutOrg_ObjStore::get_params(y);
 }
@@ -4796,6 +4800,29 @@ RGWOp *RGWHandler_REST_Obj_S3::get_obj_op(bool get_data)
   return get_obj_op;
 }
 
+void RGWDeleteOrg_ObjStore_S3::send_response()
+{
+  set_req_state_err(s, 0);
+  dump_errno(s);
+  end_header(s, this);
+}
+
+RGWOp *RGWHandler_REST_Obj_S3::op_delete()
+{
+  auto *get_org_op = new RGWDeleteObj_ObjStore_S3;
+  dout(0) << "socks : rgw_rest_s3.cc : op_delete called" << dendl;
+  return get_org_op;
+}
+
+RGWOp *RGWHandler_REST_Org_S3::op_delete()
+{
+    auto *get_org_op = new RGWDeleteOrg_ObjStore_S3;
+    dout(0) << "socks : rgw_rest_s3.cc : op_delete called" << dendl;
+    return get_org_op;
+}
+
+
+
 RGWOp *RGWHandler_REST_Org_S3::op_get()
 {
     auto *get_org_op = new RGWGetOrg_ObjStore_S3;
@@ -4855,7 +4882,8 @@ RGWOp *RGWHandler_REST_Obj_S3::op_put()
   else
     return new RGWCopyObj_ObjStore_S3;
 }
-
+// op_delete() 여기서 또 선언됐는데
+/*
 RGWOp *RGWHandler_REST_Obj_S3::op_delete()
 {
   if (is_tagging_op()) {
@@ -4867,7 +4895,7 @@ RGWOp *RGWHandler_REST_Obj_S3::op_delete()
     return new RGWDeleteObj_ObjStore_S3;
   else
     return new RGWAbortMultipart_ObjStore_S3;
-}
+}*/
 
 RGWOp *RGWHandler_REST_Obj_S3::op_post()
 {

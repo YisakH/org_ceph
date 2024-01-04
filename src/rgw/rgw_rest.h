@@ -115,6 +115,21 @@ public:
   }
 };
 
+class RGWDeleteOrg_ObjStore : public RGWDeleteOrg
+{
+  protected:
+    bool sent_header;
+  public:
+    RGWDeleteOrg_ObjStore() : sent_header(false) {}
+
+    void init(rgw::sal::Driver* driver, req_state *s, RGWHandler *h) override {
+      RGWDeleteOrg::init(driver, s, h);
+      sent_header = false;
+    }
+
+    int get_params(optional_yield y) override;
+};
+
 class RGWGetOrg_ObjStore : public RGWGetOrg
 {
 protected:

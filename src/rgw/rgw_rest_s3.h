@@ -36,6 +36,15 @@ struct rgw_http_error {
 
 void rgw_get_errno_s3(struct rgw_http_error *e, int err_no);
 
+class RGWDeleteOrg_ObjStore_S3 : public RGWDeleteOrg_ObjStore {
+public:
+  RGWDeleteOrg_ObjStore_S3() {}
+  ~RGWDeleteOrg_ObjStore_S3() override {}
+
+  void send_response() override;
+  int get_params(optional_yield y) override;
+};
+
 class RGWGetOrg_ObjStore_S3 : public RGWGetOrg_ObjStore {
 public:
   RGWGetOrg_ObjStore_S3() = default;
@@ -707,7 +716,7 @@ protected:
 
     RGWOp *op_put() override;
 
-    //RGWOp *op_delete() override;
+    RGWOp *op_delete() override;
 
     //RGWOp *op_post() override;
 

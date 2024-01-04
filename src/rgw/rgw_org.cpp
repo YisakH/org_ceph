@@ -44,22 +44,60 @@ int DBManager::deleteData(const std::string& key){
 
 
 int RGWOrg::putRGWOrg(DBManager& dbManager){
+    std::string key = user + ":" + orgPermission->path;
     std::string value = authorizer + " "+ std::to_string(tier) + " " + std::to_string(orgPermission->r) + " " 
                         + std::to_string(orgPermission->w) + " " + std::to_string(orgPermission->x) + " " + std::to_string(orgPermission->g);
-    return dbManager.putData(user, value);
+    return dbManager.putData(key, value);
 }
 
-int RGWOrg::getRGWOrg(DBManager &dbManager, std::string user, RGWOrg *rgwOrg) {
+int RGWOrg::deleteRGWOrg(DBManager& dbManager, std::string key){
+    return dbManager.deleteData(key);
+}
+
+int RGWOrg::getFullMatchRgwOrg(DBManager &dbManager, std::string user, std::string path, RGWOrg *rgwOrg) {
+    std::istringstream iss(path);
+    std::string segment;
+    std::string accumulatedPath;
+    std::string key;
+    int ret = 1;
+    while (std::getline(iss, segment, '/')) {
+        if (!segment.empty()) { // Skip empty segments (like the one before the first /)
+            accumulatedPath += "/";
+            
+            accumulatedPath += segment;
+            key = user + ":" + accumulatedPath;
+            int cur_ret = getRGWOrg(dbManager,key, rgwOrg);
+            if(cur_ret == 0){
+                ret = 0;
+            }
+        }
+    }
+    return ret;
+}
+
+int RGWOrg::getRGWOrg(DBManager &dbManager, std::string key, RGWOrg *rgwOrg) {
     std::string value;
-    int ret = dbManager.getData(user, value);
+    int ret = dbManager.getData(key, value);
+    if(ret < 0){
+        // key 존재하지 않음
+        return ret;
+    }
+
     rgwOrg->orgPermission = new OrgPermission();
+
+    std::istringstream iss(key);
+    std::string token;
+
+    std::getline(iss, token, ':');
+    rgwOrg->user = token;
+    std::getline(iss, token, ':');
+    rgwOrg->orgPermission->path = token;
+
     if (ret == 0) {
         std::istringstream iss(value);
         std::string token;
 
         try {
-            rgwOrg->user = user;
-
             std::getline(iss, token, ' ');
             rgwOrg->authorizer = token;
             std::getline(iss, token, ' ');

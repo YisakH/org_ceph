@@ -4745,36 +4745,39 @@ void RGWDeleteOrg::pre_exec()
 
 void RGWGetOrg::execute(optional_yield y)
 {
-  int ret;
+  int ret = -2;
+  bufferlist response_bl;
   if (s->decoded_uri == "/admin/org/acl") {
     const auto& user = findValueForKey(s->http_params, "user");
     const auto& path = findValueForKey(s->http_params, "path");
     
     s->rgwOrg = getAcl(user, path);
+    response_bl.append(s->rgwOrg->toString().c_str());
+
+    ret = 0;
   } else if(s->decoded_uri == "/admin/org/tier") {
     const auto& user = findValueForKey(s->http_params, "user");
-    uint16_t tier;
+    int tier;
 
     ret = getTier(user, &tier);
+
+    response_bl.append(to_string(tier).c_str());
   } else if(s->decoded_uri == "/admin/org/anc") {
     const auto& user = findValueForKey(s->http_params, "user");
 
     string* anc;
     ret = getAnc(user, anc);
 
+    response_bl.append(anc->c_str());
+
   } else {
     dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : wrong uri" << dendl;
   }
 
 
-
-  bufferlist response_bl;
-  if(s->rgwOrg == nullptr) {
+  if(ret != 0) {
     dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb get error" << dendl;
     response_bl.append("error occured! maybe there is no such key in rocksdb");
-  }else{
-    dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb return value : " << s->rgwOrg->toString() << dendl;
-    response_bl.append(s->rgwOrg->toString().c_str());
   }
   
   send_response_data(response_bl, 0, response_bl.length());
@@ -4791,36 +4794,37 @@ void RGWPutOrg::execute(optional_yield y)
   }
   dout(0) << "socks : rgw_op.cc : request_params : " << s->info.request_params << dendl;
   */
+  int ret = -1;
 
-  
+if (s->decoded_uri == "/admin/org/acl") {
 
-  auto& dbm = aclDB::getInstance();
-  if(!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound()) {
-    
-    dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
-    dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : get db instance error. error_string : " << dbm.getStatus().ToString() << dendl;
-    return;
+      const auto& user = findValueForKey(s->http_params, "user");
+      const auto& authorizer = findValueForKey(s->http_params, "authorizer");
+      const int& tier = stoi(findValueForKey(s->http_params, "tier"));
+      const bool& r = findValueForKey(s->http_params, "r") == "true";
+      const bool& w = findValueForKey(s->http_params, "w") == "true";
+      const bool& x = findValueForKey(s->http_params, "x") == "true";
+      const bool& g = findValueForKey(s->http_params, "g") == "true";
+      const auto& path = findValueForKey(s->http_params, "path");
+
+      ret = putAcl(user, path, authorizer, tier, r, w, x, g);
+
+} else if (s->decoded_uri == "/admin/org/tier") {
+      const auto& user = findValueForKey(s->http_params, "user");
+      const int& tier = stoi(findValueForKey(s->http_params, "tier"));
+
+      ret = putTier(user, tier);
+
+} else if (s->decoded_uri == "/admin/org/anc") {
+      const auto& user = findValueForKey(s->http_params, "user");
+      const auto& anc = findValueForKey(s->http_params, "anc");
+      ret = putAnc(user, anc);
+      
+} else {
+      dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : wrong uri" << dendl;
   }
-  dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : get db succeded" << dendl;
-  
-  const auto& user = findValueForKey(s->http_params, "user");
-  const auto& authorizer = findValueForKey(s->http_params, "authorizer");
-  const int& tier = stoi(findValueForKey(s->http_params, "tier"));
 
 
-  dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : no error 1" << dendl;
-
-  const bool& r = findValueForKey(s->http_params, "r") == "true";
-  const bool& w = findValueForKey(s->http_params, "w") == "true";
-  const bool& x = findValueForKey(s->http_params, "x") == "true";
-  const bool& g = findValueForKey(s->http_params, "g") == "true";
-  const auto& path = findValueForKey(s->http_params, "path");
-
-
-  dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : no error 2" << dendl;
-
-  auto* org = new RGWOrg(user, authorizer, tier, new OrgPermission(r, w, x, g, path));
-  int ret = org->putRGWOrg(dbm);
 
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : rocksdb ret = " << ret << dendl;
 }

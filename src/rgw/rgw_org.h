@@ -30,19 +30,11 @@ namespace rocksdb{
 class DBManager
 {
 private:
-    // 복사 생성자 및 할당 연산자 삭제
-    DBManager(const DBManager&) = default;
-    DBManager& operator=(const DBManager&) = delete;
-
     DBManager(std::string dbPath, const std::string &ip, std::string port)
             : DBManager(std::move(dbPath)) {
         this->ip = ip;
         this->port = std::move(port);
     }
-
-protected:
-
-
 public:
     std::string dbPath;
     std::string ip;
@@ -54,7 +46,7 @@ public:
     ~DBManager() {
         delete db;
     }
-    DBManager(std::string dbPath) : dbPath(std::move(dbPath)), db(nullptr) {
+    DBManager(const std::string& dbPath) : dbPath(std::move(dbPath)), db(nullptr) {
         //if(dbName == "RocksDB"){
         options.create_if_missing = true;
         status = rocksdb::DB::Open(options, dbPath, &db);
@@ -92,7 +84,7 @@ public:
     }
 
 private:
-    aclDB() : DBManager("/tmp/org/aclDB") {}
+    aclDB() : DBManager("/tmp/org/AclDB") {}
 };
 
 // TierDB class
@@ -145,7 +137,7 @@ class RGWOrg
 private:
     std::string user;
     std::string authorizer;
-    uint16_t tier;
+    int tier;
     OrgPermission* orgPermission;
 public:
     RGWOrg(std::string user, const std::string &authorizer, uint16_t tier,
@@ -157,7 +149,7 @@ public:
                                                                                         orgPermission = new OrgPermission();
                                                                                      }
     RGWOrg(){
-        
+        orgPermission = new OrgPermission();
     }                                                                                 
     
     const std::string &getUser() const {
@@ -184,12 +176,12 @@ public:
         RGWOrg::authorizer = authorizer;
     }
 
-    void setTier(uint16_t tier) {
+    void setTier(int tier) {
         RGWOrg::tier = tier;
     }
 
-    void setOrgPermission(OrgPermission &orgPermission) {
-        orgPermission = orgPermission;
+    void setOrgPermission(OrgPermission &newOrgPermission) {
+        orgPermission = &newOrgPermission;
     }
 
     int putRGWOrg(DBManager &dbManager);
@@ -210,7 +202,7 @@ class RGWOrgTier
 
 public:
     // get user tier function
-    static int getUserTier(std::string user, uint16_t *tier){
+    static int getUserTier(std::string user, int *tier){
         std::string value;
         TierDB &tierDb = TierDB::getInstance();
         tierDb.getData(user, value);
@@ -224,7 +216,7 @@ public:
         }
     }
 
-    static int putUserTier(std::string user, uint16_t tier){
+    static int putUserTier(std::string user, int tier){
         std::string value = std::to_string(tier);
         TierDB &tierDb = TierDB::getInstance();
         tierDb.putData(user, value);
@@ -295,38 +287,16 @@ class RGWOrgAnc
 };
 
 
-RGWOrg* getAcl(const auto& user, const auto& path){
-    auto& dbm = aclDB::getInstance();
-    RGWOrg *rgwOrg;
-    if(!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound()) {
-        dbm.reOpenDB();
-        return nullptr;
-    }
-    
-    rgwOrg = new RGWOrg();
-    int ret = RGWOrg::getFullMatchRgwOrg(dbm, user, path, rgwOrg);
+RGWOrg* getAcl(const std::string& user, const std::string& path);
+int putAcl(const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g);
+int deleteAcl(const std::string& user, const std::string& path);
 
-    if(ret < 0){
-        return nullptr;
-    }
-    else{
-        return rgwOrg;
-    }
-}
+int getTier(const std::string& user, int *tier);
+int putTier(const std::string& user, int tier);
+int deleteTier(const std::string& user);
 
-int getTier(const auto& user, uint16_t *tier){
-    int ret = RGWOrgTier::getUserTier(user, tier);
-    if(ret < 0){
-        return -1;
-    }
-    else{
-        return 0;
-    }
-}
-
-int getAnc(const std::string& user, std::string *anc){
-    int ret = RGWOrgAnc::getAnc(user, anc);
-    return ret;
-}
+int getAnc(const std::string& user, std::string *anc);
+int putAnc(const std::string& user, const std::string &anc);
+int deleteAnc(const std::string& user);
 
 #endif

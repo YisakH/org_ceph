@@ -9,6 +9,10 @@
 #include <mutex>
 #include <utility>
 
+#define RGW_ORG_TIER_NOT_ALLOWED -2
+#define RGW_ORG_PERMISSION_NOT_ALLOWED -3
+#define RGW_ORG_PERMISSION_ALLOWED 0
+
 namespace rocksdb{
   class DB;
   class Env;
@@ -130,6 +134,7 @@ OrgPermission() {
 
     OrgPermission(bool r, bool w, bool x, bool g) : r(r), w(w), x(x), g(g) {}
     OrgPermission(bool r, bool w, bool x, bool g, std::string path) : r(r), w(w), x(x), g(g), path(path){}
+    bool operator<=(const OrgPermission &other) const;
 };
 
 class RGWOrg
@@ -186,7 +191,7 @@ public:
 
     int putRGWOrg(DBManager &dbManager);
 
-    static int getRGWOrg(aclDB &aclDb, std::string key, RGWOrg *rgwOrg);
+    static int getFullMatchRGWOrg(aclDB &aclDB, std::string key, RGWOrg *rgwOrg);
 
     static int deleteRGWOrg(aclDB &aclDB, std::string key);
 
@@ -194,7 +199,7 @@ public:
         return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g) + ", path: " + orgPermission->path;
     }
 
-    static int getFullMatchRgwOrg(aclDB &aclDB, std::string user, std::string path, RGWOrg *rgwOrg);
+    static int getPartialMatchRgwOrg(aclDB &aclDB, std::string user, std::string path, RGWOrg *rgwOrg);
 };
 
 class RGWOrgTier
@@ -287,9 +292,11 @@ class RGWOrgAnc
 };
 
 
-RGWOrg* getAcl(const std::string& user, const std::string& path);
+RGWOrg* getAcl(const std::string& user, const std::string& path, bool isFullMatch = false);
 int putAcl(const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g);
 int deleteAcl(const std::string& user, const std::string& path);
+int checkAclWrite(const std::string& request_user, const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g);
+
 
 int getTier(const std::string& user, int *tier);
 int putTier(const std::string& user, int tier);

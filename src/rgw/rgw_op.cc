@@ -4358,7 +4358,21 @@ int RGWPutOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry
 
 int RGWPutOrg::verify_permission(optional_yield y)
 {
-  // TODO: socks 얘도 해야함
+  if(s->decoded_uri == "/admin/org/acl"){
+    const auto& user = findValueForKey(s->http_params, "user");
+    const auto& authorizer = findValueForKey(s->http_params, "authorizer");
+    const int& tier = stoi(findValueForKey(s->http_params, "tier"));
+    const bool& r = findValueForKey(s->http_params, "r") == "true";
+    const bool& w = findValueForKey(s->http_params, "w") == "true";
+    const bool& x = findValueForKey(s->http_params, "x") == "true";
+    const bool& g = findValueForKey(s->http_params, "g") == "true";
+    const auto& path = findValueForKey(s->http_params, "path");
+
+    return checkAclWrite("admin", user, path, authorizer, tier, r, w, x, g);
+  }else if(s->decoded_uri == "/admin/org/tier"){
+    return 1;
+  }
+
   return 1;
 }
 
@@ -4765,10 +4779,10 @@ void RGWGetOrg::execute(optional_yield y)
   } else if(s->decoded_uri == "/admin/org/anc") {
     const auto& user = findValueForKey(s->http_params, "user");
 
-    string* anc;
-    ret = getAnc(user, anc);
+    std::string anc;
+    ret = getAnc(user, &anc);
 
-    response_bl.append(anc->c_str());
+    response_bl.append(anc.c_str());
 
   } else {
     dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : wrong uri" << dendl;

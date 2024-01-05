@@ -6,6 +6,12 @@
 #include <sstream>
 
 // TierDB RGWOrgTier::tierDb;
+bool OrgPermission::operator<=(const OrgPermission& other) const {
+    return (!other.r || r) &&
+           (!other.w || w) &&
+           (!other.g || g) &&
+           (!other.x || x);
+}
 
 int DBManager::getData(const std::string &key, std::string &value)
 {
@@ -67,7 +73,7 @@ int RGWOrg::deleteRGWOrg(aclDB &aclDB, std::string key)
     return aclDB.deleteData(key);
 }
 
-int RGWOrg::getFullMatchRgwOrg(aclDB &aclDB, std::string user, std::string path, RGWOrg *rgwOrg)
+int RGWOrg::getPartialMatchRgwOrg(aclDB &aclDB, std::string user, std::string path, RGWOrg *rgwOrg)
 {
     std::istringstream iss(path);
     std::string segment;
@@ -82,7 +88,7 @@ int RGWOrg::getFullMatchRgwOrg(aclDB &aclDB, std::string user, std::string path,
 
             accumulatedPath += segment;
             key = user + ":" + accumulatedPath;
-            int cur_ret = getRGWOrg(aclDB, key, rgwOrg);
+            int cur_ret = getFullMatchRGWOrg(aclDB, key, rgwOrg);
             if (cur_ret == 0)
             {
                 ret = 0;
@@ -92,7 +98,7 @@ int RGWOrg::getFullMatchRgwOrg(aclDB &aclDB, std::string user, std::string path,
     return ret;
 }
 
-int RGWOrg::getRGWOrg(aclDB &aclDB, std::string key, RGWOrg *rgwOrg)
+int RGWOrg::getFullMatchRGWOrg(aclDB &aclDB, std::string key, RGWOrg *rgwOrg)
 {
     std::string value;
     int ret = aclDB.getData(key, value);
@@ -142,19 +148,21 @@ int RGWOrg::getRGWOrg(aclDB &aclDB, std::string key, RGWOrg *rgwOrg)
     return ret;
 }
 
-RGWOrg *getAcl(const std::string &user, const std::string &path)
+RGWOrg *getAcl(const std::string &user, const std::string &path, bool isFullMatch)
 {
     auto &dbm = aclDB::getInstance();
-    RGWOrg *rgwOrg;
     if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
     {
         dbm.reOpenDB();
         return nullptr;
     }
-
-    rgwOrg = new RGWOrg();
-    int ret = RGWOrg::getFullMatchRgwOrg(dbm, user, path, rgwOrg);
-
+    RGWOrg *rgwOrg = new RGWOrg();
+    int ret;
+    if (isFullMatch)
+        ret = RGWOrg::getFullMatchRGWOrg(dbm, user + ":" + path, rgwOrg);
+    else{
+        ret = RGWOrg::getPartialMatchRgwOrg(dbm, user, path, rgwOrg);
+    }
     if (ret < 0)
     {
         return nullptr;
@@ -243,6 +251,15 @@ int getAnc(const std::string &user, std::string *anc)
 int putAnc(const std::string &user, const std::string &anc)
 {
     int ret = RGWOrgAnc::putAnc(user, anc);
+    if(ret < 0){
+        return ret;
+    }
+    int anc_tier;
+    ret = getTier(anc, &anc_tier);
+    if(ret < 0){
+        return ret;
+    }
+    ret = putTier(user, anc_tier + 1);
     return ret;
 }
 
@@ -250,4 +267,42 @@ int deleteAnc(const std::string &user)
 {
     int ret = RGWOrgAnc::deleteAnc(user);
     return ret;
+}
+
+
+int checkAclWrite(const std::string& request_user, const std::string& target_user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g){
+    int request_user_tier, target_user_tier;
+    int ret;
+    ret = RGWOrgTier::getUserTier(request_user, &request_user_tier);
+    if(ret < 0){ // request user의 tier가 존재하지 않음
+        return -1;
+    }
+    ret = RGWOrgTier::getUserTier(target_user, &target_user_tier);
+    if(ret < 0){
+        return -1;
+    }
+
+    if(request_user_tier > target_user_tier){
+        return RGW_ORG_TIER_NOT_ALLOWED;
+    }
+
+
+    OrgPermission orgPermission(r, w, x, g, path);
+    std::string anc_user;
+    ret = getAnc(target_user, &anc_user);
+    RGWOrg *rgwOrg = getAcl(anc_user, path);
+    OrgPermission *ancPermission = rgwOrg->getOrgPermission();
+
+    if(ancPermission != nullptr && orgPermission <= *ancPermission){
+        return RGW_ORG_PERMISSION_NOT_ALLOWED;
+    }
+
+    int authorizor_user_tier;
+    ret = getTier(rgwOrg->getAuthorizer(), &authorizor_user_tier);
+
+    if(authorizor_user_tier < request_user_tier){
+        return RGW_ORG_TIER_NOT_ALLOWED;
+    }
+    
+    return RGW_ORG_PERMISSION_ALLOWED;
 }

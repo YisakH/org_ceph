@@ -306,4 +306,11 @@ int getAnc(const std::string& user, std::string *anc);
 int putAnc(const std::string& user, const std::string &anc);
 int deleteAnc(const std::string& user);
 
+std::string to_hex(const unsigned char *data, int len);
+
+std::string hmac_sha256(const std::string &key, const std::string &data);
+
+std::string getSignature(const std::string &secret_key, const std::string &date, const std::string &region, 
+                         const std::string &service, const std::string &string_to_sign);
+
 #endif

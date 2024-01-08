@@ -4,6 +4,11 @@
 #include "rgw_org.h"
 #include "../rocksdb/include/rocksdb/db.h"
 #include <sstream>
+#include <iostream>
+#include <iomanip>
+#include <string>
+#include <openssl/hmac.h>
+#include <openssl/sha.h>
 
 // TierDB RGWOrgTier::tierDb;
 bool OrgPermission::operator<=(const OrgPermission& other) const {
@@ -305,4 +310,28 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     }
     
     return RGW_ORG_PERMISSION_ALLOWED;
+}
+
+std::string to_hex(const unsigned char *data, int len) {
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0');
+    for (int i = 0; i < len; ++i) {
+        ss << std::setw(2) << (unsigned int)data[i];
+    }
+    return ss.str();
+}
+
+std::string hmac_sha256(const std::string &key, const std::string &data) {
+    unsigned char* digest = HMAC(EVP_sha256(), key.c_str(), key.length(), 
+                                 reinterpret_cast<const unsigned char*>(data.c_str()), data.length(), NULL, NULL);
+    return to_hex(digest, SHA256_DIGEST_LENGTH);
+}
+
+std::string getSignature(const std::string &secret_key, const std::string &date, const std::string &region, 
+                         const std::string &service, const std::string &string_to_sign) {
+    std::string dateKey = hmac_sha256("AWS4" + secret_key, date);
+    std::string dateRegionKey = hmac_sha256(dateKey, region);
+    std::string dateRegionServiceKey = hmac_sha256(dateRegionKey, service);
+    std::string signingKey = hmac_sha256(dateRegionServiceKey, "aws4_request");
+    return hmac_sha256(signingKey, string_to_sign);
 }

@@ -492,7 +492,7 @@ bool is_non_s3_op(RGWOpType op_type)
   }
   return false;
 }
-
+//socks 여기서 걸림
 int parse_v4_credentials(const req_info& info,                     /* in */
 			 std::string_view& access_key_id,        /* out */
 			 std::string_view& credential_scope,     /* out */

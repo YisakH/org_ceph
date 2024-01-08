@@ -5660,7 +5660,7 @@ null_completer_factory(const boost::optional<std::string>& secret_key)
 
 
 AWSEngine::VersionAbstractor::auth_data_t
-AWSGeneralAbstractor::get_auth_data(const req_state* const s) const
+AWSGeneralAbstractor::get_auth_data(const req_state* const s) const // 요것도 실행됨: socks
 {
   AwsVersion version;
   AwsRoute route;
@@ -5694,7 +5694,7 @@ AWSSignerV4::prepare(const DoutPrefixProvider *dpp,
                      const req_info& info,
                      const bufferlist *opt_content,
                      bool s3_op)
-{
+{// 얘기 인증인가 핵심인듯
   std::string signed_hdrs;
 
   ceph::real_time timestamp = ceph::real_clock::now();

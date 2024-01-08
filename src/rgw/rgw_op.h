@@ -2877,7 +2877,7 @@ inline int parse_value_and_bound(
     const long default_val)
 {
   if (!input.empty()) {
-    char *endptr;
+    char *endptr; 
     output = strtol(input.c_str(), &endptr, 10);
     if (endptr) {
       if (endptr == input.c_str()) return -EINVAL;

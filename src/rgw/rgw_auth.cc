@@ -237,6 +237,7 @@ rgw::auth::Strategy::authenticate(const DoutPrefixProvider* dpp, const req_state
   for (const stack_item_t& kv : auth_stack) {
     const rgw::auth::Engine& engine = kv.first;
     const auto& policy = kv.second;
+    dout(0) << "socks : rgw_auth.cc : called " << dendl; 
 
     ldpp_dout(dpp, 20) << get_name() << ": trying " << engine.get_name() << dendl;
 
@@ -932,3 +933,4 @@ rgw::auth::AnonymousEngine::authenticate(const DoutPrefixProvider* dpp, const re
     return result_t::grant(std::move(apl));
   }
 }
+

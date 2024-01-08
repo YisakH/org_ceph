@@ -4347,12 +4347,13 @@ int RGWDeleteOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_regis
 }
 
 int RGWGetOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
-{
+{  
     return 1;
 }
 
 int RGWPutOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
 {
+  RGWOp::verify_requester(auth_registry, y);
   return 1;
 }
 

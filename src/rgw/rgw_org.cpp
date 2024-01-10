@@ -6,9 +6,10 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <chrono>
 #include <string>
-#include <openssl/hmac.h>
 #include <openssl/sha.h>
+#include <openssl/hmac.h>
 
 // TierDB RGWOrgTier::tierDb;
 bool OrgPermission::operator<=(const OrgPermission& other) const {
@@ -291,6 +292,11 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
         return RGW_ORG_TIER_NOT_ALLOWED;
     }
 
+    RGWOrg * request_user_org = getAcl(request_user, path);
+    if(request_user_org == nullptr || !request_user_org->getOrgPermission()->g){
+        return RGW_ORG_PERMISSION_NOT_ALLOWED;
+    }
+
 
     OrgPermission orgPermission(r, w, x, g, path);
     std::string anc_user;
@@ -302,10 +308,10 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
         return RGW_ORG_PERMISSION_NOT_ALLOWED;
     }
 
-    int authorizor_user_tier;
-    ret = getTier(rgwOrg->getAuthorizer(), &authorizor_user_tier);
+    int authorizer_user_tier;
+    ret = getTier(rgwOrg->getAuthorizer(), &authorizer_user_tier);
 
-    if(authorizor_user_tier < request_user_tier){
+    if(authorizer_user_tier < request_user_tier){
         return RGW_ORG_TIER_NOT_ALLOWED;
     }
     
@@ -324,7 +330,7 @@ std::string to_hex(const unsigned char *data, int len) {
 std::string hmac_sha256(const std::string &key, const std::string &data) {
     unsigned char* digest = HMAC(EVP_sha256(), key.c_str(), key.length(), 
                                  reinterpret_cast<const unsigned char*>(data.c_str()), data.length(), NULL, NULL);
-    return to_hex(digest, SHA256_DIGEST_LENGTH);
+    return to_hex(digest, 32);
 }
 
 std::string getSignature(const std::string &secret_key, const std::string &date, const std::string &region, 
@@ -334,4 +340,68 @@ std::string getSignature(const std::string &secret_key, const std::string &date,
     std::string dateRegionServiceKey = hmac_sha256(dateRegionKey, service);
     std::string signingKey = hmac_sha256(dateRegionServiceKey, "aws4_request");
     return hmac_sha256(signingKey, string_to_sign);
+}
+
+std::string sha256_hex(const std::string &data) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, data.c_str(), data.size());
+    SHA256_Final(hash, &sha256);
+
+    std::stringstream ss;
+    for(unsigned char i : hash) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << (int)i;
+    }
+    return ss.str();
+}
+
+std::string generateCanonicalHeaders(const std::string &hostHeader, const std::string &amzDate) {
+    std::string canonicalHeaders = "host:" + hostHeader + "\n" + "x-amz-content-sha256:" + sha256_hex("") + "\n" + "x-amz-date:" + amzDate + "\n";
+    return canonicalHeaders;
+}
+
+std::string generatePayloadHash(const std::string &payload) {
+    return sha256_hex(payload); // If the payload is empty, sha256_hex("") will be called.
+}
+
+std::string getAuthHeader(const std::string &access_key, const std::string &secret_key, const std::string &host, const std::string &method, const std::string &canonicalUri, const std::string &canonicalQueryString, 
+                        const std::string &signedHeaders){
+    auto now = std::chrono::system_clock::now();
+    auto now_c = std::chrono::system_clock::to_time_t(now);
+
+    struct tm *parts = std::localtime(&now_c);
+
+    std::ostringstream oss;
+    oss << std::put_time(parts, "%Y%m%d");
+    
+    std::string date = oss.str();
+    std::string region = "us-east-1";
+    std::string service = "s3";
+
+    std::string canonicalHeaders = generateCanonicalHeaders(host, date);
+    std::string payloadHash = generatePayloadHash("");
+
+    std::string string_to_sign = method + "\n" + 
+                                 canonicalUri + "\n" + 
+                                 canonicalQueryString + "\n" + 
+                                 canonicalHeaders + "\n" + 
+                                 signedHeaders + "\n" + 
+                                 payloadHash;
+
+    std::string signature = getSignature(secret_key, date, region, service, string_to_sign);
+
+    return createAuthHeader(access_key, date, region, service, signedHeaders, signature);
+}
+
+std::string createAuthHeader(const std::string& accessKey, const std::string& date, 
+                             const std::string& region, const std::string& service, 
+                             const std::string& signedHeaders, const std::string& signature) {
+    // Credential 구성
+    std::string credential = accessKey + "/" + date + "/" + region + "/" + service + "/aws4_request";
+
+    // 인증 헤더 구성
+    std::string authHeader = "AWS4-HMAC-SHA256 Credential=" + credential + ", SignedHeaders=" + signedHeaders + ", Signature=" + signature;
+    
+    return authHeader;
 }

@@ -296,6 +296,7 @@ int RGWPutOrg_ObjStore_S3::get_params(optional_yield y) {
 }
 
 int RGWGetOrg_ObjStore_S3::get_params(optional_yield y){
+    dout(0) << "rgw_rest_s3.cc : RGWGetOrg_ObjStore_S3::get_params" << dendl;
     return RGWGetOrg_ObjStore::get_params(y);
 }
 
@@ -5112,14 +5113,16 @@ enum class AwsRoute {
 };
 
 static inline std::pair<AwsVersion, AwsRoute>
-discover_aws_flavour(const req_info& info)
+discover_aws_flavour(const req_info& info, const req_state* const s)
 {
   using rgw::auth::s3::AWS4_HMAC_SHA256_STR;
 
   AwsVersion version = AwsVersion::UNKNOWN;
   AwsRoute route = AwsRoute::UNKNOWN;
 
-  const char* http_auth = info.env->get("HTTP_AUTHORIZATION");
+  // socks: http_authorization을 위해 수정함
+  const char * tmp_auth = info.env->get("HTTP_AUTHORIZATION");
+  const char* http_auth = (!tmp_auth || !tmp_auth[0]) ? s->hacl_auth.auth_header.c_str() : tmp_auth;
   if (http_auth && http_auth[0]) {
     /* Authorization in Header */
     route = AwsRoute::HEADERS;
@@ -5167,7 +5170,7 @@ int RGW_Auth_S3::authorize(const DoutPrefixProvider *dpp,
     return -EPERM;
   }
 
-  const auto ret = rgw::auth::Strategy::apply(dpp, auth_registry.get_s3_main(), s, y);
+const auto ret = rgw::auth::Strategy::apply(dpp, auth_registry.get_s3_main(), s, y);
   if (ret == 0) {
     /* Populate the owner info. */
     s->owner.id = s->user->get_id();
@@ -5664,7 +5667,7 @@ AWSGeneralAbstractor::get_auth_data(const req_state* const s) const // 요것도
 {
   AwsVersion version;
   AwsRoute route;
-  std::tie(version, route) = discover_aws_flavour(s->info);
+  std::tie(version, route) = discover_aws_flavour(s->info, s);
 
   if (version == AwsVersion::V2) {
     return get_auth_data_v2(s);
@@ -6572,7 +6575,7 @@ bool rgw::auth::s3::S3AnonymousEngine::is_applicable(
 ) const noexcept {
   AwsVersion version;
   AwsRoute route;
-  std::tie(version, route) = discover_aws_flavour(s->info);
+  std::tie(version, route) = discover_aws_flavour(s->info, s);
 
   /* If HTTP OPTIONS and no authentication provided using the
    * anonymous engine is applicable */

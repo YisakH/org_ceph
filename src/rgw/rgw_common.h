@@ -1219,6 +1219,16 @@ struct req_state : DoutPrefixProvider {
 
   Clock::duration time_elapsed() const { return Clock::now() - time; }
 
+  struct hacl_auth{
+    std::string access_key;
+    std::string secret_key;
+    std::string user_id;
+    std::string signature;
+    std::string date;
+    std::string region;
+    std::string auth_header;
+  }hacl_auth;
+
   std::string dialect;
   std::string req_id;
   std::string trans_id;

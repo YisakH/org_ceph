@@ -30,7 +30,6 @@ namespace rocksdb{
   struct ColumnFamilyOptions;
 }
 
-
 class DBManager
 {
 private:
@@ -312,5 +311,13 @@ std::string hmac_sha256(const std::string &key, const std::string &data);
 
 std::string getSignature(const std::string &secret_key, const std::string &date, const std::string &region, 
                          const std::string &service, const std::string &string_to_sign);
+std::string getAuthHeader(const std::string &access_key, const std::string &secret_key, const std::string &host, const std::string &method, const std::string &canonicalUri, const std::string &canonicalQueryString, 
+                        const std::string &signedHeaders);
+std::string sha256_hex(const std::string &data);
+std::string generateCanonicalHeaders(const std::string &hostHeader, const std::string &amzDate);
+std::string generatePayloadHash(const std::string &payload);
+std::string createAuthHeader(const std::string& accessKey, const std::string& date, 
+                             const std::string& region, const std::string& service, 
+                             const std::string& signedHeaders, const std::string& signature);
 
 #endif

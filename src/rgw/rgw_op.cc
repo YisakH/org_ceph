@@ -1828,6 +1828,25 @@ bool RGWOp::generate_cors_headers(string &origin, string &method, string &header
   return true;
 }
 
+int parse_org_params(req_state *s){
+  /*  struct hacl_auth{
+    std::string access_key;
+    std::string secret_key;
+    std::string user_id;
+    std::string signature;
+    std::string date;
+    std::string region;
+
+    std::string getSignature(const std::string &secret_key, const std::string &date, const std::string &region, 
+                         const std::string &service, const std::string &string_to_sign);
+  };*/
+  //s->hacl_auth.access_key = s->info.args.get("access_key");
+  //s->hacl_auth.secret_key = s->info.args.get("secret_key");
+  //s->hacl_auth.user_id = s->info.args.get("user_id");
+
+
+}
+
 int rgw_policy_from_attrset(const DoutPrefixProvider *dpp, CephContext *cct, map<string, bufferlist> &attrset, RGWAccessControlPolicy *policy)
 {
   map<string, bufferlist>::iterator aiter = attrset.find(RGW_ATTR_ACL);
@@ -4353,7 +4372,22 @@ int RGWGetOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry
 
 int RGWPutOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
 {
-  RGWOp::verify_requester(auth_registry, y);
+  /*std::string getAuthHeader(const std::string &secret_key, const std::string &host, const std::string &method, const std::string &canonicalUri, const std::string &canonicalQueryString, 
+                        const std::string &signedHeaders);*/
+  const std::string request_method = s->info.env->get("REQUEST_METHOD");
+  const std::string request_uri = s->info.env->get("REQUEST_URI");
+  const std::string http_host = s->info.env->get("HTTP_HOST");
+  const std::string query_string = s->info.env->get("QUERY_STRING");
+  const std::string signedHeaders = "host;x-amz-content-sha256;x-amz-date";
+  const std::string access_key = "qwer";
+  const std::string secret_key = "qwer";
+  
+  // getAuthHeader의 반환값을 직접 변수에 저장
+  std::string auth_header = getAuthHeader(access_key, secret_key, http_host, request_method, request_uri, query_string, signedHeaders);
+  s->hacl_auth.auth_header = auth_header;
+
+  int ret = RGWOp::verify_requester(auth_registry, y);
+  dout(0) << "socks : rgw_op.cc : RGWPutOrg::verify_requester() : verify requester return : " << ret << dendl;
   return 1;
 }
 
@@ -4800,6 +4834,9 @@ void RGWGetOrg::execute(optional_yield y)
 
 void RGWPutOrg::execute(optional_yield y)
 {
+    for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it) {
+    dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
+  }
   /*
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : args = " << s->info.args.get_str() << dendl;

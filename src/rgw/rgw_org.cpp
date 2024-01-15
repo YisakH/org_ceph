@@ -38,11 +38,7 @@ int DBManager::putData(const std::string &key, const std::string &value)
     if(db == nullptr){
         return -1;
     }
-    rocksdb::Status s = db->Get(rocksdb::ReadOptions(), key, &exiting_value);
-    if (s.ok())
-    {
-        return 2;
-    }
+
     status = db->Put(rocksdb::WriteOptions(), key, value);
     if (status.ok())
     {
@@ -275,6 +271,72 @@ int deleteAnc(const std::string &user)
     return ret;
 }
 
+int RGWOrgDec::getDec(const std::string& user, std::vector<std::string> *dec_list){
+    std::string value;
+    DecDB &decDB = DecDB::getInstance();
+
+    decDB.getData(user, value);
+
+    if(decDB.status.ok()){
+        *dec_list = str_split_to_vec(value);
+        return 0;
+    }
+    else{
+        return -1;
+    }
+}
+
+int RGWOrgDec::putDec(std::string user, std::vector<std::string> dec_list){
+    DecDB &decDB = DecDB::getInstance();
+    TierDB &tierDB = TierDB::getInstance();
+
+    std::string dec_list_string = str_join(dec_list);
+    decDB.putData(user, dec_list_string);
+
+    int tier;
+    tierDB.getData(user, tier);
+    for (auto dec : dec_list){
+        tierDB.putData(user, tier + 1);
+    }
+
+    if(decDB.status.ok()){
+        return 0;
+    }
+    else{
+        return -1;
+    }
+}
+
+int RGWOrgDec::deleteDec(std::string user){
+    DecDB &decDB = DecDB::getInstance();
+    decDB.deleteData(user);
+
+    if(decDB.status.ok()){
+        return 0;
+    }
+    else{
+        return -1;
+    }
+}
+
+int RGWOrgDec::updateDec(std::string user, std::vector<std::string> dec_list){
+    DecDB &decDB = DecDB::getInstance();
+    std::string dec_list_string = str_join(dec_list);
+
+    decDB.deleteData(user);
+    if(!decDB.status.ok()){
+        return -1;
+    }
+
+    decDB.putData(user, dec_list_string);
+
+    if(decDB.status.ok()){
+        return 0;
+    }
+    else{
+        return -1;
+    }
+}
 
 int checkAclWrite(const std::string& request_user, const std::string& target_user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g){
     int request_user_tier, target_user_tier;
@@ -404,4 +466,172 @@ std::string createAuthHeader(const std::string& accessKey, const std::string& da
     std::string authHeader = "AWS4-HMAC-SHA256 Credential=" + credential + ", SignedHeaders=" + signedHeaders + ", Signature=" + signature;
     
     return authHeader;
+}
+
+std::vector<std::string> str_split_to_vec(const std::string& s){
+    std::vector<std::string> result;
+    std::istringstream iss(s);
+    std::string token;
+    while(std::getline(iss, token, ',')){
+        result.push_back(token);
+    }
+    return result;
+}
+
+
+std::string str_join(const std::vector<std::string>& v){
+    std::string result;
+    for(int i = 0; i < v.size(); i++){
+        result += v[i];
+        if(i != v.size() - 1){
+            result += ",";
+        }
+    }
+    return result;
+}
+
+int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::string> dec_list){
+    int ret;
+
+    ret = deleteUser(user);
+
+
+    if (anc != ""){ // anc가 존재하는 경우
+        int anc_tier;
+        ret = RGWOrgTier::getUserTier(anc, &anc_tier);
+        // user -> anc 등록
+        ret = putAnc(user, anc);
+        if(ret < 0){
+            return ret;
+        }
+
+        // anc -> user 등록
+        ret = RGWOrgDec::putDec(anc, std::vector<std::string>(1, user));
+        if(ret < 0){
+            return ret;
+        }
+
+        // user tier 등록
+        ret = RGWOrgTier::putUserTier(user, anc_tier + 1);
+    }
+    else{ // anc가 존재하지 않는 경우
+
+        // user tier 등록
+        ret = RGWOrgTier::putUserTier(user, 0);
+        if(ret < 0){
+            return ret;
+        }
+    }
+
+
+    if(dec_list.size() > 0){
+        ret = RGWOrgDec::putDec(user, dec_list);
+        if(ret < 0){
+            return ret;
+        }
+
+        for (auto dec : dec_list){
+            ret = putAnc(dec, user);
+            if(ret < 0){
+                return ret;
+            }
+        }
+
+        ret = RGWOrgTier::updateUserTier(user);
+    }
+    return 0;
+}
+
+int RGWOrgUser::putUser(std::string user, std::string anc, std::string dec_list_str){
+    std::vector<std::string> dec_list = str_split_to_vec(dec_list_str);
+    return putUser(user, anc, dec_list);
+}
+
+int RGWOrgUser::deleteUser(std::string &user){
+
+    std::string anc;
+    int ret = getAnc(user, &anc);
+    if(ret < 0){
+        return ret;
+    }
+
+    std::vector<std::string> dec_list;
+    ret = RGWOrgDec::getDec(user, &dec_list);
+    if(ret < 0){
+        return ret;
+    }
+
+    ret = RGWOrgDec::putDec(anc, dec_list);
+    if(ret < 0){
+        return ret;
+    }
+
+    for (auto dec : dec_list){
+        ret = RGWOrgAnc::putAnc(dec, anc);
+
+        if(ret < 0){
+            return ret;
+        }
+    }
+
+    ret = RGWOrgTier::deleteUserTier(user);
+    if(ret < 0){
+        return ret;
+    }
+
+    return 0;
+}
+
+int TierDB::putData(const std::string& key, const int &value){
+    status = db->Put(rocksdb::WriteOptions(), key, std::to_string(value));
+    if (status.ok())
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+int TierDB::getData(const std::string& key, int &value){
+    std::string str_value;
+    status = db->Get(rocksdb::ReadOptions(), key, &str_value);
+    value = std::stoi(str_value);
+    if (status.ok())
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+int RGWOrgTier::updateUserTier(std::string &start_user){
+    int start_user_tier;
+    int ret = getUserTier(start_user, &start_user_tier);
+    if(ret < 0){
+        return ret;
+    }
+
+    std::vector<std::string> dec_list;
+    ret = RGWOrgDec::getDec(start_user, &dec_list);
+    if(ret < 0){
+        return ret;
+    }
+
+    for(auto dec : dec_list){
+        int dec_tier = start_user_tier + 1;
+        
+        ret = putUserTier(dec, dec_tier);
+        if(ret < 0){
+            return ret;
+        }
+        ret = updateUserTier(dec);
+        if(ret < 0){
+            return ret;
+        }
+    }
+    return 0;
 }

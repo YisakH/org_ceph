@@ -98,6 +98,9 @@ public:
         return instance;
     }
 
+    int putData(const std::string& key, const int &value);
+    int getData(const std::string& key, int &value);
+
 private:
     TierDB() : DBManager("/tmp/org/TierDB") {}
 };
@@ -112,6 +115,16 @@ public:
 
 private:
     AncDB() : DBManager("/tmp/org/AncDB") {}
+};
+
+class DecDB : public DBManager {
+    public:
+    static DecDB& getInstance() {
+        static DecDB instance;
+        return instance;
+    }
+    private:
+    DecDB() : DBManager("/tmp/org/DecDB") {}
 };
 
 class OrgPermission
@@ -207,12 +220,12 @@ class RGWOrgTier
 public:
     // get user tier function
     static int getUserTier(std::string user, int *tier){
-        std::string value;
+        int value;
         TierDB &tierDb = TierDB::getInstance();
         tierDb.getData(user, value);
 
         if(tierDb.status.ok()){
-            *tier = std::stoi(value);
+            *tier = value;
             return 0;
         }
         else{
@@ -221,9 +234,8 @@ public:
     }
 
     static int putUserTier(std::string user, int tier){
-        std::string value = std::to_string(tier);
         TierDB &tierDb = TierDB::getInstance();
-        tierDb.putData(user, value);
+        tierDb.putData(user, tier);
 
         if(tierDb.status.ok()){
             return 0;
@@ -244,6 +256,8 @@ public:
             return -1;
         }
     }
+
+    static int updateUserTier(std::string &start_user);
 };
 
 class RGWOrgAnc
@@ -288,8 +302,37 @@ class RGWOrgAnc
             return -1;
         }
     }
+
+    static int updateAnc(std::string user, std::string anc){
+        AncDB &ancDB = AncDB::getInstance();
+        ancDB.putData(user, anc);
+
+        if(ancDB.status.ok()){
+            return 0;
+        }
+        else{
+            return -1;
+        }
+    }
 };
 
+class RGWOrgDec
+{
+    public:
+    static int getDec(const std::string& user, std::vector<std::string> *dec_list);
+    static int putDec(std::string user, std::vector<std::string> dec_list);
+    static int deleteDec(std::string user);
+    static int updateDec(std::string user, std::vector<std::string> dec_list);
+};
+
+class RGWOrgUser
+{
+public:
+    static int putUser(std::string user, std::string anc = "", std::vector<std::string> dec_list = std::vector<std::string>());
+    static int putUser(std::string user, std::string anc, std::string dec_list_str);
+    static int deleteUser(std::string &user);
+    static int updateUser();
+};
 
 RGWOrg* getAcl(const std::string& user, const std::string& path, bool isFullMatch = false);
 int putAcl(const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g);
@@ -319,5 +362,8 @@ std::string generatePayloadHash(const std::string &payload);
 std::string createAuthHeader(const std::string& accessKey, const std::string& date, 
                              const std::string& region, const std::string& service, 
                              const std::string& signedHeaders, const std::string& signature);
+
+std::vector<std::string> str_split_to_vec(const std::string& s);
+std::string str_join(const std::vector<std::string>& v);
 
 #endif

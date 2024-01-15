@@ -5829,6 +5829,7 @@ AWSEngine::VersionAbstractor::auth_data_t
 AWSGeneralAbstractor::get_auth_data_v4(const req_state* const s,
                                        const bool using_qs) const
 {
+  dout(0) << "socks : get_auth_data_v4 : using_qs = " << using_qs << dendl;
   std::string_view access_key_id;
   std::string_view signed_hdrs;
 

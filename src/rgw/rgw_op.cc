@@ -4362,12 +4362,16 @@ int RGWDeleteOrg::verify_permission(optional_yield y)
 
 int RGWDeleteOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
 {
-  return 1;
+  int ret = RGWOp::verify_requester(auth_registry, y);
+  dout(0) << "socks : rgw_op.cc : RGWDeleteOrg : verify requester return : " << ret << dendl;
+  return ret;
 }
 
 int RGWGetOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
 {  
-    return 1;
+  int ret = RGWOp::verify_requester(auth_registry, y);
+  dout(0) << "socks : rgw_op.cc : RGWGetOrg : verify requester return : " << ret << dendl;
+    return ret;
 }
 
 int RGWPutOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
@@ -4388,7 +4392,7 @@ int RGWPutOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry
 
   int ret = RGWOp::verify_requester(auth_registry, y);
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::verify_requester() : verify requester return : " << ret << dendl;
-  return 1;
+  return ret;
 }
 
 int RGWPutOrg::verify_permission(optional_yield y)
@@ -4872,7 +4876,14 @@ if (s->decoded_uri == "/admin/org/acl") {
       const auto& anc = findValueForKey(s->http_params, "anc");
       ret = putAnc(user, anc);
       
-} else {
+} else if (s->decoded_uri == "/admin/org/user") {
+  const auto& user = findValueForKey(s->http_params, "user");
+  const auto& anc = findValueForKey(s->http_params, "anc");
+  const auto& dec_list = findValueForKey(s->http_params, "dec_list");
+
+  ret = RGWOrgUser::putUser(user, anc, dec_list);
+} 
+else {
       dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : wrong uri" << dendl;
   }
 

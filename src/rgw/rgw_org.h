@@ -12,6 +12,7 @@
 #define RGW_ORG_TIER_NOT_ALLOWED -2
 #define RGW_ORG_PERMISSION_NOT_ALLOWED -3
 #define RGW_ORG_PERMISSION_ALLOWED 0
+#define RGW_ORG_KEY_NOT_FOUND -4
 
 namespace rocksdb{
   class DB;
@@ -273,6 +274,8 @@ class RGWOrgAnc
         if(ancDB.status.ok()){
             *anc = value;
             return 0;
+        }else if(ancDB.status.IsNotFound()){
+            return RGW_ORG_KEY_NOT_FOUND;
         }
         else{
             return -1;
@@ -294,6 +297,8 @@ class RGWOrgAnc
     static int deleteAnc(std::string user){
         AncDB &ancDB = AncDB::getInstance();
         ancDB.deleteData(user);
+
+        RGWOrgTier::putUserTier(user, 0);
 
         if(ancDB.status.ok()){
             return 0;

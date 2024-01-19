@@ -280,6 +280,8 @@ int RGWOrgDec::getDec(const std::string& user, std::vector<std::string> *dec_lis
     if(decDB.status.ok()){
         *dec_list = str_split_to_vec(value);
         return 0;
+    } else if(decDB.status.IsNotFound()){
+        return RGW_ORG_KEY_NOT_FOUND;
     }
     else{
         return -1;
@@ -549,35 +551,73 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::string dec_list_
 
 int RGWOrgUser::deleteUser(std::string &user){
 
-    std::string anc;
-    int ret = getAnc(user, &anc);
-    if(ret < 0){
-        return ret;
-    }
+    std::string anc = "";
+    int anc_ret = getAnc(user, &anc);
 
     std::vector<std::string> dec_list;
-    ret = RGWOrgDec::getDec(user, &dec_list);
-    if(ret < 0){
-        return ret;
+    int dec_ret = RGWOrgDec::getDec(user, &dec_list);
+
+    int ret = -1;
+
+    if(anc_ret == RGW_ORG_KEY_NOT_FOUND && dec_ret == RGW_ORG_KEY_NOT_FOUND){
+        ret = RGWOrgTier::deleteUserTier(user);
     }
-
-    ret = RGWOrgDec::putDec(anc, dec_list);
-    if(ret < 0){
-        return ret;
-    }
-
-    for (auto dec : dec_list){
-        ret = RGWOrgAnc::putAnc(dec, anc);
-
+    else if(anc_ret == RGW_ORG_KEY_NOT_FOUND){
+        for (auto dec : dec_list){
+            ret = RGWOrgAnc::deleteAnc(dec);
+            if(ret < 0){
+                return ret;
+            }
+        }
+        ret = RGWOrgDec::deleteDec(user);
         if(ret < 0){
             return ret;
         }
+
+        ret = RGWOrgTier::deleteUserTier(user);
     }
+    else if(dec_ret == RGW_ORG_KEY_NOT_FOUND){
+        ret = RGWOrgAnc::deleteAnc(user);
+        if(ret < 0){
+            return ret;
+        }
+
+        ret = RGWOrgTier::deleteUserTier(user);
+    }
+    else{ // anc, dec 둘 다 존재하는 경우
+        for (auto dec : dec_list){
+            ret = RGWOrgAnc::putAnc(dec, anc);
+            if(ret < 0){
+                return ret;
+            }
+        }
+        ret = RGWOrgDec::putDec(anc, dec_list);
+        
+        if(ret < 0){
+            return ret;
+        }
+
+        ret = RGWOrgDec::deleteDec(user);
+        if(ret < 0){
+            return ret;
+        }
+
+        ret = RGWOrgAnc::deleteAnc(user);
+        if(ret < 0){
+            return ret;
+        }
+
+        ret = RGWOrgTier::deleteUserTier(user);
+    }
+    
+    
 
     ret = RGWOrgTier::deleteUserTier(user);
     if(ret < 0){
         return ret;
     }
+
+    RGWOrgTier::updateUserTier(anc);
 
     return 0;
 }

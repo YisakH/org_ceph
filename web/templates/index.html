@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tree Structure</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        ul.tree { list-style-type: none; }
+        ul.tree li { margin-left: 20px; cursor: pointer; }
+        .hidden { display: none; }
+    </style>
+    <script>
+        $(document).ready(function(){
+            $('.toggle').click(function(e) {
+                e.stopPropagation();
+                $(this).children('ul').toggleClass('hidden');
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>Tree Structure</h1>
+    <ul class="tree">
+        {% for parent, children in tree.items() %}
+            <li class="toggle">{{ parent }}
+                <ul class="hidden">
+                    {% for child in children %}
+                        <li>{{ child }}</li>
+                    {% endfor %}
+                </ul>
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

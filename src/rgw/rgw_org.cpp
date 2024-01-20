@@ -341,8 +341,8 @@ int RGWOrgDec::updateDec(std::string user, std::vector<std::string> dec_list){
 }
 
 int checkAclWrite(const std::string& request_user, const std::string& target_user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g){
-    int request_user_tier, target_user_tier;
-    int ret;
+    int request_user_tier = -1, target_user_tier = -1;
+    int ret = -1;
     ret = RGWOrgTier::getUserTier(request_user, &request_user_tier);
     if(ret < 0){ // request user의 tier가 존재하지 않음
         return -1;
@@ -483,7 +483,7 @@ std::vector<std::string> str_split_to_vec(const std::string& s){
 
 std::string str_join(const std::vector<std::string>& v){
     std::string result;
-    for(int i = 0; i < v.size(); i++){
+    for(size_t i = 0; i < v.size(); i++){
         result += v[i];
         if(i != v.size() - 1){
             result += ",";
@@ -499,7 +499,7 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::stri
 
 
     if (anc != ""){ // anc가 존재하는 경우
-        int anc_tier;
+        int anc_tier = -1;
         ret = RGWOrgTier::getUserTier(anc, &anc_tier);
         // user -> anc 등록
         ret = putAnc(user, anc);
@@ -549,73 +549,63 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::string dec_list_
     return putUser(user, anc, dec_list);
 }
 
-int RGWOrgUser::deleteUser(std::string &user){
-
+int RGWOrgUser::deleteUser(std::string &user) {
     std::string anc = "";
     int anc_ret = getAnc(user, &anc);
 
     std::vector<std::string> dec_list;
     int dec_ret = RGWOrgDec::getDec(user, &dec_list);
 
-    int ret = -1;
-
-    if(anc_ret == RGW_ORG_KEY_NOT_FOUND && dec_ret == RGW_ORG_KEY_NOT_FOUND){
-        ret = RGWOrgTier::deleteUserTier(user);
+    if(anc_ret == RGW_ORG_KEY_NOT_FOUND && dec_ret == RGW_ORG_KEY_NOT_FOUND) {
+        return deleteOnlyUser(user);
     }
-    else if(anc_ret == RGW_ORG_KEY_NOT_FOUND){
-        for (auto dec : dec_list){
-            ret = RGWOrgAnc::deleteAnc(dec);
-            if(ret < 0){
-                return ret;
-            }
-        }
-        ret = RGWOrgDec::deleteDec(user);
-        if(ret < 0){
-            return ret;
-        }
-
-        ret = RGWOrgTier::deleteUserTier(user);
+    if(anc_ret == RGW_ORG_KEY_NOT_FOUND) {
+        return deleteWithDescendants(user, dec_list);
     }
-    else if(dec_ret == RGW_ORG_KEY_NOT_FOUND){
-        ret = RGWOrgAnc::deleteAnc(user);
-        if(ret < 0){
-            return ret;
-        }
-
-        ret = RGWOrgTier::deleteUserTier(user);
+    if(dec_ret == RGW_ORG_KEY_NOT_FOUND) {
+        return deleteWithAncestor(user);
     }
-    else{ // anc, dec 둘 다 존재하는 경우
-        for (auto dec : dec_list){
-            ret = RGWOrgAnc::putAnc(dec, anc);
-            if(ret < 0){
-                return ret;
-            }
-        }
-        ret = RGWOrgDec::putDec(anc, dec_list);
-        
-        if(ret < 0){
-            return ret;
-        }
+    return deleteWithBoth(user, anc, dec_list);
+}
 
-        ret = RGWOrgDec::deleteDec(user);
-        if(ret < 0){
-            return ret;
-        }
+int RGWOrgUser::deleteOnlyUser(const std::string &user) {
+    return RGWOrgTier::deleteUserTier(user);
+}
 
-        ret = RGWOrgAnc::deleteAnc(user);
-        if(ret < 0){
-            return ret;
-        }
-
-        ret = RGWOrgTier::deleteUserTier(user);
+int RGWOrgUser::deleteWithDescendants(const std::string &user, const std::vector<std::string> &dec_list) {
+    for (const auto &dec : dec_list) {
+        int ret = RGWOrgAnc::deleteAnc(dec);
+        if(ret < 0) return ret;
     }
-    
-    
+    int ret = RGWOrgDec::deleteDec(user);
+    if(ret < 0) return ret;
+
+    return RGWOrgTier::deleteUserTier(user);
+}
+
+int RGWOrgUser::deleteWithAncestor(const std::string &user) {
+    int ret = RGWOrgAnc::deleteAnc(user);
+    if(ret < 0) return ret;
+
+    return RGWOrgTier::deleteUserTier(user);
+}
+
+int RGWOrgUser::deleteWithBoth(const std::string &user, const std::string &anc, const std::vector<std::string> &dec_list) {
+    for (const auto &dec : dec_list) {
+        int ret = RGWOrgAnc::putAnc(dec, anc);
+        if(ret < 0) return ret;
+    }
+    int ret = RGWOrgDec::putDec(anc, dec_list);
+    if(ret < 0) return ret;
+
+    ret = RGWOrgDec::deleteDec(user);
+    if(ret < 0) return ret;
+
+    ret = RGWOrgAnc::deleteAnc(user);
+    if(ret < 0) return ret;
 
     ret = RGWOrgTier::deleteUserTier(user);
-    if(ret < 0){
-        return ret;
-    }
+    if(ret < 0) return ret;
 
     RGWOrgTier::updateUserTier(anc);
 
@@ -637,6 +627,10 @@ int TierDB::putData(const std::string& key, const int &value){
 int TierDB::getData(const std::string& key, int &value){
     std::string str_value;
     status = db->Get(rocksdb::ReadOptions(), key, &str_value);
+    if(status.IsNotFound()){
+        return RGW_ORG_KEY_NOT_FOUND;
+    }
+
     value = std::stoi(str_value);
     if (status.ok())
     {
@@ -648,7 +642,7 @@ int TierDB::getData(const std::string& key, int &value){
     }
 }
 
-int RGWOrgTier::updateUserTier(std::string &start_user){
+int RGWOrgTier::updateUserTier(const std::string &start_user){
     int start_user_tier;
     int ret = getUserTier(start_user, &start_user_tier);
     if(ret < 0){
@@ -674,4 +668,24 @@ int RGWOrgTier::updateUserTier(std::string &start_user){
         }
     }
     return 0;
+}
+
+bool validateRGWOrgPermission(std::string user, std::string path, bool r, bool w, bool x, bool g){
+    RGWOrg *rgwOrg = getAcl(user, path);
+    if(rgwOrg == nullptr){
+        return false;
+    }
+    OrgPermission *orgPermission = rgwOrg->getOrgPermission();
+
+    // compare orgPermission and r, w, x, g
+    // if request user has more permission than input r, w, x, g, return true
+    
+    if ((r && !orgPermission->r) ||
+        (w && !orgPermission->w) ||
+        (x && !orgPermission->x) ||
+        (g && !orgPermission->g)) {
+        return false;
+    }
+
+    return true;
 }

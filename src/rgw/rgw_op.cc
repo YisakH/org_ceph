@@ -1223,6 +1223,8 @@ int RGWGetObj::verify_permission(optional_yield y)
     get_legal_hold = verify_object_permission(this, s, rgw::IAM::s3GetObjectLegalHold);
   }
 
+  //dout(0) << "socks : request user name : " << s->user->get_id().id;
+
   return 0;
 }
 
@@ -4591,6 +4593,14 @@ int RGWPutObj::verify_permission(optional_yield y)
   {
     return -EACCES;
   }
+
+  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : user id : " << s->user->get_id().id << dendl;
+  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : bucket name : " << s->bucket->get_name() << dendl;
+  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : object name : " << s->object->get_name() << dendl;
+
+
+  string path = s->bucket->get_name() + "/" + s->object->get_name();
+  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : verify result : " << validateRGWOrgPermission(s->user->get_id().id, path, true, true) << dendl;
 
   return 0;
 }

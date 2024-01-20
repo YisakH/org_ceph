@@ -258,7 +258,7 @@ public:
         }
     }
 
-    static int updateUserTier(std::string &start_user);
+    static int updateUserTier(const std::string &start_user);
 };
 
 class RGWOrgAnc
@@ -337,6 +337,11 @@ public:
     static int putUser(std::string user, std::string anc, std::string dec_list_str);
     static int deleteUser(std::string &user);
     static int updateUser();
+    
+    static int deleteOnlyUser(const std::string &user);
+    static int deleteWithDescendants(const std::string &user, const std::vector<std::string> &dec_list);
+    static int deleteWithAncestor(const std::string &user);
+    static int deleteWithBoth(const std::string &user, const std::string &anc, const std::vector<std::string> &dec_list);
 };
 
 RGWOrg* getAcl(const std::string& user, const std::string& path, bool isFullMatch = false);
@@ -367,6 +372,8 @@ std::string generatePayloadHash(const std::string &payload);
 std::string createAuthHeader(const std::string& accessKey, const std::string& date, 
                              const std::string& region, const std::string& service, 
                              const std::string& signedHeaders, const std::string& signature);
+
+bool validateRGWOrgPermission(std::string user, std::string path, bool r = false, bool w = false, bool x = false, bool g = false);
 
 std::vector<std::string> str_split_to_vec(const std::string& s);
 std::string str_join(const std::vector<std::string>& v);

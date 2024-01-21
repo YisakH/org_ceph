@@ -4833,7 +4833,13 @@ void RGWGetOrg::execute(optional_yield y)
 
     response_bl.append(anc.c_str());
 
-  } else {
+  } else if(s->decoded_uri == "/admin/org/dec"){
+    const auto& user = findValueForKey(s->http_params, "user");
+
+    std::string dec_list;
+    int ret = RGWOrgDec::
+  } 
+  else {
     dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : wrong uri" << dendl;
   }
 

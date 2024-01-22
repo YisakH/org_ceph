@@ -271,6 +271,17 @@ int deleteAnc(const std::string &user)
     return ret;
 }
 
+int RGWOrgDec::decListToString(std::vector<std::string> &dec_list, std::string *dec_list_str){
+    *dec_list_str = "";
+    for (size_t i = 0; i < dec_list.size(); ++i){
+        *dec_list_str += dec_list[i];
+        if (i < dec_list.size() - 1){
+            *dec_list_str += ",";
+        }
+    }
+    return 0;
+}
+
 int RGWOrgDec::getDec(const std::string& user, std::vector<std::string> *dec_list){
     std::string value;
     DecDB &decDB = DecDB::getInstance();

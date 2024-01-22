@@ -20,16 +20,6 @@
 </head>
 <body>
     <h1>Tree Structure</h1>
-    <ul class="tree">
-        {% for parent, children in tree.items() %}
-            <li class="toggle">{{ parent }}
-                <ul class="hidden">
-                    {% for child in children %}
-                        <li>{{ child }}</li>
-                    {% endfor %}
-                </ul>
-            </li>
-        {% endfor %}
-    </ul>
+    {{ tree_html | safe }}
 </body>
 </html>

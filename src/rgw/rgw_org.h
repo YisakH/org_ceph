@@ -328,6 +328,7 @@ class RGWOrgDec
     static int putDec(std::string user, std::vector<std::string> dec_list);
     static int deleteDec(std::string user);
     static int updateDec(std::string user, std::vector<std::string> dec_list);
+    static int decListToString(std::vector<std::string> &dec_list, std::string *dec_list_str);
 };
 
 class RGWOrgUser

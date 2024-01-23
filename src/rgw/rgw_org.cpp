@@ -195,7 +195,7 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     int ret = rgwOrg->putRGWOrg(dbm);
     if (ret < 0)
     {
-        return -1;
+        return ret;
     }
     else
     {
@@ -234,6 +234,9 @@ int getTier(const std::string &user, int *tier)
 int putTier(const std::string &user, int tier)
 {
     int ret = RGWOrgTier::putUserTier(user, tier);
+
+    RGWOrgTier::updateUserTier(user);
+
     return ret;
 }
 
@@ -282,7 +285,10 @@ int RGWOrgDec::appendDecEdge(std::string user, std::vector<std::string> dec_list
     int ret = getDec(user, &existing_dec_list);
 
     if(ret == RGW_ORG_KEY_NOT_FOUND){
-        return ret;
+        ret = putDec(user, dec_list);
+        if (ret < 0){
+            return ret;
+        }
     }
     else if(ret < 0){
         return ret;
@@ -747,7 +753,7 @@ int RGWOrgTier::updateUserTier(const std::string &start_user){
             return ret;
         }
         ret = updateUserTier(dec);
-        if(ret < 0){
+        if(ret < 0 && ret != RGW_ORG_KEY_NOT_FOUND){
             return ret;
         }
     }

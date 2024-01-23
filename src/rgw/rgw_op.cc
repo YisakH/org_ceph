@@ -4413,7 +4413,10 @@ int RGWPutOrg::verify_permission(optional_yield y)
     const bool &g = findValueForKey(s->http_params, "g") == "true";
     const auto &path = findValueForKey(s->http_params, "path");
 
-    return checkAclWrite("admin", user, path, authorizer, tier, r, w, x, g);
+    if (authorizer == "root")
+      return 1;
+    else
+      return checkAclWrite("admin", user, path, authorizer, tier, r, w, x, g);
   }
   else if (s->decoded_uri == "/admin/org/tier")
   {

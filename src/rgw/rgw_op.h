@@ -436,7 +436,7 @@ public:
   virtual void send_response() override = 0;
 
   const char* name() const override { return "delete_org"; }
-  RGWOpType get_type() override { return RGW_OP_DELETE_OBJ; }
+  RGWOpType get_type() override { return RGW_OP_DELETE_ORG; }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
   virtual bool need_object_expiration() { return false; }
   /**
@@ -566,7 +566,7 @@ public:
   virtual int send_response_data(bufferlist& bl, off_t ofs, off_t len) = 0;
 
   const char* name() const override { return "get_obj"; }
-  RGWOpType get_type() override { return RGW_OP_GET_OBJ; }
+  RGWOpType get_type() override { return RGW_OP_GET_ORG; }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
   virtual bool need_object_expiration() { return false; }
   /**

@@ -2,12 +2,12 @@
 // Created by root on 23. 12. 29.
 //
 #include "rgw_org.h"
-#include "../rocksdb/include/rocksdb/db.h"
 #include <sstream>
 #include <iostream>
 #include <iomanip>
 #include <chrono>
 #include <string>
+#include <utility>
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
 
@@ -70,12 +70,12 @@ int RGWOrg::putRGWOrg(DBManager &dbManager)
     return dbManager.putData(key, value);
 }
 
-int RGWOrg::deleteRGWOrg(aclDB &aclDB, std::string key)
+int RGWOrg::deleteRGWOrg(aclDB &aclDB, const std::string& key)
 {
     return aclDB.deleteData(key);
 }
 
-int RGWOrg::getPartialMatchRgwOrg(aclDB &aclDB, std::string user, std::string path, RGWOrg *rgwOrg)
+int RGWOrg::getPartialMatchRgwOrg(aclDB &aclDB, const std::string& user, const std::string& path, RGWOrg *rgwOrg)
 {
     std::istringstream iss(path);
     std::string segment;
@@ -100,7 +100,7 @@ int RGWOrg::getPartialMatchRgwOrg(aclDB &aclDB, std::string user, std::string pa
     return ret;
 }
 
-int RGWOrg::getFullMatchRGWOrg(aclDB &aclDB, std::string key, RGWOrg *rgwOrg)
+int RGWOrg::getFullMatchRGWOrg(aclDB &aclDB, const std::string& key, RGWOrg *rgwOrg)
 {
     std::string value;
     int ret = aclDB.getData(key, value);
@@ -158,7 +158,7 @@ RGWOrg *getAcl(const std::string &user, const std::string &path, bool isFullMatc
         dbm.reOpenDB();
         return nullptr;
     }
-    RGWOrg *rgwOrg = new RGWOrg();
+    auto *rgwOrg = new RGWOrg();
     int ret;
     if (isFullMatch)
         ret = RGWOrg::getFullMatchRGWOrg(dbm, user + ":" + path, rgwOrg);
@@ -189,7 +189,7 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     rgwOrg->setUser(user);
     rgwOrg->setAuthorizer(authorizer);
     rgwOrg->setTier(tier);
-    OrgPermission *orgPermission = new OrgPermission(r, w, x, g, path);
+    auto *orgPermission = new OrgPermission(r, w, x, g, path);
     rgwOrg->setOrgPermission(*orgPermission);
 
     int ret = rgwOrg->putRGWOrg(dbm);
@@ -206,7 +206,6 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
 int deleteAcl(const std::string &user, const std::string &path)
 {
     auto &dbm = aclDB::getInstance();
-    RGWOrg *rgwOrg;
     if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
     {
         dbm.reOpenDB();
@@ -214,7 +213,7 @@ int deleteAcl(const std::string &user, const std::string &path)
     }
 
     std::string key = user + ":" + path;
-    int ret = rgwOrg->deleteRGWOrg(dbm, key);
+    int ret = RGWOrg::deleteRGWOrg(dbm, key);
     if (ret < 0)
     {
         return -1;
@@ -274,13 +273,13 @@ int deleteAnc(const std::string &user)
     return ret;
 }
 
-int RGWOrgDec::appendDecEdge(std::string user, std::string dec){
+int RGWOrgDec::appendDecEdge(const std::string& user, const std::string& dec){
     std::vector<std::string> dec_list(1, dec);
     int ret = appendDecEdge(user, dec_list);
     return ret;
 }
 
-int RGWOrgDec::appendDecEdge(std::string user, std::vector<std::string> dec_list){
+int RGWOrgDec::appendDecEdge(const std::string& user, const std::vector<std::string>& dec_list){
     std::vector<std::string> existing_dec_list;
     int ret = getDec(user, &existing_dec_list);
 
@@ -304,7 +303,7 @@ int RGWOrgDec::appendDecEdge(std::string user, std::vector<std::string> dec_list
     return ret;
 }
 
-bool RGWOrgDec::existDecEdge(std::string user, std::string dec){
+bool RGWOrgDec::existDecEdge(const std::string& user, const std::string& dec){
     std::vector<std::string> existing_dec_list;
     int ret = getDec(user, &existing_dec_list);
 
@@ -319,7 +318,7 @@ bool RGWOrgDec::existDecEdge(std::string user, std::string dec){
     return true;
 }
 
-int RGWOrgDec::deleteDecEdge(std::string user, std::string dec){
+int RGWOrgDec::deleteDecEdge(const std::string& user, const std::string& dec){
     std::vector<std::string> existing_dec_list;
     int ret = getDec(user, &existing_dec_list);
 

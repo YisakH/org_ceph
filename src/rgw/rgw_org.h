@@ -204,15 +204,15 @@ public:
 
     int putRGWOrg(DBManager &dbManager);
 
-    static int getFullMatchRGWOrg(aclDB &aclDB, std::string key, RGWOrg *rgwOrg);
+    static int getFullMatchRGWOrg(aclDB &aclDB, const std::string& key, RGWOrg *rgwOrg);
 
-    static int deleteRGWOrg(aclDB &aclDB, std::string key);
+    static int deleteRGWOrg(aclDB &aclDB, const std::string& key);
 
     std::string toString() {
         return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g) + ", path: " + orgPermission->path;
     }
 
-    static int getPartialMatchRgwOrg(aclDB &aclDB, std::string user, std::string path, RGWOrg *rgwOrg);
+    static int getPartialMatchRgwOrg(aclDB &aclDB, const std::string& user, const std::string& path, RGWOrg *rgwOrg);
 };
 
 class RGWOrgTier
@@ -329,10 +329,10 @@ class RGWOrgDec
     static int deleteDec(std::string user);
     static int updateDec(std::string user, std::vector<std::string> dec_list);
     static int decListToString(std::vector<std::string> &dec_list, std::string *dec_list_str);
-    static int appendDecEdge(std::string user, std::string dec);
-    static int appendDecEdge(std::string user, std::vector<std::string> dec_list);
-    static bool existDecEdge(std::string user, std::string dec);
-    static int deleteDecEdge(std::string user, std::string dec);
+    static int appendDecEdge(const std::string& user, const std::string& dec);
+    static int appendDecEdge(const std::string& user, const std::vector<std::string>& dec_list);
+    static bool existDecEdge(const std::string& user, const std::string& dec);
+    static int deleteDecEdge(const std::string& user, const std::string& dec);
 };
 
 class RGWOrgUser

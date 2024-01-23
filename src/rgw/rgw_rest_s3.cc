@@ -5979,6 +5979,9 @@ AWSGeneralAbstractor::get_auth_data_v4(const req_state* const s,
         case RGW_OP_GET_BUCKET_PUBLIC_ACCESS_BLOCK:
         case RGW_OP_DELETE_BUCKET_PUBLIC_ACCESS_BLOCK:
 	case RGW_OP_GET_OBJ://s3select its post-method(payload contain the query) , the request is get-object
+  case RGW_OP_GET_ORG:
+  case RGW_OP_PUT_ORG:
+  case RGW_OP_DELETE_ORG:
           break;
         default:
           ldpp_dout(s, 10) << "ERROR: AWS4 completion for operation: " << s->op_type << ", NOT IMPLEMENTED" << dendl;

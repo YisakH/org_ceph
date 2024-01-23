@@ -329,6 +329,10 @@ class RGWOrgDec
     static int deleteDec(std::string user);
     static int updateDec(std::string user, std::vector<std::string> dec_list);
     static int decListToString(std::vector<std::string> &dec_list, std::string *dec_list_str);
+    static int appendDecEdge(std::string user, std::string dec);
+    static int appendDecEdge(std::string user, std::vector<std::string> dec_list);
+    static bool existDecEdge(std::string user, std::string dec);
+    static int deleteDecEdge(std::string user, std::string dec);
 };
 
 class RGWOrgUser

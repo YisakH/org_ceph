@@ -271,6 +271,73 @@ int deleteAnc(const std::string &user)
     return ret;
 }
 
+int RGWOrgDec::appendDecEdge(std::string user, std::string dec){
+    std::vector<std::string> dec_list(1, dec);
+    int ret = appendDecEdge(user, dec_list);
+    return ret;
+}
+
+int RGWOrgDec::appendDecEdge(std::string user, std::vector<std::string> dec_list){
+    std::vector<std::string> existing_dec_list;
+    int ret = getDec(user, &existing_dec_list);
+
+    if(ret == RGW_ORG_KEY_NOT_FOUND){
+        return ret;
+    }
+    else if(ret < 0){
+        return ret;
+    }
+    else{
+        for(auto dec : dec_list){
+            if(!existDecEdge(user, dec)){
+                existing_dec_list.push_back(dec);
+            }
+        }
+        ret = putDec(user, existing_dec_list);
+    }
+    return ret;
+}
+
+bool RGWOrgDec::existDecEdge(std::string user, std::string dec){
+    std::vector<std::string> existing_dec_list;
+    int ret = getDec(user, &existing_dec_list);
+
+    if(ret == RGW_ORG_KEY_NOT_FOUND){
+        return false;
+    }
+
+    if (std::find(existing_dec_list.begin(), existing_dec_list.end(), dec) == existing_dec_list.end()) {
+            // New user is not a descendant yet, add to the list.
+            return false;
+    }
+    return true;
+}
+
+int RGWOrgDec::deleteDecEdge(std::string user, std::string dec){
+    std::vector<std::string> existing_dec_list;
+    int ret = getDec(user, &existing_dec_list);
+
+    if(ret < 0){
+        // 오류 처리: 키를 찾을 수 없거나 다른 오류가 발생한 경우
+        return ret;
+    }
+
+    // dec가 존재하는지 확인
+    auto it = std::find(existing_dec_list.begin(), existing_dec_list.end(), dec);
+    if(it == existing_dec_list.end()){
+        // dec가 리스트에 없음
+        return RGW_ORG_KEY_NOT_FOUND;
+    }
+
+    // dec를 리스트에서 제거
+    existing_dec_list.erase(it);
+
+    // 업데이트된 리스트를 데이터베이스에 저장
+    ret = putDec(user, existing_dec_list);
+    return ret; // 성공적으로 제거되었거나 발생한 오류를 반환
+}
+
+
 int RGWOrgDec::decListToString(std::vector<std::string> &dec_list, std::string *dec_list_str){
     *dec_list_str = "";
     for (size_t i = 0; i < dec_list.size(); ++i){
@@ -519,7 +586,7 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::stri
         }
 
         // anc -> user 등록
-        ret = RGWOrgDec::putDec(anc, std::vector<std::string>(1, user));
+        ret = RGWOrgDec::appendDecEdge(anc, user);
         if(ret < 0){
             return ret;
         }
@@ -538,7 +605,7 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::stri
 
 
     if(dec_list.size() > 0){
-        ret = RGWOrgDec::putDec(user, dec_list);
+        ret = RGWOrgDec::appendDecEdge(user, dec_list);
         if(ret < 0){
             return ret;
         }
@@ -606,7 +673,13 @@ int RGWOrgUser::deleteWithBoth(const std::string &user, const std::string &anc, 
         int ret = RGWOrgAnc::putAnc(dec, anc);
         if(ret < 0) return ret;
     }
-    int ret = RGWOrgDec::putDec(anc, dec_list);
+    int ret = RGWOrgDec::deleteDecEdge(anc, user);
+    if(ret < 0) return ret;
+
+    ret = RGWOrgDec::appendDecEdge(anc, dec_list);
+    if(ret < 0) return ret;
+
+    RGWOrgDec::putDec(anc, dec_list);
     if(ret < 0) return ret;
 
     ret = RGWOrgDec::deleteDec(user);

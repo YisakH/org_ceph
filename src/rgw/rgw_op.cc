@@ -582,7 +582,7 @@ int rgw_build_bucket_policies(const DoutPrefixProvider *dpp, rgw::sal::Driver *d
 
   string bucket_name = s->bucket_name;
   dout(0) << "socks : rgw_op.cc(rgw_build_bucket_policies): bucket_name=" << bucket_name << dendl;
-  
+
   if (!s->bucket_name.empty())
   {
     s->bucket_exists = true;
@@ -1223,7 +1223,7 @@ int RGWGetObj::verify_permission(optional_yield y)
     get_legal_hold = verify_object_permission(this, s, rgw::IAM::s3GetObjectLegalHold);
   }
 
-  //dout(0) << "socks : request user name : " << s->user->get_id().id;
+  // dout(0) << "socks : request user name : " << s->user->get_id().id;
 
   return 0;
 }
@@ -1830,7 +1830,8 @@ bool RGWOp::generate_cors_headers(string &origin, string &method, string &header
   return true;
 }
 
-int parse_org_params(req_state *s){
+int parse_org_params(req_state *s)
+{
   /*  struct hacl_auth{
     std::string access_key;
     std::string secret_key;
@@ -1839,14 +1840,13 @@ int parse_org_params(req_state *s){
     std::string date;
     std::string region;
 
-    std::string getSignature(const std::string &secret_key, const std::string &date, const std::string &region, 
+    std::string getSignature(const std::string &secret_key, const std::string &date, const std::string &region,
                          const std::string &service, const std::string &string_to_sign);
   };*/
-  //s->hacl_auth.access_key = s->info.args.get("access_key");
-  //s->hacl_auth.secret_key = s->info.args.get("secret_key");
-  //s->hacl_auth.user_id = s->info.args.get("user_id");
-
-
+  // s->hacl_auth.access_key = s->info.args.get("access_key");
+  // s->hacl_auth.secret_key = s->info.args.get("secret_key");
+  // s->hacl_auth.user_id = s->info.args.get("user_id");
+  return 0;
 }
 
 int rgw_policy_from_attrset(const DoutPrefixProvider *dpp, CephContext *cct, map<string, bufferlist> &attrset, RGWAccessControlPolicy *policy)
@@ -3856,13 +3856,16 @@ static int select_bucket_placement(const DoutPrefixProvider *dpp,
   return 0;
 }
 
-std::string findValueForKey(const std::vector<std::pair<std::string, std::string>>& keyValuePairs, const std::string& key) {
-    for (const auto& pair : keyValuePairs) {
-        if (pair.first == key) {
-            return pair.second;
-        }
+std::string findValueForKey(const std::vector<std::pair<std::string, std::string>> &keyValuePairs, const std::string &key)
+{
+  for (const auto &pair : keyValuePairs)
+  {
+    if (pair.first == key)
+    {
+      return pair.second;
     }
-    return ""; // Key를 찾지 못한 경우 빈 문자열 반환
+  }
+  return ""; // Key를 찾지 못한 경우 빈 문자열 반환
 }
 
 void RGWCreateBucket::execute(optional_yield y)
@@ -4370,15 +4373,15 @@ int RGWDeleteOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_regis
 }
 
 int RGWGetOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
-{  
+{
   int ret = RGWOp::verify_requester(auth_registry, y);
   dout(0) << "socks : rgw_op.cc : RGWGetOrg : verify requester return : " << ret << dendl;
-    return ret;
+  return ret;
 }
 
 int RGWPutOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
 {
-  /*std::string getAuthHeader(const std::string &secret_key, const std::string &host, const std::string &method, const std::string &canonicalUri, const std::string &canonicalQueryString, 
+  /*std::string getAuthHeader(const std::string &secret_key, const std::string &host, const std::string &method, const std::string &canonicalUri, const std::string &canonicalQueryString,
                         const std::string &signedHeaders);*/
   const std::string request_method = s->info.env->get("REQUEST_METHOD");
   const std::string request_uri = s->info.env->get("REQUEST_URI");
@@ -4387,7 +4390,7 @@ int RGWPutOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry
   const std::string signedHeaders = "host;x-amz-content-sha256;x-amz-date";
   const std::string access_key = "qwer";
   const std::string secret_key = "qwer";
-  
+
   // getAuthHeader의 반환값을 직접 변수에 저장
   std::string auth_header = getAuthHeader(access_key, secret_key, http_host, request_method, request_uri, query_string, signedHeaders);
   s->hacl_auth.auth_header = auth_header;
@@ -4399,18 +4402,21 @@ int RGWPutOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry
 
 int RGWPutOrg::verify_permission(optional_yield y)
 {
-  if(s->decoded_uri == "/admin/org/acl"){
-    const auto& user = findValueForKey(s->http_params, "user");
-    const auto& authorizer = findValueForKey(s->http_params, "authorizer");
-    const int& tier = stoi(findValueForKey(s->http_params, "tier"));
-    const bool& r = findValueForKey(s->http_params, "r") == "true";
-    const bool& w = findValueForKey(s->http_params, "w") == "true";
-    const bool& x = findValueForKey(s->http_params, "x") == "true";
-    const bool& g = findValueForKey(s->http_params, "g") == "true";
-    const auto& path = findValueForKey(s->http_params, "path");
+  if (s->decoded_uri == "/admin/org/acl")
+  {
+    const auto &user = findValueForKey(s->http_params, "user");
+    const auto &authorizer = findValueForKey(s->http_params, "authorizer");
+    const int &tier = stoi(findValueForKey(s->http_params, "tier"));
+    const bool &r = findValueForKey(s->http_params, "r") == "true";
+    const bool &w = findValueForKey(s->http_params, "w") == "true";
+    const bool &x = findValueForKey(s->http_params, "x") == "true";
+    const bool &g = findValueForKey(s->http_params, "g") == "true";
+    const auto &path = findValueForKey(s->http_params, "path");
 
     return checkAclWrite("admin", user, path, authorizer, tier, r, w, x, g);
-  }else if(s->decoded_uri == "/admin/org/tier"){
+  }
+  else if (s->decoded_uri == "/admin/org/tier")
+  {
     return 1;
   }
 
@@ -4594,13 +4600,14 @@ int RGWPutObj::verify_permission(optional_yield y)
     return -EACCES;
   }
 
-  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : user id : " << s->user->get_id().id << dendl;
-  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : bucket name : " << s->bucket->get_name() << dendl;
-  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : object name : " << s->object->get_name() << dendl;
+  const string user_name = s->user->get_id().id;
+  const string bucket_name = s->bucket->get_name();
+  const string object_name = s->object->get_name();
 
-
-  string path = s->bucket->get_name() + "/" + s->object->get_name();
-  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : verify result : " << validateRGWOrgPermission(s->user->get_id().id, path, true, true) << dendl;
+  const string path = bucket_name + "/" + object_name;
+  const bool isAccessable = validateRGWOrgPermission(user_name, path, true, true);
+  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : user id : " << user_name << " path : " << path << dendl;
+  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : verify result : " << isAccessable << dendl;
 
   return 0;
 }
@@ -4775,22 +4782,26 @@ void RGWDeleteOrg::execute(optional_yield y)
 {
   dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : op_delete called" << dendl;
 
-  auto& dbm = aclDB::getInstance();
-  if(!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound()) {
+  auto &dbm = aclDB::getInstance();
+  if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
+  {
     dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
     dbm.reOpenDB();
     return;
   }
 
-  const auto& user = findValueForKey(s->http_params, "user");
-  const auto& path = findValueForKey(s->http_params, "path");
-  const auto& key = user + ":" + path;
+  const auto &user = findValueForKey(s->http_params, "user");
+  const auto &path = findValueForKey(s->http_params, "path");
+  const auto &key = user + ":" + path;
 
   int ret = RGWOrg::deleteRGWOrg(dbm, key);
 
-  if(ret == 0) {
+  if (ret == 0)
+  {
     dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : delete success" << dendl;
-  } else {
+  }
+  else
+  {
     dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : delete failed" << dendl;
   }
 }
@@ -4805,36 +4816,41 @@ void RGWDeleteOrg::pre_exec()
   rgw_bucket_object_pre_exec(s);
 }
 
-
 void RGWGetOrg::execute(optional_yield y)
 {
   int ret = -2;
   bufferlist response_bl;
-  if (s->decoded_uri == "/admin/org/acl") {
-    const auto& user = findValueForKey(s->http_params, "user");
-    const auto& path = findValueForKey(s->http_params, "path");
-    
+  if (s->decoded_uri == "/admin/org/acl")
+  {
+    const auto &user = findValueForKey(s->http_params, "user");
+    const auto &path = findValueForKey(s->http_params, "path");
+
     s->rgwOrg = getAcl(user, path);
     response_bl.append(s->rgwOrg->toString().c_str());
 
     ret = 0;
-  } else if(s->decoded_uri == "/admin/org/tier") {
-    const auto& user = findValueForKey(s->http_params, "user");
+  }
+  else if (s->decoded_uri == "/admin/org/tier")
+  {
+    const auto &user = findValueForKey(s->http_params, "user");
     int tier;
 
     ret = getTier(user, &tier);
 
     response_bl.append(to_string(tier).c_str());
-  } else if(s->decoded_uri == "/admin/org/anc") {
-    const auto& user = findValueForKey(s->http_params, "user");
+  }
+  else if (s->decoded_uri == "/admin/org/anc")
+  {
+    const auto &user = findValueForKey(s->http_params, "user");
 
     std::string anc;
     ret = getAnc(user, &anc);
 
     response_bl.append(anc.c_str());
-
-  } else if(s->decoded_uri == "/admin/org/dec"){
-    const auto& user = findValueForKey(s->http_params, "user");
+  }
+  else if (s->decoded_uri == "/admin/org/dec")
+  {
+    const auto &user = findValueForKey(s->http_params, "user");
 
     std::vector<std::string> dec_list;
     std::string dec_list_str;
@@ -4843,23 +4859,25 @@ void RGWGetOrg::execute(optional_yield y)
     ret = RGWOrgDec::decListToString(dec_list, &dec_list_str);
 
     response_bl.append(dec_list_str.c_str());
-  } 
-  else {
+  }
+  else
+  {
     dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : wrong uri" << dendl;
   }
 
-
-  if(ret != 0) {
+  if (ret != 0)
+  {
     dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb get error" << dendl;
     response_bl.append("error occured! maybe there is no such key in rocksdb");
   }
-  
+
   send_response_data(response_bl, 0, response_bl.length());
 }
 
 void RGWPutOrg::execute(optional_yield y)
 {
-    for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it) {
+  for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it)
+  {
     dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
   }
   /*
@@ -4873,42 +4891,45 @@ void RGWPutOrg::execute(optional_yield y)
   */
   int ret = -1;
 
-if (s->decoded_uri == "/admin/org/acl") {
+  if (s->decoded_uri == "/admin/org/acl")
+  {
 
-      const auto& user = findValueForKey(s->http_params, "user");
-      const auto& authorizer = findValueForKey(s->http_params, "authorizer");
-      const int& tier = stoi(findValueForKey(s->http_params, "tier"));
-      const bool& r = findValueForKey(s->http_params, "r") == "true";
-      const bool& w = findValueForKey(s->http_params, "w") == "true";
-      const bool& x = findValueForKey(s->http_params, "x") == "true";
-      const bool& g = findValueForKey(s->http_params, "g") == "true";
-      const auto& path = findValueForKey(s->http_params, "path");
+    const auto &user = findValueForKey(s->http_params, "user");
+    const auto &authorizer = findValueForKey(s->http_params, "authorizer");
+    const int &tier = stoi(findValueForKey(s->http_params, "tier"));
+    const bool &r = findValueForKey(s->http_params, "r") == "true";
+    const bool &w = findValueForKey(s->http_params, "w") == "true";
+    const bool &x = findValueForKey(s->http_params, "x") == "true";
+    const bool &g = findValueForKey(s->http_params, "g") == "true";
+    const auto &path = findValueForKey(s->http_params, "path");
 
-      ret = putAcl(user, path, authorizer, tier, r, w, x, g);
-
-} else if (s->decoded_uri == "/admin/org/tier") {
-      const auto& user = findValueForKey(s->http_params, "user");
-      const int& tier = stoi(findValueForKey(s->http_params, "tier"));
-
-      ret = putTier(user, tier);
-
-} else if (s->decoded_uri == "/admin/org/anc") {
-      const auto& user = findValueForKey(s->http_params, "user");
-      const auto& anc = findValueForKey(s->http_params, "anc");
-      ret = putAnc(user, anc);
-      
-} else if (s->decoded_uri == "/admin/org/user") {
-  const auto& user = findValueForKey(s->http_params, "user");
-  const auto& anc = findValueForKey(s->http_params, "anc");
-  const auto& dec_list = findValueForKey(s->http_params, "dec_list");
-
-  ret = RGWOrgUser::putUser(user, anc, dec_list);
-} 
-else {
-      dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : wrong uri" << dendl;
+    ret = putAcl(user, path, authorizer, tier, r, w, x, g);
   }
+  else if (s->decoded_uri == "/admin/org/tier")
+  {
+    const auto &user = findValueForKey(s->http_params, "user");
+    const int &tier = stoi(findValueForKey(s->http_params, "tier"));
 
+    ret = putTier(user, tier);
+  }
+  else if (s->decoded_uri == "/admin/org/anc")
+  {
+    const auto &user = findValueForKey(s->http_params, "user");
+    const auto &anc = findValueForKey(s->http_params, "anc");
+    ret = putAnc(user, anc);
+  }
+  else if (s->decoded_uri == "/admin/org/user")
+  {
+    const auto &user = findValueForKey(s->http_params, "user");
+    const auto &anc = findValueForKey(s->http_params, "anc");
+    const auto &dec_list = findValueForKey(s->http_params, "dec_list");
 
+    ret = RGWOrgUser::putUser(user, anc, dec_list);
+  }
+  else
+  {
+    dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : wrong uri" << dendl;
+  }
 
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : rocksdb ret = " << ret << dendl;
 }
@@ -4918,7 +4939,8 @@ void RGWPutObj::execute(optional_yield y)
   dout(0) << "socks : rgw_op.cc : RGWPutObj::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutObj::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutObj::execute : env = " << s->info.env->get_map() << dendl;
-  for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it) {
+  for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it)
+  {
     dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
   }
   dout(0) << "socks : rgw_op.cc : request_params : " << s->info.request_params << dendl;
@@ -5404,7 +5426,8 @@ void RGWPutObj::execute(optional_yield y)
 
   dout(0) << "socks : rgw_op.cc : RGWPutObj::execute : args = " << s->info.args.get_str() << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutObj::execute : env = " << s->info.env->get_map() << dendl;
-  for (std::map<string, string>::const_iterator it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it) {
+  for (std::map<string, string>::const_iterator it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it)
+  {
     dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
   }
   dout(0) << "socks : rgw_op.cc : request_params : " << s->info.request_params << dendl;

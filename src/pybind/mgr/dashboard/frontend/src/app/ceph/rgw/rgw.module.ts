@@ -193,6 +193,11 @@ const routes: Routes = [
   {
     path: 'multisite',
     children: [{ path: '', component: RgwMultisiteDetailsComponent }]
+  },
+  {
+    path: 'hacl',
+    data: { breadcrumbs: 'HA Cluster' },
+    children: [{ path: '', component: RgwMultisiteDetailsComponent}]
   }
 ];
 

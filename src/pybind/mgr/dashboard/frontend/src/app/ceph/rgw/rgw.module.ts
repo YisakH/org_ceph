@@ -26,6 +26,7 @@ import { RgwUserSubuserModalComponent } from './rgw-user-subuser-modal/rgw-user-
 import { RgwUserSwiftKeyModalComponent } from './rgw-user-swift-key-modal/rgw-user-swift-key-modal.component';
 import { RgwUserTabsComponent } from './rgw-user-tabs/rgw-user-tabs.component';
 import { RgwMultisiteDetailsComponent } from './rgw-multisite-details/rgw-multisite-details.component';
+import { RgwHaclDetailsComponent } from './rgw-hacl-details/rgw-hacl-details.component';
 import { TreeModule } from '@circlon/angular-tree-component';
 import { DataTableModule } from '~/app/shared/datatable/datatable.module';
 import { RgwMultisiteRealmFormComponent } from './rgw-multisite-realm-form/rgw-multisite-realm-form.component';
@@ -88,6 +89,7 @@ import { BucketTagModalComponent } from './bucket-tag-modal/bucket-tag-modal.com
     RgwConfigModalComponent,
     RgwUserTabsComponent,
     RgwMultisiteDetailsComponent,
+    RgwHaclDetailsComponent, // 내가 추가함
     RgwMultisiteRealmFormComponent,
     RgwMultisiteZonegroupFormComponent,
     RgwMultisiteZoneFormComponent,
@@ -197,7 +199,7 @@ const routes: Routes = [
   {
     path: 'hacl',
     data: { breadcrumbs: 'HA Cluster' },
-    children: [{ path: '', component: RgwMultisiteDetailsComponent}]
+    children: [{ path: '', component: RgwHaclDetailsComponent}]
   }
 ];
 

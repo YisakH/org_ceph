@@ -81,6 +81,42 @@ class Rgw(BaseController):
             status['message'] = str(ex)  # type: ignore
         return status
 
+@UIRouter('/rgw/hacl')
+class RgwHACL(RESTController):
+    @Endpoint()
+    @ReadPermission
+    
+    def status():
+        status = {'available': True, 'message': None}
+        multisite_instance = RgwMultisite()
+        is_multisite_configured = multisite_instance.get_multisite_status()
+        if not is_multisite_configured:
+            status['available'] = False
+            status['message'] = 'Multi-site provides disaster recovery and may also \
+                serve as a foundation for content delivery networks'  # type: ignore
+        return status
+
+    @RESTController.Collection(method='PUT', path='/migrate')
+    @allow_empty_body
+    # pylint: disable=W0102,W0613
+    def migrate(self, daemon_name=None, realm_name=None, zonegroup_name=None, zone_name=None,
+                zonegroup_endpoints=None, zone_endpoints=None, access_key=None,
+                secret_key=None):
+        multisite_instance = RgwMultisite()
+        result = multisite_instance.migrate_to_multisite(realm_name, zonegroup_name,
+                                                         zone_name, zonegroup_endpoints,
+                                                         zone_endpoints, access_key,
+                                                         secret_key)
+        return result
+
+    @RESTController.Collection(method='GET', path='/sync_status')
+    @allow_empty_body
+    # pylint: disable=W0102,W0613
+    def get_sync_status(self):
+        multisite_instance = RgwMultisite()
+        result = multisite_instance.get_multisite_sync_status()
+        return result
+
 
 @UIRouter('/rgw/multisite')
 class RgwMultisiteStatus(RESTController):

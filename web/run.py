@@ -35,8 +35,16 @@ def send_request(url, method, access_key, secret_key, params=None, service='s3',
     signed_request = sign_request(url, method, service, region, params, access_key, secret_key)
     response = requests.request(method, url, headers=dict(signed_request.headers), params=params)
     
-    print("Signed URL:", signed_request.url)
-    print("Headers:", signed_request.headers)
+    # resonse를 curl 명령어로 출력
+    print("curl -X", method, url, end='')
+    for key, value in signed_request.headers.items():
+        print(" -H", key + ":" + value, end='')
+    # prams도 출력
+    print(" -d", params)
+    
+    
+    #print("Signed URL:", signed_request.url)
+    #print("Headers:", signed_request.headers)
 
     return response.status_code, response.text
     

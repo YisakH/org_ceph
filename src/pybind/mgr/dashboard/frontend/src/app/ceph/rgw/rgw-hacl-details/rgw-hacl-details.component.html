@@ -1,4 +1,4 @@
-<div class="row">d
+<div class="row">
   <div class="card">
     <div class="card-header" i18n>Tree Viewer</div>
     <div class="card-body">
@@ -7,6 +7,11 @@
           <i [ngClass]="[icons.spinner, icons.spin]"></i>
         </ng-template>
       </tree-root>
+      <!-- Display the presigned URL -->
+      <img *ngIf="presignedUrl" [src]="presignedUrl" alt="Presigned Content">
+      <!-- Or if it's a downloadable file -->
+      <a *ngIf="presignedUrl" [href]="presignedUrl">Download File</a>
     </div>
   </div>
 </div>
+:

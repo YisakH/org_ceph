@@ -33,6 +33,7 @@ export class NavigationPageHelper extends PageHelper {
         { menu: 'Buckets', component: 'cd-rgw-bucket-list' },
         { menu: 'Users', component: 'cd-rgw-user-list' },
         { menu: 'Multi-site', component: 'cd-rgw-multisite-details' },
+        { menu: 'H-ACL', component: 'cd-rgw-hacl-details'}
         { menu: 'Gateways', component: 'cd-rgw-daemon-list' },
         { menu: 'NFS', component: 'cd-error' }
       ]

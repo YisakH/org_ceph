@@ -4,16 +4,18 @@ Binary: ceph-build-deps
 Architecture: amd64
 Version: 15.2.0-1
 Checksums-Md5:
- a83be7c8eca3534438143fed76a7fb41 3098 ceph-build-deps_15.2.0-1_amd64.deb
+ 3a6b7c7d8b5327b481a77786d071110e 3098 ceph-build-deps_15.2.0-1_amd64.deb
 Checksums-Sha1:
- 6a186b1476f27925fea47dc5cc5c78027d18f726 3098 ceph-build-deps_15.2.0-1_amd64.deb
+ a3eb553f2722e3ddc7b77f2ef41faae10d7b3333 3098 ceph-build-deps_15.2.0-1_amd64.deb
 Checksums-Sha256:
- 3bee414b97cd08b7742dc0148b89f39a785025e82c06a107d9c0a52619fb621c 3098 ceph-build-deps_15.2.0-1_amd64.deb
+ e279420151ffad29ef2a586ed4c45fb341f248e5bf97ba4328eed73d9537c777 3098 ceph-build-deps_15.2.0-1_amd64.deb
 Build-Origin: Ubuntu
 Build-Architecture: amd64
-Build-Date: Fri, 19 Jan 2024 05:25:40 +0000
+Build-Date: Mon, 29 Jan 2024 07:39:39 +0000
 Build-Tainted-By:
  merged-usr-via-aliased-dirs
+ usr-local-has-includes
+ usr-local-has-libraries
  usr-local-has-programs
 Installed-Build-Depends:
  autoconf (= 2.71-2),
@@ -71,9 +73,9 @@ Installed-Build-Depends:
  libblkid1 (= 2.37.2-4ubuntu3),
  libbz2-1.0 (= 1.0.8-5build1),
  libc-bin (= 2.35-0ubuntu3.4),
- libc-dev-bin (= 2.35-0ubuntu3.5),
- libc6 (= 2.35-0ubuntu3.5),
- libc6-dev (= 2.35-0ubuntu3.5),
+ libc-dev-bin (= 2.35-0ubuntu3.6),
+ libc6 (= 2.35-0ubuntu3.6),
+ libc6-dev (= 2.35-0ubuntu3.6),
  libcap-ng0 (= 0.7.9-2.2build3),
  libcap2 (= 1:2.44-1ubuntu0.22.04.1),
  libcc1-0 (= 12.3.0-1ubuntu1~22.04),
@@ -174,4 +176,5 @@ Environment:
  DEB_BUILD_PROFILES="noudeb"
  LANG="en_US.UTF-8"
  LC_ALL="C.UTF-8"
- SOURCE_DATE_EPOCH="1705641937"
+ LD_LIBRARY_PATH="/lib:"
+ SOURCE_DATE_EPOCH="1706513976"

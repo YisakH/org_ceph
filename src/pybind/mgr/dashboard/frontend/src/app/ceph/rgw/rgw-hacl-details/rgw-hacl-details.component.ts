@@ -1,592 +1,756 @@
-import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, Input, OnChanges, OnInit, TemplateRef, ViewChild } from '@angular/core';
+import { AbstractControl, Validators } from '@angular/forms';
+
 import {
-  TreeComponent,
   ITreeOptions,
+  TreeComponent,
   TreeModel,
   TreeNode,
   TREE_ACTIONS
 } from '@circlon/angular-tree-component';
 import { NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 import _ from 'lodash';
+import moment from 'moment';
 
-import { forkJoin, Subscription, timer as observableTimer } from 'rxjs';
-import { RgwRealmService } from '~/app/shared/api/rgw-realm.service';
-import { RgwZoneService } from '~/app/shared/api/rgw-zone.service';
-import { RgwZonegroupService } from '~/app/shared/api/rgw-zonegroup.service';
+import { CephfsService } from '~/app/shared/api/cephfs.service';
+import { ConfirmationModalComponent } from '~/app/shared/components/confirmation-modal/confirmation-modal.component';
 import { CriticalConfirmationModalComponent } from '~/app/shared/components/critical-confirmation-modal/critical-confirmation-modal.component';
-import { ActionLabelsI18n, TimerServiceInterval } from '~/app/shared/constants/app.constants';
+import { FormModalComponent } from '~/app/shared/components/form-modal/form-modal.component';
+import { ActionLabelsI18n } from '~/app/shared/constants/app.constants';
+import { CellTemplate } from '~/app/shared/enum/cell-template.enum';
 import { Icons } from '~/app/shared/enum/icons.enum';
 import { NotificationType } from '~/app/shared/enum/notification-type.enum';
+import { CdValidators } from '~/app/shared/forms/cd-validators';
+import { CdFormModalFieldConfig } from '~/app/shared/models/cd-form-modal-field-config';
 import { CdTableAction } from '~/app/shared/models/cd-table-action';
+import { CdTableColumn } from '~/app/shared/models/cd-table-column';
 import { CdTableSelection } from '~/app/shared/models/cd-table-selection';
+import {
+  CephfsDir,
+  CephfsQuotas,
+  CephfsSnapshot
+} from '~/app/shared/models/cephfs-directory-models';
 import { Permission } from '~/app/shared/models/permissions';
+import { CdDatePipe } from '~/app/shared/pipes/cd-date.pipe';
+import { DimlessBinaryPipe } from '~/app/shared/pipes/dimless-binary.pipe';
 import { AuthStorageService } from '~/app/shared/services/auth-storage.service';
 import { ModalService } from '~/app/shared/services/modal.service';
 import { NotificationService } from '~/app/shared/services/notification.service';
-import { TimerService } from '~/app/shared/services/timer.service';
-import { RgwRealm, RgwZone, RgwZonegroup } from '../models/rgw-multisite';
-import { RgwMultisiteMigrateComponent } from '../rgw-multisite-migrate/rgw-multisite-migrate.component';
-import { RgwMultisiteZoneDeletionFormComponent } from '../models/rgw-multisite-zone-deletion-form/rgw-multisite-zone-deletion-form.component';
-import { RgwMultisiteZonegroupDeletionFormComponent } from '../models/rgw-multisite-zonegroup-deletion-form/rgw-multisite-zonegroup-deletion-form.component';
-import { RgwMultisiteExportComponent } from '../rgw-multisite-export/rgw-multisite-export.component';
-import { RgwMultisiteImportComponent } from '../rgw-multisite-import/rgw-multisite-import.component';
-import { RgwMultisiteRealmFormComponent } from '../rgw-multisite-realm-form/rgw-multisite-realm-form.component';
-import { RgwMultisiteZoneFormComponent } from '../rgw-multisite-zone-form/rgw-multisite-zone-form.component';
-import { RgwMultisiteZonegroupFormComponent } from '../rgw-multisite-zonegroup-form/rgw-multisite-zonegroup-form.component';
-import { RgwDaemonService } from '~/app/shared/api/rgw-daemon.service';
-import { MgrModuleService } from '~/app/shared/api/mgr-module.service';
-import { BlockUI, NgBlockUI } from 'ng-block-ui';
-import { Router } from '@angular/router';
+import { HAclService } from '~/app/shared/api/hacl.service'
+
+
+class QuotaSetting {
+  row: {
+    // Used in quota table
+    name: string;
+    value: number | string;
+    originPath: string;
+  };
+  quotaKey: string;
+  dirValue: number;
+  nextTreeMaximum: {
+    value: number;
+    path: string;
+  };
+}
 
 @Component({
-  selector: 'cd-rgw-multisite-details',
+  selector: 'cd-rgw-hacl-details',
   templateUrl: './rgw-hacl-details.component.html',
   styleUrls: ['./rgw-hacl-details.component.scss']
 })
-export class RgwHaclDetailsComponent implements OnDestroy, OnInit {
-  private sub = new Subscription();
+export class RgwHaclDetailsComponent implements OnInit, OnChanges {
+  @ViewChild(TreeComponent)
+  treeComponent: TreeComponent;
+  @ViewChild('origin', { static: true })
+  originTmpl: TemplateRef<any>;
 
-  @ViewChild('tree') tree: TreeComponent;
+  @Input()
+  id: number;
 
-  messages = {
-    noDefaultRealm: $localize`Please create a default realm first to enable this feature`,
-    noMasterZone: $localize`Please create a master zone for each zone group to enable this feature`,
-    noRealmExists: $localize`No realm exists`,
-    disableExport: $localize`Please create master zone group and master zone for each of the realms`
-  };
-
-  @BlockUI()
-  blockUI: NgBlockUI;
+  private modalRef: NgbModalRef;
+  private dirs: CephfsDir[];
+  private nodeIds: { [path: string]: CephfsDir };
+  private requestedPaths: string[];
+  private loadingTimeout: any;
 
   icons = Icons;
-  permission: Permission;
-  selection = new CdTableSelection();
-  createTableActions: CdTableAction[];
-  migrateTableAction: CdTableAction[];
-  importAction: CdTableAction[];
-  exportAction: CdTableAction[];
-  loadingIndicator = true;
-  nodes: object[] = [];
+  loadingIndicator = false;
+  loading = {};
   treeOptions: ITreeOptions = {
     useVirtualScroll: true,
-    nodeHeight: 22,
-    levelPadding: 20,
+    getChildren: (node: TreeNode): Promise<any[]> => {
+      return this.updateDirectory(node.id);
+    },
     actionMapping: {
       mouse: {
-        click: this.onNodeSelected.bind(this)
+        click: this.selectAndShowNode.bind(this),
+        expanderClick: this.selectAndShowNode.bind(this)
       }
     }
   };
-  modalRef: NgbModalRef;
 
-  realms: RgwRealm[] = [];
-  zonegroups: RgwZonegroup[] = [];
-  zones: RgwZone[] = [];
-  metadata: any;
-  metadataTitle: string;
-  bsModalRef: NgbModalRef;
-  realmIds: string[] = [];
-  zoneIds: string[] = [];
-  defaultRealmId = '';
-  defaultZonegroupId = '';
-  defaultZoneId = '';
-  multisiteInfo: object[] = [];
-  defaultsInfo: string[] = [];
-  showMigrateAction: boolean = false;
-  editTitle: string = 'Edit';
-  deleteTitle: string = 'Delete';
-  disableExport = true;
-  rgwModuleStatus: boolean;
-  restartGatewayMessage = false;
-  rgwModuleData: string | any[] = [];
+  treeData: any[];
+  permission: Permission;
+  selectedDir: CephfsDir;
+  settings: QuotaSetting[];
+  quota: {
+    columns: CdTableColumn[];
+    selection: CdTableSelection;
+    tableActions: CdTableAction[];
+    updateSelection: Function;
+  };
+  snapshot: {
+    columns: CdTableColumn[];
+    selection: CdTableSelection;
+    tableActions: CdTableAction[];
+    updateSelection: Function;
+  };
+  nodes: any[];
+  alreadyExists: boolean;
+  presignedUrl: string;
+  signature: string;
 
   constructor(
-    private modalService: ModalService,
-    private timerService: TimerService,
     private authStorageService: AuthStorageService,
-    public actionLabels: ActionLabelsI18n,
-    public timerServiceVariable: TimerServiceInterval,
-    public router: Router,
-    public rgwRealmService: RgwRealmService,
-    public rgwZonegroupService: RgwZonegroupService,
-    public rgwZoneService: RgwZoneService,
-    public rgwDaemonService: RgwDaemonService,
-    public mgrModuleService: MgrModuleService,
-    private notificationService: NotificationService
-  ) {
-    this.permission = this.authStorageService.getPermissions().rgw;
+    private modalService: ModalService,
+    private cephfsService: CephfsService,
+    private cdDatePipe: CdDatePipe,
+    private actionLabels: ActionLabelsI18n,
+    private notificationService: NotificationService,
+    private dimlessBinaryPipe: DimlessBinaryPipe,
+    private hAclService: HAclService
+  ) {}
+
+  private selectAndShowNode(tree: TreeModel, node: TreeNode, $event: any) {
+    TREE_ACTIONS.TOGGLE_EXPANDED(tree, node, $event);
+    this.selectNode(node);
   }
 
-  openModal(entity: any, edit = false) {
-    const entityName = edit ? entity.data.type : entity;
-    const action = edit ? 'edit' : 'create';
-    const initialState = {
-      resource: entityName,
-      action: action,
-      info: entity,
-      defaultsInfo: this.defaultsInfo,
-      multisiteInfo: this.multisiteInfo
-    };
-    if (entityName === 'realm') {
-      this.bsModalRef = this.modalService.show(RgwMultisiteRealmFormComponent, initialState, {
-        size: 'lg'
-      });
-    } else if (entityName === 'zonegroup') {
-      this.bsModalRef = this.modalService.show(RgwMultisiteZonegroupFormComponent, initialState, {
-        size: 'lg'
-      });
-    } else {
-      this.bsModalRef = this.modalService.show(RgwMultisiteZoneFormComponent, initialState, {
-        size: 'lg'
-      });
+  private selectNode(node: TreeNode) {
+    TREE_ACTIONS.TOGGLE_ACTIVE(undefined, node, undefined);
+    this.selectedDir = this.getDirectory(node);
+    if (node.id === '/') {
+      return;
     }
-  }
-
-  openMigrateModal() {
-    const initialState = {
-      multisiteInfo: this.multisiteInfo
-    };
-    this.bsModalRef = this.modalService.show(RgwMultisiteMigrateComponent, initialState, {
-      size: 'lg'
-    });
-  }
-
-  openImportModal() {
-    const initialState = {
-      multisiteInfo: this.multisiteInfo
-    };
-    this.bsModalRef = this.modalService.show(RgwMultisiteImportComponent, initialState, {
-      size: 'lg'
-    });
-  }
-
-  openExportModal() {
-    const initialState = {
-      defaultsInfo: this.defaultsInfo,
-      multisiteInfo: this.multisiteInfo
-    };
-    this.bsModalRef = this.modalService.show(RgwMultisiteExportComponent, initialState, {
-      size: 'lg'
-    });
-  }
-
-  getDisableExport() {
-    this.realms.forEach((realm: any) => {
-      this.zonegroups.forEach((zonegroup) => {
-        if (realm.id === zonegroup.realm_id) {
-          if (zonegroup.is_master && zonegroup.master_zone !== '') {
-            this.disableExport = false;
-          }
-        }
-      });
-    });
-    if (!this.rgwModuleStatus) {
-      return true;
-    }
-    if (this.realms.length < 1) {
-      return this.messages.noRealmExists;
-    } else if (this.disableExport) {
-      return this.messages.disableExport;
-    } else {
-      return false;
-    }
-  }
-
-  getDisableImport() {
-    if (!this.rgwModuleStatus) {
-      return true;
-    } else {
-      return false;
-    }
+    this.setSettings(node);
   }
 
   ngOnInit() {
-    const createRealmAction: CdTableAction = {
-      permission: 'create',
-      icon: Icons.add,
-      name: this.actionLabels.CREATE + ' Realm',
-      click: () => this.openModal('realm')
-    };
-    const createZonegroupAction: CdTableAction = {
-      permission: 'create',
-      icon: Icons.add,
-      name: this.actionLabels.CREATE + ' Zone Group',
-      click: () => this.openModal('zonegroup'),
-      disable: () => this.getDisable()
-    };
-    const createZoneAction: CdTableAction = {
-      permission: 'create',
-      icon: Icons.add,
-      name: this.actionLabels.CREATE + ' Zone',
-      click: () => this.openModal('zone')
-    };
-    const migrateMultsiteAction: CdTableAction = {
-      permission: 'read',
-      icon: Icons.exchange,
-      name: this.actionLabels.MIGRATE,
-      click: () => this.openMigrateModal()
-    };
-    const importMultsiteAction: CdTableAction = {
-      permission: 'read',
-      icon: Icons.download,
-      name: this.actionLabels.IMPORT,
-      click: () => this.openImportModal(),
-      disable: () => this.getDisableImport()
-    };
-    const exportMultsiteAction: CdTableAction = {
-      permission: 'read',
-      icon: Icons.upload,
-      name: this.actionLabels.EXPORT,
-      click: () => this.openExportModal(),
-      disable: () => this.getDisableExport()
-    };
-    this.createTableActions = [createRealmAction, createZonegroupAction, createZoneAction];
-    this.migrateTableAction = [migrateMultsiteAction];
-    this.importAction = [importMultsiteAction];
-    this.exportAction = [exportMultsiteAction];
+    this.permission = this.authStorageService.getPermissions().cephfs;
+    this.setUpQuotaTable();
+    this.setUpSnapshotTable();
 
-    const observables = [
-      this.rgwRealmService.getAllRealmsInfo(),
-      this.rgwZonegroupService.getAllZonegroupsInfo(),
-      this.rgwZoneService.getAllZonesInfo()
-    ];
-    this.sub = this.timerService
-      .get(() => forkJoin(observables), this.timerServiceVariable.TIMER_SERVICE_PERIOD * 2)
-      .subscribe(
-        (multisiteInfo: [object, object, object]) => {
-          this.multisiteInfo = multisiteInfo;
-          this.loadingIndicator = false;
-          this.nodes = this.abstractTreeData(multisiteInfo);
-        },
-        (_error) => {}
-      );
-    this.mgrModuleService.list().subscribe((moduleData: any) => {
-      this.rgwModuleData = moduleData.filter((module: object) => module['name'] === 'rgw');
-      if (this.rgwModuleData.length > 0) {
-        this.rgwModuleStatus = this.rgwModuleData[0].enabled;
-      }
-    });
-  }
-
-  /* setConfigValues() {
-    this.rgwDaemonService
-      .setMultisiteConfig(
-        this.defaultsInfo['defaultRealmName'],
-        this.defaultsInfo['defaultZonegroupName'],
-        this.defaultsInfo['defaultZoneName']
-      )
-      .subscribe(() => {});
-  }*/
-
-  ngOnDestroy() {
-    this.sub.unsubscribe();
-  }
-
-  private abstractTreeData(multisiteInfo: [object, object, object]): any[] {
-    let allNodes: object[] = [];
-    let rootNodes = {};
-    let firstChildNodes = {};
-    let allFirstChildNodes = [];
-    let secondChildNodes = {};
-    let allSecondChildNodes: {}[] = [];
-    this.realms = multisiteInfo[0]['realms'];
-    this.zonegroups = multisiteInfo[1]['zonegroups'];
-    this.zones = multisiteInfo[2]['zones'];
-    this.defaultRealmId = multisiteInfo[0]['default_realm'];
-    this.defaultZonegroupId = multisiteInfo[1]['default_zonegroup'];
-    this.defaultZoneId = multisiteInfo[2]['default_zone'];
-    this.defaultsInfo = this.getDefaultsEntities(
-      this.defaultRealmId,
-      this.defaultZonegroupId,
-      this.defaultZoneId
-    );
-    if (this.realms.length > 0) {
-      // get tree for realm -> zonegroup -> zone
-      for (const realm of this.realms) {
-        const result = this.rgwRealmService.getRealmTree(realm, this.defaultRealmId);
-        rootNodes = result['nodes'];
-        this.realmIds = this.realmIds.concat(result['realmIds']);
-        for (const zonegroup of this.zonegroups) {
-          if (zonegroup.realm_id === realm.id) {
-            firstChildNodes = this.rgwZonegroupService.getZonegroupTree(
-              zonegroup,
-              this.defaultZonegroupId,
-              realm
-            );
-            for (const zone of zonegroup.zones) {
-              const zoneResult = this.rgwZoneService.getZoneTree(
-                zone,
-                this.defaultZoneId,
-                this.zones,
-                zonegroup,
-                realm
-              );
-              secondChildNodes = zoneResult['nodes'];
-              this.zoneIds = this.zoneIds.concat(zoneResult['zoneIds']);
-              allSecondChildNodes.push(secondChildNodes);
-              secondChildNodes = {};
-            }
-            firstChildNodes['children'] = allSecondChildNodes;
-            allSecondChildNodes = [];
-            allFirstChildNodes.push(firstChildNodes);
-            firstChildNodes = {};
-          }
-        }
-        rootNodes['children'] = allFirstChildNodes;
-        allNodes.push(rootNodes);
-        firstChildNodes = {};
-        secondChildNodes = {};
-        rootNodes = {};
-        allFirstChildNodes = [];
-        allSecondChildNodes = [];
-      }
-    }
-    if (this.zonegroups.length > 0) {
-      // get tree for zonegroup -> zone (standalone zonegroups that don't match a realm eg(initial default))
-      for (const zonegroup of this.zonegroups) {
-        if (!this.realmIds.includes(zonegroup.realm_id)) {
-          rootNodes = this.rgwZonegroupService.getZonegroupTree(zonegroup, this.defaultZonegroupId);
-          for (const zone of zonegroup.zones) {
-            const zoneResult = this.rgwZoneService.getZoneTree(
-              zone,
-              this.defaultZoneId,
-              this.zones,
-              zonegroup
-            );
-            firstChildNodes = zoneResult['nodes'];
-            this.zoneIds = this.zoneIds.concat(zoneResult['zoneIds']);
-            allFirstChildNodes.push(firstChildNodes);
-            firstChildNodes = {};
-          }
-          rootNodes['children'] = allFirstChildNodes;
-          allNodes.push(rootNodes);
-          firstChildNodes = {};
-          rootNodes = {};
-          allFirstChildNodes = [];
-        }
-      }
-    }
-    if (this.zones.length > 0) {
-      // get tree for standalone zones(zones that do not belong to a zonegroup)
-      for (const zone of this.zones) {
-        if (this.zoneIds.length > 0 && !this.zoneIds.includes(zone.id)) {
-          const zoneResult = this.rgwZoneService.getZoneTree(zone, this.defaultZoneId, this.zones);
-          rootNodes = zoneResult['nodes'];
-          allNodes.push(rootNodes);
-          rootNodes = {};
-        }
-      }
-    }
-    if (this.realms.length < 1 && this.zonegroups.length < 1 && this.zones.length < 1) {
-      return [
-        {
-          name: 'No nodes!'
-        }
-      ];
-    }
-    this.realmIds = [];
-    this.zoneIds = [];
-    this.getDisableMigrate();
-    this.rgwDaemonService.list().subscribe((data: any) => {
-      const realmName = data.map((item: { [x: string]: any }) => item['realm_name']);
-      if (
-        this.defaultRealmId != '' &&
-        this.defaultZonegroupId != '' &&
-        this.defaultZoneId != '' &&
-        realmName.includes('')
-      ) {
-        this.restartGatewayMessage = true;
-      }
-    });
-    return allNodes;
-  }
-
-  getDefaultsEntities(
-    defaultRealmId: string,
-    defaultZonegroupId: string,
-    defaultZoneId: string
-  ): any {
-    const defaultRealm = this.realms.find((x: { id: string }) => x.id === defaultRealmId);
-    const defaultZonegroup = this.zonegroups.find(
-      (x: { id: string }) => x.id === defaultZonegroupId
-    );
-    const defaultZone = this.zones.find((x: { id: string }) => x.id === defaultZoneId);
-    const defaultRealmName = defaultRealm !== undefined ? defaultRealm.name : null;
-    const defaultZonegroupName = defaultZonegroup !== undefined ? defaultZonegroup.name : null;
-    const defaultZoneName = defaultZone !== undefined ? defaultZone.name : null;
-    return {
-      defaultRealmName: defaultRealmName,
-      defaultZonegroupName: defaultZonegroupName,
-      defaultZoneName: defaultZoneName
-    };
-  }
-
-  onNodeSelected(tree: TreeModel, node: TreeNode) {
-    TREE_ACTIONS.ACTIVATE(tree, node, true);
-    this.metadataTitle = node.data.name;
-    this.metadata = node.data.info;
-    node.data.show = true;
-  }
-
-  onUpdateData() {
-    this.tree.treeModel.expandAll();
-  }
-
-  getDisable() {
-    let isMasterZone = true;
-    if (this.defaultRealmId === '') {
-      return this.messages.noDefaultRealm;
-    } else {
-      this.zonegroups.forEach((zgp: any) => {
-        if (_.isEmpty(zgp.master_zone)) {
-          isMasterZone = false;
-        }
-      });
-      if (!isMasterZone) {
-        this.editTitle =
-          'Please create a master zone for each existing zonegroup to enable this feature';
-        return this.messages.noMasterZone;
+    this.hAclService.createSignedUrl().then(([signedUrl, signature]) => {
+      // Check and handle the signedUrl
+      if (signedUrl instanceof Uint8Array) {
+        this.presignedUrl = new TextDecoder().decode(signedUrl);
       } else {
-        this.editTitle = 'Edit';
-        return false;
+        this.presignedUrl = signedUrl;
       }
-    }
+
+      // Check and handle the signature
+      if (signature instanceof Uint8Array) {
+        this.signature = new TextDecoder().decode(signature);
+      } else {
+        this.signature = signature;
+      }
+    });
   }
 
-  getDisableMigrate() {
-    if (
-      this.realms.length === 0 &&
-      this.zonegroups.length === 1 &&
-      this.zonegroups[0].name === 'default' &&
-      this.zones.length === 1 &&
-      this.zones[0].name === 'default'
-    ) {
-      this.showMigrateAction = true;
-    } else {
-      this.showMigrateAction = false;
-    }
-    return this.showMigrateAction;
-  }
-
-  isDeleteDisabled(node: TreeNode): boolean {
-    let disable: boolean = false;
-    let masterZonegroupCount: number = 0;
-    if (node.data.type === 'realm' && node.data.is_default && this.realms.length < 2) {
-      disable = true;
-    }
-
-    if (node.data.type === 'zonegroup') {
-      if (this.zonegroups.length < 2) {
-        this.deleteTitle = 'You can not delete the only zonegroup available';
-        disable = true;
-      } else if (node.data.is_default) {
-        this.deleteTitle = 'You can not delete the default zonegroup';
-        disable = true;
-      } else if (node.data.is_master) {
-        for (let zonegroup of this.zonegroups) {
-          if (zonegroup.is_master === true) {
-            masterZonegroupCount++;
-            if (masterZonegroupCount > 1) break;
-          }
+  private setUpQuotaTable() {
+    this.quota = {
+      columns: [
+        {
+          prop: 'row.name',
+          name: $localize`Name`,
+          flexGrow: 1
+        },
+        {
+          prop: 'row.value',
+          name: $localize`Value`,
+          sortable: false,
+          flexGrow: 1
+        },
+        {
+          prop: 'row.originPath',
+          name: $localize`Origin`,
+          sortable: false,
+          cellTemplate: this.originTmpl,
+          flexGrow: 1
         }
-        if (masterZonegroupCount < 2) {
-          this.deleteTitle = 'You can not delete the only master zonegroup available';
-          disable = true;
+      ],
+      selection: new CdTableSelection(),
+      updateSelection: (selection: CdTableSelection) => {
+        this.quota.selection = selection;
+      },
+      tableActions: [
+        {
+          name: this.actionLabels.SET,
+          icon: Icons.edit,
+          permission: 'update',
+          visible: (selection) =>
+            !selection.hasSelection || (selection.first() && selection.first().dirValue === 0),
+          click: () => this.updateQuotaModal()
+        },
+        {
+          name: this.actionLabels.UPDATE,
+          icon: Icons.edit,
+          permission: 'update',
+          visible: (selection) => selection.first() && selection.first().dirValue > 0,
+          click: () => this.updateQuotaModal()
+        },
+        {
+          name: this.actionLabels.UNSET,
+          icon: Icons.destroy,
+          permission: 'update',
+          disable: (selection) =>
+            !selection.hasSelection || (selection.first() && selection.first().dirValue === 0),
+          click: () => this.unsetQuotaModal()
         }
-      }
-    }
-
-    if (node.data.type === 'zone') {
-      if (this.zones.length < 2) {
-        this.deleteTitle = 'You can not delete the only zone available';
-        disable = true;
-      } else if (node.data.is_default) {
-        this.deleteTitle = 'You can not delete the default zone';
-        disable = true;
-      } else if (node.data.is_master && node.data.zone_zonegroup.zones.length < 2) {
-        this.deleteTitle =
-          'You can not delete the master zone as there are no more zones in this zonegroup';
-        disable = true;
-      }
-    }
-
-    if (!disable) {
-      this.deleteTitle = 'Delete';
-    }
-
-    return disable;
+      ]
+    };
   }
 
-  delete(node: TreeNode) {
-    if (node.data.type === 'realm') {
-      this.modalRef = this.modalService.show(CriticalConfirmationModalComponent, {
-        itemDescription: $localize`${node.data.type} ${node.data.name}`,
-        itemNames: [`${node.data.name}`],
-        submitAction: () => {
-          this.rgwRealmService.delete(node.data.name).subscribe(
-            () => {
-              this.modalRef.close();
-              this.notificationService.show(
-                NotificationType.success,
-                $localize`Realm: '${node.data.name}' deleted successfully`
-              );
-            },
-            () => {
-              this.modalRef.componentInstance.stopLoadingSpinner();
-            }
+  private setUpSnapshotTable() {
+    this.snapshot = {
+      columns: [
+        {
+          prop: 'name',
+          name: $localize`Name`,
+          flexGrow: 1
+        },
+        {
+          prop: 'path',
+          name: $localize`Path`,
+          flexGrow: 1.5,
+          cellTransformation: CellTemplate.path
+        },
+        {
+          prop: 'created',
+          name: $localize`Created`,
+          flexGrow: 1,
+          pipe: this.cdDatePipe
+        }
+      ],
+      selection: new CdTableSelection(),
+      updateSelection: (selection: CdTableSelection) => {
+        this.snapshot.selection = selection;
+      },
+      tableActions: [
+        {
+          name: this.actionLabels.CREATE,
+          icon: Icons.add,
+          permission: 'create',
+          canBePrimary: (selection) => !selection.hasSelection,
+          click: () => this.createSnapshot(),
+          disable: () => this.disableCreateSnapshot()
+        },
+        {
+          name: this.actionLabels.DELETE,
+          icon: Icons.destroy,
+          permission: 'delete',
+          click: () => this.deleteSnapshotModal(),
+          canBePrimary: (selection) => selection.hasSelection,
+          disable: (selection) => !selection.hasSelection
+        }
+      ]
+    };
+  }
+
+  private disableCreateSnapshot(): string | boolean {
+    const folders = this.selectedDir.path.split('/').slice(1);
+    // With depth of 4 or more we have the subvolume files/folders for which we cannot create
+    // a snapshot. Somehow, you can create a snapshot of the subvolume but not its files.
+    if (folders.length >= 4 && folders[0] === 'volumes') {
+      return $localize`Cannot create snapshots for files/folders in the subvolume ${folders[2]}`;
+    }
+    return false;
+  }
+
+  ngOnChanges() {
+    this.selectedDir = undefined;
+    this.dirs = [];
+    this.requestedPaths = [];
+    this.nodeIds = {};
+    if (this.id) {
+      this.setRootNode();
+      this.firstCall();
+    }
+  }
+
+  private setRootNode() {
+    this.nodes = [
+      {
+        name: '/',
+        id: '/',
+        isExpanded: true
+      }
+    ];
+  }
+
+  private firstCall() {
+    const path = '/';
+    setTimeout(() => {
+      this.getNode(path).loadNodeChildren();
+    }, 10);
+  }
+
+  updateDirectory(path: string): Promise<any[]> {
+    this.unsetLoadingIndicator();
+    if (!this.requestedPaths.includes(path)) {
+      this.requestedPaths.push(path);
+    } else if (this.loading[path] === true) {
+      return undefined; // Path is currently fetched.
+    }
+    return new Promise((resolve) => {
+      this.setLoadingIndicator(path, true);
+      this.cephfsService.lsDir(this.id, path).subscribe((dirs) => {
+        this.updateTreeStructure(dirs);
+        this.updateQuotaTable();
+        this.updateTree();
+        resolve(this.getChildren(path));
+        this.setLoadingIndicator(path, false);
+      });
+    });
+  }
+
+  private setLoadingIndicator(path: string, loading: boolean) {
+    this.loading[path] = loading;
+    this.unsetLoadingIndicator();
+  }
+
+  private getSubDirectories(path: string, tree: CephfsDir[] = this.dirs): CephfsDir[] {
+    return tree.filter((d) => d.parent === path);
+  }
+
+  private getChildren(path: string): any[] {
+    const subTree = this.getSubTree(path);
+    return _.sortBy(this.getSubDirectories(path), 'path').map((dir) =>
+      this.createNode(dir, subTree)
+    );
+  }
+
+  private createNode(dir: CephfsDir, subTree?: CephfsDir[]): any {
+    this.nodeIds[dir.path] = dir;
+    if (!subTree) {
+      this.getSubTree(dir.parent);
+    }
+    return {
+      name: dir.name,
+      id: dir.path,
+      hasChildren: this.getSubDirectories(dir.path, subTree).length > 0
+    };
+  }
+
+  private getSubTree(path: string): CephfsDir[] {
+    return this.dirs.filter((d) => d.parent && d.parent.startsWith(path));
+  }
+
+  private setSettings(node: TreeNode) {
+    const readable = (value: number, fn?: (arg0: number) => number | string): number | string =>
+      value ? (fn ? fn(value) : value) : '';
+
+    this.settings = [
+      this.getQuota(node, 'max_files', readable),
+      this.getQuota(node, 'max_bytes', (value) =>
+        readable(value, (v) => this.dimlessBinaryPipe.transform(v))
+      )
+    ];
+  }
+
+  private getQuota(
+    tree: TreeNode,
+    quotaKey: string,
+    valueConvertFn: (number: number) => number | string
+  ): QuotaSetting {
+    // Get current maximum
+    const currentPath = tree.id;
+    tree = this.getOrigin(tree, quotaKey);
+    const dir = this.getDirectory(tree);
+    const value = dir.quotas[quotaKey];
+    // Get next tree maximum
+    // => The value that isn't changeable through a change of the current directories quota value
+    let nextMaxValue = value;
+    let nextMaxPath = dir.path;
+    if (tree.id === currentPath) {
+      if (tree.parent.id === '/') {
+        // The value will never inherit any other value, so it has no maximum.
+        nextMaxValue = 0;
+      } else {
+        const nextMaxDir = this.getDirectory(this.getOrigin(tree.parent, quotaKey));
+        nextMaxValue = nextMaxDir.quotas[quotaKey];
+        nextMaxPath = nextMaxDir.path;
+      }
+    }
+    return {
+      row: {
+        name: quotaKey === 'max_bytes' ? $localize`Max size` : $localize`Max files`,
+        value: valueConvertFn(value),
+        originPath: value ? dir.path : ''
+      },
+      quotaKey,
+      dirValue: this.nodeIds[currentPath].quotas[quotaKey],
+      nextTreeMaximum: {
+        value: nextMaxValue,
+        path: nextMaxValue ? nextMaxPath : ''
+      }
+    };
+  }
+
+  /**
+   * Get the node where the quota limit originates from in the current node
+   *
+   * Example as it's a recursive method:
+   *
+   * |  Path + Value | Call depth |       useOrigin?      | Output |
+   * |:-------------:|:----------:|:---------------------:|:------:|
+   * | /a/b/c/d (15) |     1st    | 2nd (5) < 15 => false |  /a/b  |
+   * | /a/b/c (20)   |     2nd    | 3rd (5) < 20 => false |  /a/b  |
+   * | /a/b (5)      |     3rd    |  4th (10) < 5 => true |  /a/b  |
+   * | /a (10)       |     4th    |       10 => true      |   /a   |
+   *
+   */
+  private getOrigin(tree: TreeNode, quotaSetting: string): TreeNode {
+    if (tree.parent && tree.parent.id !== '/') {
+      const current = this.getQuotaFromTree(tree, quotaSetting);
+
+      // Get the next used quota and node above the current one (until it hits the root directory)
+      const originTree = this.getOrigin(tree.parent, quotaSetting);
+      const inherited = this.getQuotaFromTree(originTree, quotaSetting);
+
+      // Select if the current quota is in use or the above
+      const useOrigin = current === 0 || (inherited !== 0 && inherited < current);
+      return useOrigin ? originTree : tree;
+    }
+    return tree;
+  }
+
+  private getQuotaFromTree(tree: TreeNode, quotaSetting: string): number {
+    return this.getDirectory(tree).quotas[quotaSetting];
+  }
+
+  private getDirectory(node: TreeNode): CephfsDir {
+    const path = node.id as string;
+    return this.nodeIds[path];
+  }
+
+  selectOrigin(path: string) {
+    this.selectNode(this.getNode(path));
+  }
+
+  private getNode(path: string): TreeNode {
+    return this.treeComponent.treeModel.getNodeById(path);
+  }
+
+  updateQuotaModal() {
+    const path = this.selectedDir.path;
+    const selection: QuotaSetting = this.quota.selection.first();
+    const nextMax = selection.nextTreeMaximum;
+    const key = selection.quotaKey;
+    const value = selection.dirValue;
+    this.modalService.show(FormModalComponent, {
+      titleText: this.getModalQuotaTitle(
+        value === 0 ? this.actionLabels.SET : this.actionLabels.UPDATE,
+        path
+      ),
+      message: nextMax.value
+        ? $localize`The inherited ${this.getQuotaValueFromPathMsg(
+            nextMax.value,
+            nextMax.path
+          )} is the maximum value to be used.`
+        : undefined,
+      fields: [this.getQuotaFormField(selection.row.name, key, value, nextMax.value)],
+      submitButtonText: $localize`Save`,
+      onSubmit: (values: CephfsQuotas) => this.updateQuota(values)
+    });
+  }
+
+  private getModalQuotaTitle(action: string, path: string): string {
+    return $localize`${action} CephFS ${this.getQuotaName()} quota for '${path}'`;
+  }
+
+  private getQuotaName(): string {
+    return this.isBytesQuotaSelected() ? $localize`size` : $localize`files`;
+  }
+
+  private isBytesQuotaSelected(): boolean {
+    return this.quota.selection.first().quotaKey === 'max_bytes';
+  }
+
+  private getQuotaValueFromPathMsg(value: number, path: string): string {
+    value = this.isBytesQuotaSelected() ? this.dimlessBinaryPipe.transform(value) : value;
+
+    return $localize`${this.getQuotaName()} quota ${value} from '${path}'`;
+  }
+
+  private getQuotaFormField(
+    label: string,
+    name: string,
+    value: number,
+    maxValue: number
+  ): CdFormModalFieldConfig {
+    const isBinary = name === 'max_bytes';
+    const formValidators = [isBinary ? CdValidators.binaryMin(0) : Validators.min(0)];
+    if (maxValue) {
+      formValidators.push(isBinary ? CdValidators.binaryMax(maxValue) : Validators.max(maxValue));
+    }
+    const field: CdFormModalFieldConfig = {
+      type: isBinary ? 'binary' : 'number',
+      label,
+      name,
+      value,
+      validators: formValidators,
+      required: true
+    };
+    if (!isBinary) {
+      field.errors = {
+        min: $localize`Value has to be at least 0 or more`,
+        max: $localize`Value has to be at most ${maxValue} or less`
+      };
+    }
+    return field;
+  }
+
+  private updateQuota(values: CephfsQuotas, onSuccess?: Function) {
+    const path = this.selectedDir.path;
+    const key = this.quota.selection.first().quotaKey;
+    const action =
+      this.selectedDir.quotas[key] === 0
+        ? this.actionLabels.SET
+        : values[key] === 0
+        ? this.actionLabels.UNSET
+        : $localize`Updated`;
+    this.cephfsService.quota(this.id, path, values).subscribe(() => {
+      if (onSuccess) {
+        onSuccess();
+      }
+      this.notificationService.show(
+        NotificationType.success,
+        this.getModalQuotaTitle(action, path)
+      );
+      this.forceDirRefresh();
+    });
+  }
+
+  unsetQuotaModal() {
+    const path = this.selectedDir.path;
+    const selection: QuotaSetting = this.quota.selection.first();
+    const key = selection.quotaKey;
+    const nextMax = selection.nextTreeMaximum;
+    const dirValue = selection.dirValue;
+
+    const quotaValue = this.getQuotaValueFromPathMsg(nextMax.value, nextMax.path);
+    const conclusion =
+      nextMax.value > 0
+        ? nextMax.value > dirValue
+          ? $localize`in order to inherit ${quotaValue}`
+          : $localize`which isn't used because of the inheritance of ${quotaValue}`
+        : $localize`in order to have no quota on the directory`;
+
+    this.modalRef = this.modalService.show(ConfirmationModalComponent, {
+      titleText: this.getModalQuotaTitle(this.actionLabels.UNSET, path),
+      buttonText: this.actionLabels.UNSET,
+      description: $localize`${this.actionLabels.UNSET} ${this.getQuotaValueFromPathMsg(
+        dirValue,
+        path
+      )} ${conclusion}.`,
+      onSubmit: () => this.updateQuota({ [key]: 0 }, () => this.modalRef.close())
+    });
+  }
+
+  createSnapshot() {
+    // Create a snapshot. Auto-generate a snapshot name by default.
+    const path = this.selectedDir.path;
+    this.modalService.show(FormModalComponent, {
+      titleText: $localize`Create Snapshot`,
+      message: $localize`Please enter the name of the snapshot.`,
+      fields: [
+        {
+          type: 'text',
+          name: 'name',
+          value: `${moment().toISOString(true)}`,
+          required: true,
+          validators: [this.validateValue.bind(this)]
+        }
+      ],
+      submitButtonText: $localize`Create Snapshot`,
+      onSubmit: (values: CephfsSnapshot) => {
+        if (!this.alreadyExists) {
+          this.cephfsService.mkSnapshot(this.id, path, values.name).subscribe((name) => {
+            this.notificationService.show(
+              NotificationType.success,
+              $localize`Created snapshot '${name}' for '${path}'`
+            );
+            this.forceDirRefresh();
+          });
+        } else {
+          this.notificationService.show(
+            NotificationType.error,
+            $localize`Snapshot name '${values.name}' is already in use. Please use another name.`
           );
         }
+      }
+    });
+  }
+
+  validateValue(control: AbstractControl) {
+    this.alreadyExists = this.selectedDir.snapshots.some((s) => s.name === control.value);
+  }
+
+  /**
+   * Forces an update of the current selected directory
+   *
+   * As all nodes point by their path on an directory object, the easiest way is to update
+   * the objects by merge with their latest change.
+   */
+  private forceDirRefresh(path?: string) {
+    if (!path) {
+      const dir = this.selectedDir;
+      if (!dir) {
+        throw new Error('This function can only be called without path if an selection was made');
+      }
+      // Parent has to be called in order to update the object referring
+      // to the current selected directory
+      path = dir.parent ? dir.parent : dir.path;
+    }
+    const node = this.getNode(path);
+    node.loadNodeChildren();
+  }
+
+  private updateTreeStructure(dirs: CephfsDir[]) {
+    const getChildrenAndPaths = (
+      directories: CephfsDir[],
+      parent: string
+    ): { children: CephfsDir[]; paths: string[] } => {
+      const children = directories.filter((d) => d.parent === parent);
+      const paths = children.map((d) => d.path);
+      return { children, paths };
+    };
+
+    const parents = _.uniq(dirs.map((d) => d.parent).sort());
+    parents.forEach((p) => {
+      const received = getChildrenAndPaths(dirs, p);
+      const cached = getChildrenAndPaths(this.dirs, p);
+
+      cached.children.forEach((d) => {
+        if (!received.paths.includes(d.path)) {
+          this.removeOldDirectory(d);
+        }
       });
-    } else if (node.data.type === 'zonegroup') {
-      this.modalRef = this.modalService.show(RgwMultisiteZonegroupDeletionFormComponent, {
-        zonegroup: node.data
+      received.children.forEach((d) => {
+        if (cached.paths.includes(d.path)) {
+          this.updateExistingDirectory(cached.children, d);
+        } else {
+          this.addNewDirectory(d);
+        }
       });
-    } else if (node.data.type === 'zone') {
-      this.modalRef = this.modalService.show(RgwMultisiteZoneDeletionFormComponent, {
-        zone: node.data
-      });
+    });
+  }
+
+  private removeOldDirectory(rmDir: CephfsDir) {
+    const path = rmDir.path;
+    // Remove directory from local variables
+    _.remove(this.dirs, (d) => d.path === path);
+    delete this.nodeIds[path];
+    this.updateDirectoriesParentNode(rmDir);
+  }
+
+  private updateDirectoriesParentNode(dir: CephfsDir) {
+    const parent = dir.parent;
+    if (!parent) {
+      return;
+    }
+    const node = this.getNode(parent);
+    if (!node) {
+      // Node will not be found for new sub directories - this is the intended behaviour
+      return;
+    }
+    const children = this.getChildren(parent);
+    node.data.children = children;
+    node.data.hasChildren = children.length > 0;
+    this.treeComponent.treeModel.update();
+  }
+
+  private addNewDirectory(newDir: CephfsDir) {
+    this.dirs.push(newDir);
+    this.nodeIds[newDir.path] = newDir;
+    this.updateDirectoriesParentNode(newDir);
+  }
+
+  private updateExistingDirectory(source: CephfsDir[], updatedDir: CephfsDir) {
+    const currentDirObject = source.find((sub) => sub.path === updatedDir.path);
+    Object.assign(currentDirObject, updatedDir);
+  }
+
+  private updateQuotaTable() {
+    const node = this.selectedDir ? this.getNode(this.selectedDir.path) : undefined;
+    if (node && node.id !== '/') {
+      this.setSettings(node);
     }
   }
 
-  enableRgwModule() {
-    let $obs;
-    const fnWaitUntilReconnected = () => {
-      observableTimer(2000).subscribe(() => {
-        // Trigger an API request to check if the connection is
-        // re-established.
-        this.mgrModuleService.list().subscribe(
-          () => {
-            // Resume showing the notification toasties.
-            this.notificationService.suspendToasties(false);
-            // Unblock the whole UI.
-            this.blockUI.stop();
-            // Reload the data table content.
-            this.notificationService.show(NotificationType.success, $localize`Enabled RGW Module`);
-            this.router.navigateByUrl('/', { skipLocationChange: true }).then(() => {
-              this.router.navigate(['/rgw/multisite']);
-            });
-            // Reload the data table content.
-          },
-          () => {
-            fnWaitUntilReconnected();
-          }
+  private updateTree(force: boolean = false) {
+    if (this.loadingIndicator && !force) {
+      // In order to make the page scrollable during load, the render cycle for each node
+      // is omitted and only be called if all updates were loaded.
+      return;
+    }
+    this.treeComponent.treeModel.update();
+    this.nodes = [...this.nodes];
+    this.treeComponent.sizeChanged();
+  }
+
+  deleteSnapshotModal() {
+    this.modalRef = this.modalService.show(CriticalConfirmationModalComponent, {
+      itemDescription: $localize`CephFs Snapshot`,
+      itemNames: this.snapshot.selection.selected.map((snapshot: CephfsSnapshot) => snapshot.name),
+      submitAction: () => this.deleteSnapshot()
+    });
+  }
+
+  deleteSnapshot() {
+    const path = this.selectedDir.path;
+    this.snapshot.selection.selected.forEach((snapshot: CephfsSnapshot) => {
+      const name = snapshot.name;
+      this.cephfsService.rmSnapshot(this.id, path, name).subscribe(() => {
+        this.notificationService.show(
+          NotificationType.success,
+          $localize`Deleted snapshot '${name}' for '${path}'`
         );
       });
-    };
+    });
+    this.modalRef.close();
+    this.forceDirRefresh();
+  }
 
-    if (!this.rgwModuleStatus) {
-      $obs = this.mgrModuleService.enable('rgw');
-    }
-    $obs.subscribe(
-      () => undefined,
-      () => {
-        // Suspend showing the notification toasties.
-        this.notificationService.suspendToasties(true);
-        // Block the whole UI to prevent user interactions until
-        // the connection to the backend is reestablished
-        this.blockUI.start($localize`Reconnecting, please wait ...`);
-        fnWaitUntilReconnected();
+  refreshAllDirectories() {
+    // In order to make the page scrollable during load, the render cycle for each node
+    // is omitted and only be called if all updates were loaded.
+    this.loadingIndicator = true;
+    this.requestedPaths.map((path) => this.forceDirRefresh(path));
+    const interval = setInterval(() => {
+      this.updateTree(true);
+      if (!this.loadingIndicator) {
+        clearInterval(interval);
       }
-    );
+    }, 3000);
+  }
+
+  unsetLoadingIndicator() {
+    if (!this.loadingIndicator) {
+      return;
+    }
+    clearTimeout(this.loadingTimeout);
+    this.loadingTimeout = setTimeout(() => {
+      const loading = Object.values(this.loading).some((l) => l);
+      if (loading) {
+        return this.unsetLoadingIndicator();
+      }
+      this.loadingIndicator = false;
+      this.updateTree();
+      // The problem is that we can't subscribe to an useful updated tree event and the time
+      // between fetching all calls and rebuilding the tree can take some time
+    }, 3000);
   }
 }

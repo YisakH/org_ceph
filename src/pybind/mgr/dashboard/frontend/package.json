@@ -77,7 +77,9 @@
     "simplebar-angular": "2.3.6",
     "swagger-ui": "4.12.0",
     "tslib": "2.3.1",
-    "zone.js": "0.11.8"
+    "zone.js": "0.11.8",
+    "js-aws-sigv4": "0.2.24",
+    "aws-signature-v4": "1.4.0"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "15.2.9",

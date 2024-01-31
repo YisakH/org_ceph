@@ -56,7 +56,7 @@ export class HAclService {
     let region = 'us-east-1';
     let accessKey = 'qwer';
     let secretKey = 'qwer';
-    let queryParams = {'user': 'test-user'};
+    let queryParams = {'user': 'user1'};
 
     const headers: HttpHeaders = this.awsSignatureService.signRequest(method, url, service, region, accessKey, secretKey, queryParams);
 

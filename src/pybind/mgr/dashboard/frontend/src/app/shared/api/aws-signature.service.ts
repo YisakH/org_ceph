@@ -35,7 +35,7 @@ export class AwsSignatureService {
     const canonicalQuerystring = this.buildCanonicalQueryString(queryParams);
 
     // Create the canonical request
-    const canonicalUri = '/'; // Adjust based on your URL
+    const canonicalUri = '/admin/org/dec'; // Adjust based on your URL
 
     const payloadHash = CryptoJS.SHA256('').toString(); // Hash of an empty string for GET requests
     const canonicalHeaders = `host:${new URL(url).hostname}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;

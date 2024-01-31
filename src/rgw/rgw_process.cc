@@ -403,6 +403,10 @@ int process_request(const RGWProcessEnv& penv,
 
     s->http_params = parseStringToVector(s->info.request_params);
 
+    for (auto &param : s->http_params) {
+      dout(0) << "socks : param : " << param.first << " : " << param.second << dendl;
+    }
+
     s->trace = tracing::rgw::tracer.start_trace(op->name(), s->trace_enabled);
     s->trace->SetAttribute(tracing::rgw::TRANS_ID, s->trans_id);
 

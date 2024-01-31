@@ -63,9 +63,11 @@
     "async-mutex": "0.2.4",
     "bootstrap": "5.2.3",
     "chart.js": "2.9.4",
+    "crypto-browserify": "",
     "detect-browser": "5.2.0",
     "file-saver": "2.0.2",
     "fork-awesome": "1.1.7",
+    "js-aws-sigv4": "0.2.24",
     "lodash": "4.17.21",
     "moment": "2.29.4",
     "ng-block-ui": "3.0.2",
@@ -77,9 +79,7 @@
     "simplebar-angular": "2.3.6",
     "swagger-ui": "4.12.0",
     "tslib": "2.3.1",
-    "zone.js": "0.11.8",
-    "js-aws-sigv4": "0.2.24",
-    "aws-signature-v4": "1.4.0"
+    "zone.js": "0.11.8"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "15.2.9",
@@ -95,6 +95,7 @@
     "@compodoc/compodoc": "1.1.18",
     "@cypress/browserify-preprocessor": "3.0.2",
     "@types/brace-expansion": "1.1.0",
+    "@types/crypto-js": "4.2.2",
     "@types/cypress-cucumber-preprocessor": "4.0.1",
     "@types/jest": "29.5.4",
     "@types/lodash": "4.14.161",

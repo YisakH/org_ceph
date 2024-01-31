@@ -4821,6 +4821,10 @@ void RGWDeleteOrg::pre_exec()
 
 void RGWGetOrg::execute(optional_yield y)
 {
+  for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it)
+  {
+    dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
+  }
   int ret = -2;
   bufferlist response_bl;
   if (s->decoded_uri == "/admin/org/acl")

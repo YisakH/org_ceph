@@ -1,0 +1,6 @@
+/ceph/org_ceph/src/pybind/mgr/dashboard/build/CMakeFiles/edit_cache.dir
+/ceph/org_ceph/src/pybind/mgr/dashboard/build/CMakeFiles/rebuild_cache.dir
+/ceph/org_ceph/src/pybind/mgr/dashboard/build/CMakeFiles/list_install_components.dir
+/ceph/org_ceph/src/pybind/mgr/dashboard/build/CMakeFiles/install.dir
+/ceph/org_ceph/src/pybind/mgr/dashboard/build/CMakeFiles/install/local.dir
+/ceph/org_ceph/src/pybind/mgr/dashboard/build/CMakeFiles/install/strip.dir

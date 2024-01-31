@@ -110,6 +110,11 @@ export class RgwHaclDetailsComponent implements OnInit, OnChanges {
   alreadyExists: boolean;
   presignedUrl: string;
   signature: string;
+  response_body: string;
+  response_status: number;
+  response_headers: string;
+  error: string;
+  qeuryParams: string;
 
   constructor(
     private authStorageService: AuthStorageService,
@@ -141,21 +146,24 @@ export class RgwHaclDetailsComponent implements OnInit, OnChanges {
     this.setUpQuotaTable();
     this.setUpSnapshotTable();
 
-    this.hAclService.createSignedUrl().then(([signedUrl, signature]) => {
-      // Check and handle the signedUrl
-      if (signedUrl instanceof Uint8Array) {
-        this.presignedUrl = new TextDecoder().decode(signedUrl);
-      } else {
-        this.presignedUrl = signedUrl;
-      }
+    /*
+    // getRequestInfo의 리턴값을 받아서 사용. 배열의 첫번째 값만 받음
+    const [headers, queryParams] = this.hAclService.getReqeustInfo();
+    
+    this.qeuryParams = queryParams['user'];
+    this.response_body = headers.get('Authorization');
+    this.response_status = 200;
+    */
 
-      // Check and handle the signature
-      if (signature instanceof Uint8Array) {
-        this.signature = new TextDecoder().decode(signature);
-      } else {
-        this.signature = signature;
-      }
+    
+    this.hAclService.getResponse().subscribe(response => {
+      this.response_status = response.status;
+      this.response_body = response.body;
+      //this.response_headers = response.headers;
+    }, error => {
+      this.error = error;
     });
+    
   }
 
   private setUpQuotaTable() {

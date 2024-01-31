@@ -7,11 +7,16 @@
           <i [ngClass]="[icons.spinner, icons.spin]"></i>
         </ng-template>
       </tree-root>
-      <!-- Display the presigned URL -->
-      <img *ngIf="presignedUrl" [src]="presignedUrl" alt="Presigned Content">
-      <!-- Or if it's a downloadable file -->
-      <a *ngIf="presignedUrl" [href]="presignedUrl">Download File</a>
+      <!-- Presigned URL을 텍스트로 표시 -->
+      <div *ngIf="response_body">
+        response_body: {{ response_body }}
+      </div>
+      <div *ngIf="response_status">
+        response_status: {{ response_status }}
+      </div>
+      <div *ngIf="qeuryParams">
+        qeuryParams: {{ qeuryParams }}
+      </div>
     </div>
   </div>
 </div>
-:

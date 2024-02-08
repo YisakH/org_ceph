@@ -2315,6 +2315,7 @@ RGWHandler_REST* RGWREST::get_handler(
   ldpp_dout(s, 0) << "socks: rgw_rest.cc : frontend_prefix(rgw_rest.cc) : " << frontend_prefix << dendl;
   ldpp_dout(s, 0) << "socks: rgw_rest.cc : decoded_uri(rgw_rest.cc) : " << s->decoded_uri << dendl;
   ldpp_dout(s, 0) << "socks: rgw_rest.cc : relative_uri(rgw_rest.cc) : " << s->relative_uri << dendl;
+  ldpp_dout(s, 0) << "socks: rgw_rest.cc : method(rgw_rest.cc) : " << s->info.method << dendl;
 
   RGWRESTMgr *m = mgr.get_manager(s, frontend_prefix, s->decoded_uri,
                                   &s->relative_uri);

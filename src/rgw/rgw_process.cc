@@ -329,8 +329,9 @@ int process_request(const RGWProcessEnv& penv,
                                                frontend_prefix,
                                                client_io, &mgr, &init_error);
   rgw::dmclock::SchedulerCompleter c;
-
+  string tmp = s->decoded_uri;
   if (init_error != 0) {
+    dout(0) << "socks: init_error occured" <<  dendl;
     abort_early(s, nullptr, init_error, nullptr, yield);
     goto done;
   }

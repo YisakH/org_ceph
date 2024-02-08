@@ -150,6 +150,12 @@ class CherryPyConfig(object):
             'tools.json_in.on': True,
             'tools.json_in.force': True,
             'tools.plugin_hooks_filter_request.on': True,
+            # socks: 여기서부터 내가 추가한 cors 처리 로직
+            '/admin/org/dec': {
+            'tools.cors.on': False,
+            
+            }
+            
         }
 
         if use_ssl:

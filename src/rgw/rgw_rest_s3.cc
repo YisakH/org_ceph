@@ -3884,7 +3884,8 @@ void RGWOptionsCORS_ObjStore_S3::send_response()
 
 void RGWOptionsHAclCORS_ObjStore_S3::send_response()
 {
-  string hdrs, exp_hdrs;
+  string hdrs = "Authorization, Content-Type, X-Requested-With";
+  string exp_hdrs = "Content-Length, Content-Type";
   uint32_t max_age = CORS_MAX_AGE_INVALID;
   /*EACCES means, there is no CORS registered yet for the bucket
    *ENOENT means, there is no match of the Origin in the list of CORSRule
@@ -3897,7 +3898,10 @@ void RGWOptionsHAclCORS_ObjStore_S3::send_response()
     end_header(s, NULL);
     return;
   }
-  get_response_params(hdrs, exp_hdrs, &max_age);
+  //get_response_params(hdrs, exp_hdrs, &max_age); // socks: 여기서 rules를 가져오지 못해 에러 발생
+  
+  dout(0) << "socks : RGWOptionsHAclCORS_ObjStore_S3::send_response() origin=" << origin << " req_meth=" << req_meth << 
+  " hdrs="  << hdrs << " exp_hdrs=" << exp_hdrs << " max_age=" << max_age << dendl;
 
   dump_errno(s);
   dump_access_control(s, origin, req_meth, hdrs.c_str(), exp_hdrs.c_str(),

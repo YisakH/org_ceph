@@ -1747,7 +1747,7 @@ static void get_cors_response_headers(const DoutPrefixProvider *dpp, RGWCORSRule
     get_str_list(req_hdrs, hl);
     for (list<string>::iterator it = hl.begin(); it != hl.end(); ++it)
     {
-      if (!rule->is_header_allowed((*it).c_str(), (*it).length()))
+      if (!rule->is_header_allowed((*it).c_str(), (*it).length())) // socks: rule이 0x0이라서 여기서 문제 발생
       {
         ldpp_dout(dpp, 5) << "Header " << (*it) << " is not registered in this rule" << dendl;
       }

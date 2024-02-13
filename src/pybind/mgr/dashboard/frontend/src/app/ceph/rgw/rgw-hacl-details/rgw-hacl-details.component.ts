@@ -31,6 +31,7 @@ export class RgwHaclDetailsComponent implements OnInit {
     this.hAclService.getResponse().subscribe(response => {
       this.response_status = response.status;
       this.response_body = response.body;
+      //response.headers.getAll
       //this.response_headers = response.headers;
     }, error => {
       this.error = error;

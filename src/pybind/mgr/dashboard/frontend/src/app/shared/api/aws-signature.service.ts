@@ -16,7 +16,7 @@ export class AwsSignatureService {
     const kService = CryptoJS.HmacSHA256(serviceName, kRegion);
     const kSigning = CryptoJS.HmacSHA256('aws4_request', kService);
     return kSigning;
-  }
+}
 
   buildCanonicalQueryString(queryParams: {[key: string]: string}): string {
     const sortedKeys = Object.keys(queryParams).sort();

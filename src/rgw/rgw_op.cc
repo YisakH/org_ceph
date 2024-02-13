@@ -4379,6 +4379,11 @@ int RGWDeleteOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_regis
 
 int RGWGetOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
 {
+  for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it)
+  {
+    dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
+  }
+
   int ret = RGWOp::verify_requester(auth_registry, y);
   dout(0) << "socks : rgw_op.cc : RGWGetOrg : verify requester return : " << ret << dendl;
   return ret;

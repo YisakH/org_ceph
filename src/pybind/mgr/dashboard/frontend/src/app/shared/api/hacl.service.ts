@@ -29,7 +29,7 @@ export class HAclService {
   // 빈 함수 생성
   getResponse(): Observable<HttpResponse<any>> {
     let method = 'GET';
-    let url = "http://localhost:7480/admin/org/dec?user=user1";
+    let url = "http://localhost:7480/admin/org/dec?";
     let service = 's3';
     let region = 'us-east-1';
     let accessKey = 'qwer';

@@ -3884,7 +3884,9 @@ void RGWOptionsCORS_ObjStore_S3::send_response()
 
 void RGWOptionsHAclCORS_ObjStore_S3::send_response()
 {
-  string hdrs = "Authorization, Content-Type, X-Requested-With";
+  origin = "*";
+  req_meth = "GET, POST, PUT, DELETE, OPTIONS";
+  string hdrs = "Authorization, Content-Type, X-Requested-With, x-amz-content-sha256, x-amz-date";
   string exp_hdrs = "Content-Length, Content-Type";
   uint32_t max_age = CORS_MAX_AGE_INVALID;
   /*EACCES means, there is no CORS registered yet for the bucket
@@ -3900,8 +3902,10 @@ void RGWOptionsHAclCORS_ObjStore_S3::send_response()
   }
   //get_response_params(hdrs, exp_hdrs, &max_age); // socks: 여기서 rules를 가져오지 못해 에러 발생
   
-  dout(0) << "socks : RGWOptionsHAclCORS_ObjStore_S3::send_response() origin=" << origin << " req_meth=" << req_meth << 
-  " hdrs="  << hdrs << " exp_hdrs=" << exp_hdrs << " max_age=" << max_age << dendl;
+  dout(0) << "socks : RGWOptionsHAclCORS_ObjStore_S3::send_response() origin=" << origin << " req_meth=" << req_meth << " hdrs="  << hdrs << " exp_hdrs=" << exp_hdrs << " max_age=" << max_age << dendl;
+  const char *req_headers = s->info.env->get("HTTP_ACCESS_CONTROL_REQUEST_HEADERS");
+
+  dout(0) << "socks : RGWOptionsHAclCORS_ObjStore_S3::send_response() req_headers=" << req_headers << dendl;
 
   dump_errno(s);
   dump_access_control(s, origin, req_meth, hdrs.c_str(), exp_hdrs.c_str(),

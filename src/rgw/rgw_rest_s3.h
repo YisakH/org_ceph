@@ -449,6 +449,14 @@ public:
   void send_response() override;
 };
 
+class RGWOptionsHAclCORS_ObjStore_S3 : public RGWOptionsHAclCORS_ObjStore {
+public:
+  RGWOptionsHAclCORS_ObjStore_S3() {}
+  ~RGWOptionsHAclCORS_ObjStore_S3() override {}
+
+  void send_response() override;
+};
+
 class RGWGetBucketEncryption_ObjStore_S3 : public RGWGetBucketEncryption_ObjStore {
 public:
   RGWGetBucketEncryption_ObjStore_S3() {}
@@ -717,6 +725,7 @@ protected:
     RGWOp *op_put() override;
 
     RGWOp *op_delete() override;
+    RGWOp *op_options() override;
 
     //RGWOp *op_post() override;
 

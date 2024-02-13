@@ -1697,13 +1697,18 @@ int RGWOp::read_bucket_cors()
 {
   bufferlist bl;
 
-  map<string, bufferlist>::iterator aiter = s->bucket_attrs.find(RGW_ATTR_CORS);
+  map<string, bufferlist>::iterator aiter = s->bucket_attrs.find(RGW_ATTR_CORS); // socks: 여기서 문제 발생
   if (aiter == s->bucket_attrs.end())
   {
     ldpp_dout(this, 20) << "no CORS configuration attr found" << dendl;
     cors_exist = false;
     return 0; /* no CORS configuration found */
   }
+
+  // aiter에 저장돼 있는 first, second 값 확인
+  dout(3) << "CORS configuration attr found" << dendl;
+  dout(3) << "first: " << aiter->first << dendl;
+  dout(3) << "second: " << aiter->second << dendl;
 
   cors_exist = true;
 
@@ -5947,18 +5952,18 @@ void RGWPutMetadataBucket::execute(optional_yield y)
        * the hood. This method will add the new items only if the map doesn't
        * contain such keys yet. */
       if (has_policy) {
-	if (s->dialect.compare("swift") == 0) {
-	  rgw::swift::merge_policy(policy_rw_mask, s->bucket_acl, policy);
-	}
-	buffer::list bl;
-	policy.encode(bl);
-	emplace_attr(RGW_ATTR_ACL, std::move(bl));
+        if (s->dialect.compare("swift") == 0) {
+          rgw::swift::merge_policy(policy_rw_mask, s->bucket_acl, policy);
+        }
+        buffer::list bl;
+        policy.encode(bl);
+        emplace_attr(RGW_ATTR_ACL, std::move(bl));
       }
 
       if (has_cors) {
-	buffer::list bl;
-	cors_config.encode(bl);
-	emplace_attr(RGW_ATTR_CORS, std::move(bl));
+        buffer::list bl;
+        cors_config.encode(bl);
+        emplace_attr(RGW_ATTR_CORS, std::move(bl));
       }
 
       /* It's supposed that following functions WILL NOT change any
@@ -5973,13 +5978,15 @@ void RGWPutMetadataBucket::execute(optional_yield y)
        * account quotas that can be set only by clients holding
        * reseller admin privileges. */
       op_ret = filter_out_quota_info(attrs, rmattr_names, s->bucket->get_info().quota);
-      if (op_ret < 0) {
-	return op_ret;
+      if (op_ret < 0)
+      {
+        return op_ret;
       }
 
-      if (swift_ver_location) {
-	s->bucket->get_info().swift_ver_location = *swift_ver_location;
-	s->bucket->get_info().swift_versioning = (!swift_ver_location->empty());
+      if (swift_ver_location)
+      {
+        s->bucket->get_info().swift_ver_location = *swift_ver_location;
+        s->bucket->get_info().swift_versioning = (!swift_ver_location->empty());
       }
 
       /* Web site of Swift API. */
@@ -7458,12 +7465,59 @@ int RGWOptionsCORS::validate_cors_request(RGWCORSConfiguration *cc)
   return 0;
 }
 
-void RGWOptionsCORS::execute(optional_yield y)
+int RGWOptionsHAclCORS::make_cors()
 {
+  return 0;
+}
+
+void RGWOptionsHAclCORS::execute(optional_yield y)
+{
+  dout(0) << "socks : rgw_op.cc RGWOptionsCORS::execute" << dendl;
   op_ret = read_bucket_cors();
   if (op_ret < 0)
     return;
 
+  origin = s->info.env->get("HTTP_ORIGIN");
+  if (!origin)
+  {
+    ldpp_dout(this, 0) << "Missing mandatory Origin header" << dendl;
+    op_ret = -EINVAL;
+    return;
+  }
+  req_meth = s->info.env->get("HTTP_ACCESS_CONTROL_REQUEST_METHOD");
+  if (!req_meth)
+  {
+    ldpp_dout(this, 0) << "Missing mandatory Access-control-request-method header" << dendl;
+    op_ret = -EINVAL;
+    return;
+  }
+
+  cors_exist = true;
+
+  if (!cors_exist)
+  {
+    ldpp_dout(this, 2) << "No CORS configuration set yet for this bucket" << dendl;
+    op_ret = -ENOENT;
+    return;
+  }
+  req_hdrs = s->info.env->get("HTTP_ACCESS_CONTROL_REQUEST_HEADERS"); // "authorization,x-amz-content-sha256,x-amz-date"
+  //op_ret = validate_cors_request(&bucket_cors); // 지금 여기서 -2 반환하는 문제
+  if (!rule)
+  {
+    origin = req_meth = NULL;
+    return;
+  }
+  return;
+}
+
+// 왠지 모르겠는데 실행되지 않음
+void RGWOptionsCORS::execute(optional_yield y)
+{
+  dout(0) << "socks : rgw_op.cc RGWOptionsCORS::execute" << dendl;
+  op_ret = read_bucket_cors();
+  if (op_ret < 0)
+    return;
+    
   origin = s->info.env->get("HTTP_ORIGIN");
   if (!origin)
   {

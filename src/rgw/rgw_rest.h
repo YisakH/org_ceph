@@ -438,6 +438,12 @@ public:
   ~RGWOptionsCORS_ObjStore() override {}
 };
 
+class RGWOptionsHAclCORS_ObjStore : public RGWOptionsHAclCORS {
+public:
+  RGWOptionsHAclCORS_ObjStore() {}
+  ~RGWOptionsHAclCORS_ObjStore() override {}
+};
+
 class RGWGetBucketEncryption_ObjStore : public RGWGetBucketEncryption {
 public:
   RGWGetBucketEncryption_ObjStore() {}

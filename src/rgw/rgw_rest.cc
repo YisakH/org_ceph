@@ -557,7 +557,7 @@ void dump_access_control(req_state *s, RGWOp *op)
 void dump_start(req_state *s)
 {
   if (!s->content_started) {
-    s->formatter->output_header();
+    s->formatter->output_header(); // socks : formatter is NULL
     s->content_started = true;
   }
 }
@@ -1986,17 +1986,19 @@ RGWRESTMgr* RGWRESTMgr::get_resource_mgr(req_state* const s,
 
   multimap<size_t, string>::reverse_iterator iter;
 
-  for (iter = resources_by_size.rbegin(); iter != resources_by_size.rend(); ++iter) {
-    string& resource = iter->second;
+  for (iter = resources_by_size.rbegin(); iter != resources_by_size.rend(); ++iter)
+  {
+    string &resource = iter->second;
     if (uri.compare(0, iter->first, resource) == 0 &&
-	(uri.size() == iter->first ||
-	 uri[iter->first] == '/')) {
+        (uri.size() == iter->first ||
+         uri[iter->first] == '/'))
+    {
       std::string suffix = uri.substr(iter->first);
       return resource_mgrs[resource]->get_resource_mgr(s, suffix, out_uri);
     }
   }
 
-  if (default_mgr) {
+  if (default_mgr) { // socks: 여기는 h-acl call에서 안걸림. 다른 call에서 걸리는지 안걸리는지 봐야함
     return default_mgr->get_resource_mgr_as_default(s, uri, out_uri);
   }
 

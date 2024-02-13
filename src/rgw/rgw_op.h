@@ -565,7 +565,7 @@ public:
   virtual int send_response_data_error(optional_yield y) = 0;
   virtual int send_response_data(bufferlist& bl, off_t ofs, off_t len) = 0;
 
-  const char* name() const override { return "get_obj"; }
+  const char* name() const override { return "get_org"; }
   RGWOpType get_type() override { return RGW_OP_GET_ORG; }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
   virtual bool need_object_expiration() { return false; }
@@ -2002,6 +2002,13 @@ public:
   const char* name() const override { return "options_cors"; }
   RGWOpType get_type() override { return RGW_OP_OPTIONS_CORS; }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
+};
+
+class RGWOptionsHAclCORS : public RGWOptionsCORS {
+public:
+  RGWOptionsHAclCORS() = default;
+  void execute(optional_yield y) override;
+  int make_cors();
 };
 
 class RGWPutBucketEncryption : public RGWOp {

@@ -338,7 +338,6 @@ int process_request(const RGWProcessEnv& penv,
   ldpp_dout(s, 10) << "handler=" << typeid(*handler).name() << dendl;
 
   should_log = mgr->get_logging();
-
   ldpp_dout(s, 2) << "getting op " << s->op << dendl;
   op = handler->get_op();
   if (!op) {

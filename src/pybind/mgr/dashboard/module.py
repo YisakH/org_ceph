@@ -265,6 +265,23 @@ class CherryPyConfig(object):
             resp_head['Access-Control-Allow-Origin'] = req_header_cross_origin_url
         resp_head['Access-Control-Expose-Headers'] = 'GET, POST'
         resp_head['Access-Control-Allow-Credentials'] = 'true'
+        
+        
+        with open('/tmp/cors.log', 'a') as f:
+            f.write("hello")
+            
+        f.close()
+        
+        with open('/tmp/cors.log', 'a') as f:
+            f.write("hello")
+            f.write(f"req_head: {req_head}\n")
+            f.write(f"resp_head: {resp_head}\n")
+        
+        f.close()
+        
+        # socks : 내가 추가한 cors 스킵 코드
+        if cherrypy.request.path_info == '/admin/org/dec':
+            return
 
         # Non-simple CORS preflight request; short-circuit the normal handler.
         if cherrypy.request.method == 'OPTIONS':

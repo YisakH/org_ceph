@@ -8,6 +8,7 @@
 #include "rocksdb/status.h"
 #include <mutex>
 #include <utility>
+#include <nlohmann/json.hpp>
 
 #define RGW_ORG_TIER_NOT_ALLOWED -2
 #define RGW_ORG_PERMISSION_NOT_ALLOWED -3
@@ -333,6 +334,7 @@ class RGWOrgDec
     static int appendDecEdge(const std::string& user, const std::vector<std::string>& dec_list);
     static bool existDecEdge(const std::string& user, const std::string& dec);
     static int deleteDecEdge(const std::string& user, const std::string& dec);
+    static int getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j);
 };
 
 class RGWOrgUser

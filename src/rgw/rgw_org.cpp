@@ -10,6 +10,7 @@
 #include <utility>
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
+#include <queue>
 
 // TierDB RGWOrgTier::tierDb;
 bool OrgPermission::operator<=(const OrgPermission& other) const {
@@ -777,4 +778,44 @@ bool validateRGWOrgPermission(std::string user, std::string path, bool r, bool w
     }
 
     return true;
+}
+
+int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j)
+{
+    std::queue<std::pair<std::string, nlohmann::json *>> q;
+    nlohmann::json root;
+    int id = 0; // 노드에 고유 ID 할당을 위한 변수
+
+    q.push({start_user, &root});
+
+    while (!q.empty())
+    {
+        auto [cur_root, cur_j] = q.front();
+        q.pop();
+
+        std::vector<std::string> dec_list;
+        int ret = RGWOrgDec::getDec(cur_root, &dec_list);
+        if (ret < 0)
+        {
+            return ret;
+        }
+
+        // 현재 노드에 ID 할당
+        if (cur_j->is_null())
+        {
+            (*cur_j)["name"] = cur_root;
+            (*cur_j)["id"] = id++;
+        }
+
+        for (auto &dec : dec_list)
+        {
+            // 자식 노드에 대한 JSON 객체 생성 및 ID 할당
+            nlohmann::json child = {{"name", dec}, {"id", id++}};
+            (*cur_j)["children"].push_back(child);
+            q.push({dec, &((*cur_j)["children"].back())});
+        }
+    }
+
+    j = root["root"]; // 최종적으로 구성된 트리의 root 노드를 j에 할당
+    return 0;
 }

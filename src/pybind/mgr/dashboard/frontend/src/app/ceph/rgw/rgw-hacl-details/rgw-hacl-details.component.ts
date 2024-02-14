@@ -1,6 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { HAclService } from '~/app/shared/api/hacl.service'
 
+/*
+import {
+  ITreeOptions,
+  TreeComponent,
+  TreeNode,
+  TreeModel,
+  TREE_ACTIONS
+} from '@circlon/angular-tree-component';*/
+
 @Component({
   selector: 'cd-rgw-hacl-details',
   templateUrl: './rgw-hacl-details.component.html',
@@ -26,9 +35,7 @@ export class RgwHaclDetailsComponent implements OnInit {
     this.response_body = headers.get('Authorization');
     this.response_status = 200;
     */
-
-    
-    this.hAclService.getResponse().subscribe(response => {
+    this.hAclService.getDec('root').subscribe(response => {
       this.response_status = response.status;
       this.response_body = response.body;
       //response.headers.getAll
@@ -39,6 +46,9 @@ export class RgwHaclDetailsComponent implements OnInit {
       console.log(error);
       console.log(this.response_headers);
     });
-    
+  }
+
+  loadHAclTreeData(){
+
   }
 }

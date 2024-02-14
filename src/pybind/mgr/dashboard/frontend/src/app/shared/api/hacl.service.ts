@@ -14,14 +14,14 @@ export class HAclService {
   constructor(private http: HttpClient, private awsSignatureService: AwsSignatureService) { }
 
   // 빈 함수 생성
-  getResponse(): Observable<HttpResponse<any>> {
+  getDec(userName: string): Observable<HttpResponse<any>> {
     let method = 'GET';
     let url = "http://localhost:7480/admin/org/dec";
     let service = 's3';
     let region = 'us-east-1';
     let accessKey = 'qwer';
     let secretKey = 'qwer';
-    let queryParamsDict = {'user': 'user1'}; // 변수 이름 수정
+    let queryParamsDict = {'user': userName}; // 변수 이름 수정
     
     const headers: HttpHeaders = this.awsSignatureService.signRequest(method, url, service, region, accessKey, secretKey, queryParamsDict); // 수정된 변수 이름 사용
 

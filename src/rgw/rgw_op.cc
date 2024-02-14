@@ -4829,6 +4829,35 @@ void RGWDeleteOrg::pre_exec()
   rgw_bucket_object_pre_exec(s);
 }
 
+void RGWListOrg::execute(optional_yield y)
+{
+  int ret = -2;
+  bufferlist response_bl;
+  if (s->decoded_uri == "/admin/org/dec")
+  {
+    const auto &user = findValueForKey(s->http_params, "user");
+    nlohmann::json dec_tree;
+
+    ret = RGWOrgDec::getRGWOrgDecTree(user, dec_tree);
+    string tree_str = dec_tree.dump(2);
+
+    response_bl.append(tree_str.c_str());
+  }
+
+  if (ret != 0)
+  {
+    dout(0) << "socks : rgw_op.cc : RGWListOrg::execute" << dendl;
+    response_bl.append("error occured!");
+  }
+  else
+  {
+    dout(0) << "socks : rgw_op.cc : RGWListOrg::execute : success" << dendl;
+  }
+  send_response_data(response_bl, 0, response_bl.length());
+}
+
+
+
 void RGWGetOrg::execute(optional_yield y)
 {
   for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it)

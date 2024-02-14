@@ -381,6 +381,11 @@ inline bool str_has_cntrl(const char* s) {
 int RGWGetOrg_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
                                          off_t bl_len)
 {
+    string origin = "*";
+    string req_meth = "GET, POST, PUT, DELETE, OPTIONS";
+    string hdrs = "Authorization, Content-Type, X-Requested-With, x-amz-content-sha256, x-amz-date";
+    string exp_hdrs = "Content-Length, Content-Type";
+    uint32_t max_age = CORS_MAX_AGE_INVALID;
     // Set the HTTP status code based on the operation result
     set_req_state_err(s, op_ret);
     dump_errno(s);
@@ -393,6 +398,12 @@ int RGWGetOrg_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
     dump_content_length(s, bl_len);
     const char* content_type = "binary/octet-stream"; // default content type
     dump_header(s, "Content-Type", content_type);
+
+    dump_header(s, "Access-Control-Allow-Origin", origin);
+    dump_header(s, "Access-Control-Allow-Methods", req_meth);
+    dump_header(s, "Access-Control-Allow-Headers", hdrs);
+    dump_header(s, "Access-Control-Expose-Headers", exp_hdrs);
+    dump_header(s, "Access-Control-Max-Age", max_age);
 
     // Finalize and send the headers
     end_header(s, this);

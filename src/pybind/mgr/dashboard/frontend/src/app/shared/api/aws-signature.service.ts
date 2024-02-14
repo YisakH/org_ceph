@@ -45,6 +45,7 @@ export class AwsSignatureService {
 
     const canonicalRequest = `${method}\n${canonicalUri}\n${canonicalQuerystring}\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
 
+    console.log('-----canonicalRequest-----')
     console.log(canonicalRequest);
     // Create the string to sign
     const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;

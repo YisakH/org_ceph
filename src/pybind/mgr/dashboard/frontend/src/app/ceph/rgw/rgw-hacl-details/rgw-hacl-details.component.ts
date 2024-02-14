@@ -33,8 +33,11 @@ export class RgwHaclDetailsComponent implements OnInit {
       this.response_body = response.body;
       //response.headers.getAll
       //this.response_headers = response.headers;
+      console.log(response.headers);
+      console.log(this.response_status);
     }, error => {
-      this.error = error;
+      console.log(error);
+      console.log(this.response_headers);
     });
     
   }

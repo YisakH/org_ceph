@@ -11,12 +11,13 @@ export class AwsSignatureService {
   constructor() { }
 
   getSignatureKey(key: string, dateStamp: string, regionName: string, serviceName: string) {
-    const kDate = CryptoJS.HmacSHA256(dateStamp, 'AWS4' + key);
-    const kRegion = CryptoJS.HmacSHA256(regionName, kDate);
-    const kService = CryptoJS.HmacSHA256(serviceName, kRegion);
-    const kSigning = CryptoJS.HmacSHA256('aws4_request', kService);
-    return kSigning;
-}
+    const secretKey = CryptoJS.enc.Utf8.parse('AWS4' + key);
+    const kDate = CryptoJS.HmacSHA256(dateStamp, secretKey);
+    const kRegion = CryptoJS.HmacSHA256(regionName, CryptoJS.enc.Hex.parse(kDate.toString(CryptoJS.enc.Hex)));
+    const kService = CryptoJS.HmacSHA256(serviceName, CryptoJS.enc.Hex.parse(kRegion.toString(CryptoJS.enc.Hex)));
+    const kSigning = CryptoJS.HmacSHA256('aws4_request', CryptoJS.enc.Hex.parse(kService.toString(CryptoJS.enc.Hex)));
+    return CryptoJS.enc.Hex.parse(kSigning.toString(CryptoJS.enc.Hex));
+  }
 
   buildCanonicalQueryString(queryParams: {[key: string]: string}): string {
     const sortedKeys = Object.keys(queryParams).sort();
@@ -44,6 +45,7 @@ export class AwsSignatureService {
 
     const canonicalRequest = `${method}\n${canonicalUri}\n${canonicalQuerystring}\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
 
+    console.log(canonicalRequest);
     // Create the string to sign
     const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
     const stringToSign = `${algorithm}\n${amzDate}\n${credentialScope}\n${CryptoJS.SHA256(canonicalRequest)}`;

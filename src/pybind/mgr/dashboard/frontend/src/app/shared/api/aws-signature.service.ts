@@ -39,17 +39,24 @@ export class AwsSignatureService {
     const canonicalUri = '/admin/org/dec'; // Adjust based on your URL
 
     const payloadHash = CryptoJS.SHA256('').toString(); // Hash of an empty string for GET requests
-    const canonicalHeaders = `host:${new URL(url).hostname}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+    const canonicalHeaders = `host:${new URL(url).hostname}:7480\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
     const signedHeaders = 'host;x-amz-content-sha256;x-amz-date'; // 서명에 포함될 헤더들
   
 
     const canonicalRequest = `${method}\n${canonicalUri}\n${canonicalQuerystring}\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
 
-    console.log('-----canonicalRequest-----')
+    console.log('-------canonicalRequest-------')
     console.log(canonicalRequest);
     // Create the string to sign
     const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+
+    console.log('-----canonicalRequest end-----')
+
+
+    console.log('-----cstringToSign-----')
     const stringToSign = `${algorithm}\n${amzDate}\n${credentialScope}\n${CryptoJS.SHA256(canonicalRequest)}`;
+    console.log(stringToSign);
+    console.log('-----cstringToSign end-----')
   
     // Calculate the signature
     const signingKey = this.getSignatureKey(secretKey, dateStamp, region, service);

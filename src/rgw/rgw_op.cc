@@ -4856,7 +4856,26 @@ void RGWListOrg::execute(optional_yield y)
   send_response_data(response_bl, 0, response_bl.length());
 }
 
+std::string RGWGetOrg::callSimpleDec(string user)
+{
+  std::vector<std::string> dec_list;
+  std::string dec_list_str;
+  RGWOrgDec::getDec(user, &dec_list);
 
+  RGWOrgDec::decListToString(dec_list, &dec_list_str);
+
+  return dec_list_str;
+}
+
+std::string RGWGetOrg::callTreeDec(string user)
+{
+  nlohmann::json dec_tree;
+
+  RGWOrgDec::getRGWOrgDecTree(user, dec_tree);
+  string tree_str = dec_tree.dump(2);
+
+  return tree_str;
+}
 
 void RGWGetOrg::execute(optional_yield y)
 {
@@ -4897,14 +4916,17 @@ void RGWGetOrg::execute(optional_yield y)
   else if (s->decoded_uri == "/admin/org/dec")
   {
     const auto &user = findValueForKey(s->http_params, "user");
+    const auto &json = findValueForKey(s->http_params, "json");
 
-    std::vector<std::string> dec_list;
-    std::string dec_list_str;
-    ret = RGWOrgDec::getDec(user, &dec_list);
+    string return_str;
 
-    ret = RGWOrgDec::decListToString(dec_list, &dec_list_str);
-
-    response_bl.append(dec_list_str.c_str());
+    if(json == "true"){
+      return_str = callTreeDec(user);
+    }else{
+      return_str = callSimpleDec(user);
+    }
+    ret = 0;
+    response_bl.append(return_str.c_str());
   }
   else
   {

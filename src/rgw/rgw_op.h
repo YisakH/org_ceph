@@ -659,6 +659,9 @@ public:
     get_retention = false;
     get_legal_hold = false;
  }
+std::string callSimpleDec(std::string user);
+
+std::string callTreeDec(std::string user);
 
   bool prefetch_data() override;
 

@@ -780,42 +780,52 @@ bool validateRGWOrgPermission(std::string user, std::string path, bool r, bool w
     return true;
 }
 
-int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j)
-{
-    std::queue<std::pair<std::string, nlohmann::json *>> q;
-    nlohmann::json root;
+int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j) {
+    std::queue<std::string> q;
+    std::map<std::string, nlohmann::json> j_map;
     int id = 0; // 노드에 고유 ID 할당을 위한 변수
 
-    q.push({start_user, &root});
+    q.push(start_user);
 
-    while (!q.empty())
-    {
-        auto [cur_root, cur_j] = q.front();
+    while (!q.empty()) {
+        std::string cur_name = q.front();
         q.pop();
 
         std::vector<std::string> dec_list;
-        int ret = RGWOrgDec::getDec(cur_root, &dec_list);
-        if (ret < 0)
-        {
+        int ret = RGWOrgDec::getDec(cur_name, &dec_list);
+
+        // 현재 노드에 대한 JSON 객체 생성
+        nlohmann::json cur_j = {{"name", cur_name}, {"id", id}, {"children", nlohmann::json::array()}};
+        id++; // 현재 노드에 ID 할당 후 증가
+
+        if (ret == RGW_ORG_KEY_NOT_FOUND) {
+            j_map[cur_name] = cur_j; // 현재 노드를 맵에 추가
+            continue;
+        } else if (ret < 0) {
             return ret;
         }
 
-        // 현재 노드에 ID 할당
-        if (cur_j->is_null())
-        {
-            (*cur_j)["name"] = cur_root;
-            (*cur_j)["id"] = id++;
+        // 자식 노드 이름을 바탕으로 자식 노드의 JSON 객체를 children에 추가
+        for (auto &dec : dec_list) {
+            // 자식 노드에 대한 참조를 먼저 생성합니다.
+            nlohmann::json child_ref = {{"name", dec}, {"id", id}, {"children", nlohmann::json::array()}};
+            id++; // 자식 노드에 ID 할당 후 증가
+            cur_j["children"].push_back(child_ref); // 자식 노드 참조를 children에 추가
+            q.push(dec); // 큐에 자식 노드 이름을 추가하여 나중에 처리
         }
+        j_map[cur_name] = cur_j; // 현재 노드를 맵에 추가
+    }
 
-        for (auto &dec : dec_list)
-        {
-            // 자식 노드에 대한 JSON 객체 생성 및 ID 할당
-            nlohmann::json child = {{"name", dec}, {"id", id++}};
-            (*cur_j)["children"].push_back(child);
-            q.push({dec, &((*cur_j)["children"].back())});
+    // j_map을 순회하며 children 배열을 실제 노드 객체로 대체
+    for (auto &pair : j_map) {
+        auto &node = pair.second;
+        nlohmann::json &children = node["children"];
+        for (auto &child : children) {
+            const std::string &name = child["name"];
+            child = j_map[name]; // j_map에서 찾은 실제 노드 객체로 대체
         }
     }
 
-    j = root["root"]; // 최종적으로 구성된 트리의 root 노드를 j에 할당
+    j = j_map[start_user]; // 최종 JSON 객체를 설정
     return 0;
 }

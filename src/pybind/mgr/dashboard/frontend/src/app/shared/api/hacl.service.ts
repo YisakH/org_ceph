@@ -21,7 +21,7 @@ export class HAclService {
     let region = 'us-east-1';
     let accessKey = 'qwer';
     let secretKey = 'qwer';
-    let queryParamsDict = {'user': userName}; // 변수 이름 수정
+    let queryParamsDict = {'user': userName, 'json': 'true'}; // 변수 이름 수정
     
     const headers: HttpHeaders = this.awsSignatureService.signRequest(method, url, service, region, accessKey, secretKey, queryParamsDict); // 수정된 변수 이름 사용
 
@@ -30,7 +30,7 @@ export class HAclService {
       headers: headers, 
       params: queryParamsDict, 
       observe: 'response', // Get the full response
-      responseType: 'text' // Return the body as string
+      responseType: 'json' // Get the full response
     });
   }
 

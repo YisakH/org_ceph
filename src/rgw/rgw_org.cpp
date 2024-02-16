@@ -20,6 +20,19 @@ bool OrgPermission::operator<=(const OrgPermission& other) const {
            (!other.x || x);
 }
 
+nlohmann::json RGWOrg::toJson() {
+    nlohmann::json j;
+    j["user"] = user;
+    j["authorizer"] = authorizer;
+    j["tier"] = tier;
+    j["r"] = orgPermission->r;
+    j["w"] = orgPermission->w;
+    j["x"] = orgPermission->x;
+    j["g"] = orgPermission->g;
+    j["path"] = orgPermission->path;
+    return j;
+}
+
 int DBManager::getData(const std::string &key, std::string &value)
 {
     status = db->Get(rocksdb::ReadOptions(), key, &value);
@@ -795,8 +808,17 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
         int ret = RGWOrgDec::getDec(cur_name, &dec_list);
 
         // 현재 노드에 대한 JSON 객체 생성
-        nlohmann::json cur_j = {{"name", cur_name}, {"id", id}, {"children", nlohmann::json::array()}};
-        id++; // 현재 노드에 ID 할당 후 증가
+        nlohmann::json cur_j = {
+            {"name", cur_name}, 
+            {"id", id++}, 
+            {"children", nlohmann::json::array()}, 
+            {"permission", nlohmann::json::array()}
+        };
+
+        auto *rgwOrg = getAcl(cur_name, "/");
+        if(rgwOrg != nullptr){
+            cur_j["permission"].push_back(rgwOrg->toJson());
+        }
 
         if (ret == RGW_ORG_KEY_NOT_FOUND) {
             j_map[cur_name] = cur_j; // 현재 노드를 맵에 추가
@@ -808,8 +830,7 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
         // 자식 노드 이름을 바탕으로 자식 노드의 JSON 객체를 children에 추가
         for (auto &dec : dec_list) {
             // 자식 노드에 대한 참조를 먼저 생성합니다.
-            nlohmann::json child_ref = {{"name", dec}, {"id", id}, {"children", nlohmann::json::array()}};
-            id++; // 자식 노드에 ID 할당 후 증가
+            nlohmann::json child_ref = {{"name", dec}, {"id", id++}, {"children", nlohmann::json::array()}};
             cur_j["children"].push_back(child_ref); // 자식 노드 참조를 children에 추가
             q.push(dec); // 큐에 자식 노드 이름을 추가하여 나중에 처리
         }

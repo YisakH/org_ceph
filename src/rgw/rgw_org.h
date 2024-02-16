@@ -211,7 +211,9 @@ public:
 
     std::string toString() {
         return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g) + ", path: " + orgPermission->path;
-    }
+    };
+
+    nlohmann::json toJson();
 
     static int getPartialMatchRgwOrg(aclDB &aclDB, const std::string& user, const std::string& path, RGWOrg *rgwOrg);
 };

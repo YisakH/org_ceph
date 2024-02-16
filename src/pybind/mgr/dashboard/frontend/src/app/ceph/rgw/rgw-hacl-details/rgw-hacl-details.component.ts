@@ -52,8 +52,15 @@ export class RgwHaclDetailsComponent implements OnInit {
     this.loadHAclTreeData();
   }
 
+  selectNode(node: TreeNode) {
+    TREE_ACTIONS.TOGGLE_ACTIVE(undefined, node, undefined);
+    this.selectedNode = node;
+  }
+
   selectAndShowNode(tree: TreeModel, node: TreeNode, $event: any) {
+    console.log('selectAndShowNode() called');
     TREE_ACTIONS.TOGGLE_EXPANDED(tree, node, $event);
+    this.selectNode(node);
   }
 
   loadHAclTreeData(user_name: string = 'root'){

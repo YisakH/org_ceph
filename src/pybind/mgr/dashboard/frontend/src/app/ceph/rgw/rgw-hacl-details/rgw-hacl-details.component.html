@@ -1,33 +1,36 @@
 <div class="row">
-  <div class="card">
-    <div class="card-header" i18n>Tree Viewer
-      <button type="button"
-      [class.disabled]="loadingIndicator"
-      class="btn btn-light pull-right"
-      (click)="refreshAllHAcls()">
-      <i [ngClass]="[icons.large, icons.refresh]"
-        [class.fa-spin]="loadingIndicator"></i>
-      </button>
-    </div>
-    <div class="card-body">
-      <tree-root *ngIf="nodes" [nodes]="nodes" [options]="treeOptions">
-        <ng-template #loadingTemplate>
-          <i [ngClass]="[icons.spinner, icons.spin]"></i>
-        </ng-template>
-      </tree-root>
+  <div class="col-sm-4 pe-0">
+    <div class="card">
+      <div class="card-header" i18n>Tree Viewer
+        <button type="button" [class.disabled]="loadingIndicator" class="btn btn-light pull-right"
+          (click)="refreshAllHAcls()">
+          <i [ngClass]="[icons.large, icons.refresh]" [class.fa-spin]="loadingIndicator"></i>
+        </button>
+      </div>
+      <div class="card-body">
+        <tree-root *ngIf="nodes" [nodes]="nodes" [options]="treeOptions">
+          <ng-template #loadingTemplate>
+            <i [ngClass]="[icons.spinner, icons.spin]"></i>
+          </ng-template>
+        </tree-root>
+      </div>
     </div>
   </div>
 
-  <!-- 선택된 노드의 정보를 표시하는 부분 -->
-  <div *ngIf="selectedNode" class="col-sm-8">
-    <div class="card">
-      <div class="card-header">
-        {{ selectedNode.name }} <!-- 여기서 selectedNode는 선택된 노드의 데이터 객체입니다 -->
-      </div>
-      <div class="card-body">
-        <!-- 여기에 선택된 노드에 대한 자세한 정보를 표시합니다. 예: -->
-        <p><strong>Name:</strong> {{ selectedNode.name }}</p>
-        <!-- 기타 선택된 노드의 속성을 표시 -->
+  <!-- Selection details -->
+  <div class="col-sm-8 metadata">
+    <!-- 선택된 노드의 정보를 표시하는 부분 -->
+    <div *ngIf="selectedNode" class="col-sm-8 metadata">
+      <div class="card">
+        <div class="card-header">
+          {{ selectedNode.data.name }} <!-- 여기서 selectedNode는 선택된 노드의 데이터 객체입니다 -->
+        </div>
+        <div class="card-body">
+          <!-- 여기에 선택된 노드에 대한 자세한 정보를 표시합니다. 예: -->
+          <p><strong>Name:</strong> {{ selectedNode.data.name }}</p>
+          <p><strong>Permission:</strong> {{ selectedNode.data.permission }}</p>
+          <!-- 기타 선택된 노드의 속성을 표시 -->
+        </div>
       </div>
     </div>
   </div>

@@ -33,6 +33,14 @@ nlohmann::json RGWOrg::toJson() {
     return j;
 }
 
+RGWOrg::RGWOrg(const std::string &user, const std::string &authorizer){
+    this->user = user;
+    this->authorizer = authorizer;
+
+    RGWOrgTier::getUserTier(user, &this->tier);
+    orgPermission = new OrgPermission();
+}                                   
+
 int DBManager::getData(const std::string &key, std::string &value)
 {
     status = db->Get(rocksdb::ReadOptions(), key, &value);
@@ -96,23 +104,32 @@ int RGWOrg::getPartialMatchRgwOrg(aclDB &aclDB, const std::string& user, const s
     std::string accumulatedPath;
     std::string key;
     int ret = -1;
+
+    // Check if the path is root "/" and handle it explicitly
+    if (path == "/") {
+        key = user + ":/";
+        return getFullMatchRGWOrg(aclDB, key, rgwOrg);
+    }
+
     while (std::getline(iss, segment, '/'))
     {
         if (!segment.empty())
-        { // Skip empty segments (like the one before the first /)
+        {
             accumulatedPath += "/";
-
             accumulatedPath += segment;
             key = user + ":" + accumulatedPath;
             int cur_ret = getFullMatchRGWOrg(aclDB, key, rgwOrg);
             if (cur_ret == 0)
             {
                 ret = 0;
+                // Optionally break here if you only need the first match
+                // break;
             }
         }
     }
     return ret;
 }
+
 
 int RGWOrg::getFullMatchRGWOrg(aclDB &aclDB, const std::string& key, RGWOrg *rgwOrg)
 {
@@ -215,6 +232,20 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     {
         return 0;
     }
+}
+
+int putAcl(RGWOrg &rgwOrg)
+{
+    return putAcl(
+        rgwOrg.getUser(), 
+        rgwOrg.getOrgPermission()->path, 
+        rgwOrg.getAuthorizer(), 
+        rgwOrg.getTier(), 
+        rgwOrg.getOrgPermission()->r, 
+        rgwOrg.getOrgPermission()->w, 
+        rgwOrg.getOrgPermission()->x, 
+        rgwOrg.getOrgPermission()->g
+    );
 }
 
 int deleteAcl(const std::string &user, const std::string &path)
@@ -355,6 +386,10 @@ int RGWOrgDec::deleteDecEdge(const std::string& user, const std::string& dec){
     ret = putDec(user, existing_dec_list);
     return ret; // 성공적으로 제거되었거나 발생한 오류를 반환
 }
+
+std::string RGWOrg::toString() {
+    return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g) + ", path: " + orgPermission->path;
+};
 
 
 int RGWOrgDec::decListToString(std::vector<std::string> &dec_list, std::string *dec_list_str){
@@ -590,7 +625,15 @@ std::string str_join(const std::vector<std::string>& v){
 }
 
 int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::string> dec_list){
-    int ret;
+    int ret = -1;
+
+    auto * ancAcl = getAcl(anc, "/");
+
+    if(ancAcl == nullptr){
+        return -1;
+    }
+
+
 
     ret = deleteUser(user);
 
@@ -638,6 +681,8 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::stri
 
         ret = RGWOrgTier::updateUserTier(user);
     }
+    RGWOrg *rgwOrg = new RGWOrg(user, anc);
+    ret = putAcl(*rgwOrg);
     return 0;
 }
 
@@ -741,6 +786,20 @@ int TierDB::getData(const std::string& key, int &value){
     }
     else
     {
+        return -1;
+    }
+}
+
+int RGWOrgTier::getUserTier(std::string user, int *tier){
+    int value;
+    TierDB &tierDb = TierDB::getInstance();
+    tierDb.getData(user, value);
+
+    if(tierDb.status.ok()){
+        *tier = value;
+        return 0;
+    }
+    else{
         return -1;
     }
 }

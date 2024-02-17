@@ -6,6 +6,8 @@
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/status.h"
+#include "rocksdb/slice.h"
+#include "rocksdb/filter_policy.h"
 #include <mutex>
 #include <utility>
 #include <nlohmann/json.hpp>
@@ -76,6 +78,7 @@ public:
         return status;
     }
     int getData(const std::string& key, std::string &value);
+    int getPartialMatchData(const std::string& prefix, std::vector<std::pair<std::string, std::string>> &values);
     int putData(const std::string& key, const std::string& value);
     int deleteData(const std::string& key);
 };
@@ -139,10 +142,10 @@ public:
     std::string path;
 
 OrgPermission() {
-    r = false;
-    w = false;
-    x = false;
-    g = false;
+    r = true;
+    w = true;
+    x = true;
+    g = true;
     path = "/";
     }
 
@@ -169,7 +172,11 @@ public:
                                                                                      }
     RGWOrg(){
         orgPermission = new OrgPermission();
-    }                                                                                 
+        user = "";
+        authorizer = "";
+        tier = -1;
+    }                                      
+    RGWOrg(const std::string &user, const std::string &authorizer);        
     
     const std::string &getUser() const {
         return user;
@@ -209,9 +216,7 @@ public:
 
     static int deleteRGWOrg(aclDB &aclDB, const std::string& key);
 
-    std::string toString() {
-        return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g) + ", path: " + orgPermission->path;
-    };
+    std::string toString();
 
     nlohmann::json toJson();
 
@@ -223,19 +228,7 @@ class RGWOrgTier
 
 public:
     // get user tier function
-    static int getUserTier(std::string user, int *tier){
-        int value;
-        TierDB &tierDb = TierDB::getInstance();
-        tierDb.getData(user, value);
-
-        if(tierDb.status.ok()){
-            *tier = value;
-            return 0;
-        }
-        else{
-            return -1;
-        }
-    }
+    static int getUserTier(std::string user, int *tier);
 
     static int putUserTier(std::string user, int tier){
         TierDB &tierDb = TierDB::getInstance();

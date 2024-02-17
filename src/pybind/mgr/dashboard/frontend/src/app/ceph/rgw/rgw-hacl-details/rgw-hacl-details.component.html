@@ -20,16 +20,23 @@
   <!-- Selection details -->
   <div class="col-sm-8 metadata">
     <!-- 선택된 노드의 정보를 표시하는 부분 -->
-    <div *ngIf="selectedNode" class="col-sm-8 metadata">
-      <div class="card">
-        <div class="card-header">
-          {{ selectedNode.data.name }} <!-- 여기서 selectedNode는 선택된 노드의 데이터 객체입니다 -->
-        </div>
-        <div class="card-body">
-          <!-- 여기에 선택된 노드에 대한 자세한 정보를 표시합니다. 예: -->
-          <p><strong>Name:</strong> {{ selectedNode.data.name }}</p>
-          <p><strong>Permission:</strong> {{ selectedNode.data.permission }}</p>
-          <!-- 기타 선택된 노드의 속성을 표시 -->
+    <div *ngIf="selectedNode" class="card">
+      <div class="card-header">
+        {{ selectedNode.data.name }} <!-- 선택된 노드의 이름 -->
+      </div>
+      <div class="card-body">
+        <p><strong>Name:</strong> {{ selectedNode.data.name }}</p>
+        <div *ngFor="let perm of selectedNode.data.permission"> <!-- 권한 배열 반복 -->
+          <p><strong>Permission Details:</strong></p>
+          <ul>
+            <li><strong>Authorizer:</strong> {{ perm.authorizer }}</li>
+            <li><strong>Read:</strong> {{ perm.r ? 'Yes' : 'No' }}</li>
+            <li><strong>Write:</strong> {{ perm.w ? 'Yes' : 'No' }}</li>
+            <li><strong>Execute:</strong> {{ perm.x ? 'Yes' : 'No' }}</li>
+            <li><strong>Grant:</strong> {{ perm.g ? 'Yes' : 'No' }}</li>
+            <li><strong>Path:</strong> {{ perm.path }}</li>
+            <li><strong>Tier:</strong> {{ perm.tier }}</li>
+          </ul>
         </div>
       </div>
     </div>

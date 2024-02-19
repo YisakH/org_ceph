@@ -26,31 +26,13 @@
       </div>
       <div class="card-body">
         <p><strong>Name:</strong> {{ selectedNode.data.name }}</p>
-        <p><strong>Permission Details:</strong></p>
-        <table class="table table-striped">
-          <thead>
-            <tr>
-              <th scope="col">Path</th>
-              <th scope="col">Authorizer</th>
-              <th scope="col">Tier</th>
-              <th scope="col">Read</th>
-              <th scope="col">Write</th>
-              <th scope="col">Execute</th>
-              <th scope="col">Grant</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let perm of selectedNode.data.permission">
-              <td>{{ perm.path }}</td>
-              <td>{{ perm.authorizer }}</td>
-              <td>{{ perm.tier }}</td>
-              <td>{{ perm.r ? 'Yes' : 'No' }}</td>
-              <td>{{ perm.w ? 'Yes' : 'No' }}</td>
-              <td>{{ perm.x ? 'Yes' : 'No' }}</td>
-              <td>{{ perm.g ? 'Yes' : 'No' }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <ng-container *ngIf="selectedNode.data.permission">
+          <legend i18n>Permission Details:</legend>
+          <cd-table [data]="selectedNode.data.permission"
+                    [columns]="columns"
+                    [toolHeader]="false">
+          </cd-table>
+        </ng-container>
       </div>
     </div>
   </div>

@@ -648,11 +648,11 @@ std::string str_join(const std::vector<std::string>& v){
 int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::string> dec_list){
     int ret = -1;
 
-    auto * ancAcl = getAcl(anc, "/");
+    // auto * ancAcl = getAcl(anc, "/");
 
-    if(ancAcl == nullptr){
-        return -1;
-    }
+    // if(ancAcl == nullptr){
+    //     return -1;
+    // }
 
 
 
@@ -930,7 +930,7 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
         // 자식 노드 이름을 바탕으로 자식 노드의 JSON 객체를 children에 추가
         for (auto &dec : dec_list) {
             // 자식 노드에 대한 참조를 먼저 생성합니다.
-            nlohmann::json child_ref = {{"name", dec}, {"id", id++}, {"children", nlohmann::json::array()}};
+            nlohmann::json child_ref = {{"name", dec}, {"id", id++}, {"children", nlohmann::json::array()}, {"permission", nlohmann::json::array()}};
             cur_j["children"].push_back(child_ref); // 자식 노드 참조를 children에 추가
             q.push(dec); // 큐에 자식 노드 이름을 추가하여 나중에 처리
         }
@@ -943,7 +943,12 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
         nlohmann::json &children = node["children"];
         for (auto &child : children) {
             const std::string &name = child["name"];
+            std::string tmp1 = child.dump();
             child = j_map[name]; // j_map에서 찾은 실제 노드 객체로 대체
+
+            std::string tmp2 = child.dump();
+
+            int test = 0;
         }
     }
 

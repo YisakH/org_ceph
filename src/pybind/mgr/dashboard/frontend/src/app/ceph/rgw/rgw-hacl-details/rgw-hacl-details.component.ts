@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { HAclService } from '~/app/shared/api/hacl.service'
 
 import { Icons } from '~/app/shared/enum/icons.enum';
+import { BooleanTextPipe } from '~/app/shared/pipes/boolean-text.pipe';
 
 import {
   ITreeOptions,
@@ -11,6 +12,7 @@ import {
   TREE_ACTIONS,
   //IActionMapping
 } from '@circlon/angular-tree-component';
+import { CdTableColumn } from '~/app/shared/models/cd-table-column';
 
 @Component({
   selector: 'cd-rgw-hacl-details',
@@ -19,7 +21,7 @@ import {
 })
 export class RgwHaclDetailsComponent implements OnInit {
 
-  constructor(private hAclService: HAclService) { } 
+  constructor(private hAclService: HAclService, private booleanTextPipe: BooleanTextPipe) { } 
 
   response_status: number;
   response_body: string;
@@ -30,12 +32,14 @@ export class RgwHaclDetailsComponent implements OnInit {
   user_name: string;
   loadingIndicator: boolean = false;
   icons = Icons;
+  columns: CdTableColumn[];
 
   selectedNode: any;
   treeOptions: ITreeOptions = {
     actionMapping: {
       mouse: {
-        click: this.selectAndShowNode.bind(this)
+        click: this.selectAndShowNode.bind(this),
+        expanderClick: this.selectAndShowNode.bind(this),
       }
     }
   };
@@ -49,6 +53,16 @@ export class RgwHaclDetailsComponent implements OnInit {
     this.response_body = headers.get('Authorization');
     this.response_status = 200;
     */
+    this.columns = [
+      { prop: 'path', name: 'Path' },
+      { prop: 'authorizer', name: 'Authorizer' },
+      { prop: 'tier', name: 'Tier' },
+      { prop: 'r', name: 'Read', pipe: this.booleanTextPipe },
+      { prop: 'w', name: 'Write', pipe: this.booleanTextPipe },
+      { prop: 'x', name: 'Execute', pipe: this.booleanTextPipe },
+      { prop: 'g', name: 'Grant', pipe: this.booleanTextPipe }
+    ];
+    
     this.loadHAclTreeData();
   }
 
@@ -94,7 +108,7 @@ export class RgwHaclDetailsComponent implements OnInit {
 
   refreshAllHAcls(){
     this.loadingIndicator = true;
-    this.loadHAclTreeData(this.user_name);
+    this.loadHAclTreeData();
     this.loadingIndicator = false;
   }
 }

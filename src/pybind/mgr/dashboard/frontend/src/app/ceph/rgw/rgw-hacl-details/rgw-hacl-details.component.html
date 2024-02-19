@@ -26,18 +26,31 @@
       </div>
       <div class="card-body">
         <p><strong>Name:</strong> {{ selectedNode.data.name }}</p>
-        <div *ngFor="let perm of selectedNode.data.permission"> <!-- 권한 배열 반복 -->
-          <p><strong>Permission Details:</strong></p>
-          <ul>
-            <li><strong>Authorizer:</strong> {{ perm.authorizer }}</li>
-            <li><strong>Read:</strong> {{ perm.r ? 'Yes' : 'No' }}</li>
-            <li><strong>Write:</strong> {{ perm.w ? 'Yes' : 'No' }}</li>
-            <li><strong>Execute:</strong> {{ perm.x ? 'Yes' : 'No' }}</li>
-            <li><strong>Grant:</strong> {{ perm.g ? 'Yes' : 'No' }}</li>
-            <li><strong>Path:</strong> {{ perm.path }}</li>
-            <li><strong>Tier:</strong> {{ perm.tier }}</li>
-          </ul>
-        </div>
+        <p><strong>Permission Details:</strong></p>
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th scope="col">Path</th>
+              <th scope="col">Authorizer</th>
+              <th scope="col">Tier</th>
+              <th scope="col">Read</th>
+              <th scope="col">Write</th>
+              <th scope="col">Execute</th>
+              <th scope="col">Grant</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let perm of selectedNode.data.permission">
+              <td>{{ perm.path }}</td>
+              <td>{{ perm.authorizer }}</td>
+              <td>{{ perm.tier }}</td>
+              <td>{{ perm.r ? 'Yes' : 'No' }}</td>
+              <td>{{ perm.w ? 'Yes' : 'No' }}</td>
+              <td>{{ perm.x ? 'Yes' : 'No' }}</td>
+              <td>{{ perm.g ? 'Yes' : 'No' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

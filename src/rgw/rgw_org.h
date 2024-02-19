@@ -6,7 +6,7 @@
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/status.h"
-#include "rocksdb/slice.h"
+#include "rocksdb/slice_transform.h"
 #include "rocksdb/filter_policy.h"
 #include <mutex>
 #include <utility>
@@ -34,6 +34,31 @@ namespace rocksdb{
   struct ColumnFamilyOptions;
 }
 
+class DBManager;
+class RGWOrg;
+
+class OrgPermission
+{
+public:
+    bool r;
+    bool w;
+    bool x;
+    bool g;
+    std::string path;
+
+OrgPermission() {
+    r = true;
+    w = true;
+    x = true;
+    g = true;
+    path = "/";
+    }
+
+    OrgPermission(bool r, bool w, bool x, bool g) : r(r), w(w), x(x), g(g) {}
+    OrgPermission(bool r, bool w, bool x, bool g, std::string path) : r(r), w(w), x(x), g(g), path(path){}
+    bool operator<=(const OrgPermission &other) const;
+};
+
 class DBManager
 {
 private:
@@ -56,6 +81,7 @@ public:
     DBManager(const std::string& dbPath) : dbPath(std::move(dbPath)), db(nullptr) {
         //if(dbName == "RocksDB"){
         options.create_if_missing = true;
+        options.prefix_extractor.reset(rocksdb::NewFixedPrefixTransform(1));
         status = rocksdb::DB::Open(options, dbPath, &db);
         //}
     }
@@ -78,10 +104,11 @@ public:
         return status;
     }
     int getData(const std::string& key, std::string &value);
-    int getPartialMatchData(const std::string& prefix, std::vector<std::pair<std::string, std::string>> &values);
+    int getAllPartialMatchData(const std::string& prefix, std::vector<std::pair<std::string, std::string>> &values);
     int putData(const std::string& key, const std::string& value);
     int deleteData(const std::string& key);
 };
+
 
 // aclDB class
 class aclDB : public DBManager {
@@ -90,6 +117,7 @@ public:
         static aclDB instance;
         return instance;
     }
+    int getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pair<std::string, RGWOrg>> &values);
 
 private:
     aclDB() : DBManager("/tmp/org/AclDB") {}
@@ -132,36 +160,14 @@ class DecDB : public DBManager {
     DecDB() : DBManager("/tmp/org/DecDB") {}
 };
 
-class OrgPermission
-{
-public:
-    bool r;
-    bool w;
-    bool x;
-    bool g;
-    std::string path;
-
-OrgPermission() {
-    r = true;
-    w = true;
-    x = true;
-    g = true;
-    path = "/";
-    }
-
-    OrgPermission(bool r, bool w, bool x, bool g) : r(r), w(w), x(x), g(g) {}
-    OrgPermission(bool r, bool w, bool x, bool g, std::string path) : r(r), w(w), x(x), g(g), path(path){}
-    bool operator<=(const OrgPermission &other) const;
-};
 
 class RGWOrg
 {
-private:
+public:
     std::string user;
     std::string authorizer;
     int tier;
     OrgPermission* orgPermission;
-public:
     RGWOrg(std::string user, const std::string &authorizer, uint16_t tier,
            OrgPermission* orgPermission) : user(std::move(user)), authorizer(authorizer), tier(tier),
                                                  orgPermission(orgPermission) {}
@@ -222,6 +228,8 @@ public:
 
     static int getPartialMatchRgwOrg(aclDB &aclDB, const std::string& user, const std::string& path, RGWOrg *rgwOrg);
 };
+
+
 
 class RGWOrgTier
 {

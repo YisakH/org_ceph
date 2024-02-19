@@ -54,6 +54,21 @@ int DBManager::getData(const std::string &key, std::string &value)
     }
 }
 
+int DBManager::getAllPartialMatchData(const std::string& prefix, std::vector<std::pair<std::string, std::string>> &values){
+    auto iter = db->NewIterator(rocksdb::ReadOptions());
+
+    for (iter->Seek(prefix); iter->Valid() && iter->key().starts_with(prefix); iter->Next()) {
+        values.push_back(std::make_pair(iter->key().ToString(), iter->value().ToString()));
+    }
+
+    if(values.size() > 0){
+        return 0;
+    }
+    else{
+        return -1;
+    }
+}
+
 int DBManager::putData(const std::string &key, const std::string &value)
 {
     std::string exiting_value;
@@ -83,6 +98,48 @@ int DBManager::deleteData(const std::string &key)
     {
         return -1;
     }
+}
+
+int toRGWOrg(const std::string &key, const std::string &value, RGWOrg *rgwOrg)
+{
+    rgwOrg->orgPermission = new OrgPermission();
+
+    std::istringstream iss(key);
+    std::string token;
+
+    std::getline(iss, token, ':');
+    rgwOrg->user = token;
+    std::getline(iss, token, ':');
+    rgwOrg->orgPermission->path = token;
+
+    std::istringstream iss2(value);
+    std::string token2;
+    try
+    {
+        std::getline(iss2, token2, ' ');
+        rgwOrg->authorizer = token2;
+        std::getline(iss2, token2, ' ');
+        rgwOrg->tier = std::stoi(token2);
+        std::getline(iss2, token2, ' ');
+        rgwOrg->orgPermission->r = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        std::getline(iss2, token2, ' ');
+        rgwOrg->orgPermission->w = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        std::getline(iss2, token2, ' ');
+        rgwOrg->orgPermission->x = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        std::getline(iss2, token2, ' ');
+        rgwOrg->orgPermission->g = std::stoi(token2) != 0; // 문자열을 bool로 변환
+    }
+    catch (const std::invalid_argument &e)
+    {
+        // 오류 처리 (예: 로그 출력, 오류 코드 반환 등)
+        return -1; // 또는 다른 오류 코드
+    }
+    catch (const std::out_of_range &e)
+    {
+        // 오류 처리
+        return -1; // 또는 다른 오류 코드
+    }
+    return 0;
 }
 
 int RGWOrg::putRGWOrg(DBManager &dbManager)
@@ -141,43 +198,7 @@ int RGWOrg::getFullMatchRGWOrg(aclDB &aclDB, const std::string& key, RGWOrg *rgw
         return ret;
     }
 
-    rgwOrg->orgPermission = new OrgPermission();
-
-    std::istringstream iss(key);
-    std::string token;
-
-    std::getline(iss, token, ':');
-    rgwOrg->user = token;
-    std::getline(iss, token, ':');
-    rgwOrg->orgPermission->path = token;
-
-    std::istringstream iss2(value);
-    std::string token2;
-    try
-    {
-        std::getline(iss2, token2, ' ');
-        rgwOrg->authorizer = token2;
-        std::getline(iss2, token2, ' ');
-        rgwOrg->tier = std::stoi(token2);
-        std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermission->r = std::stoi(token2) != 0; // 문자열을 bool로 변환
-        std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermission->w = std::stoi(token2) != 0; // 문자열을 bool로 변환
-        std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermission->x = std::stoi(token2) != 0; // 문자열을 bool로 변환
-        std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermission->g = std::stoi(token2) != 0; // 문자열을 bool로 변환
-    }
-    catch (const std::invalid_argument &e)
-    {
-        // 오류 처리 (예: 로그 출력, 오류 코드 반환 등)
-        return -1; // 또는 다른 오류 코드
-    }
-    catch (const std::out_of_range &e)
-    {
-        // 오류 처리
-        return -1; // 또는 다른 오류 코드
-    }
+    ret = toRGWOrg(key, value, rgwOrg);
     return ret;
 }
 
@@ -852,6 +873,21 @@ bool validateRGWOrgPermission(std::string user, std::string path, bool r, bool w
     return true;
 }
 
+int aclDB::getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pair<std::string, RGWOrg>> &values){
+    std::vector<std::pair<std::string, std::string>> str_values;
+    int ret = getAllPartialMatchData(prefix, str_values);
+
+    for (auto &pair : str_values) {
+        std::string key = pair.first;
+        std::string value = pair.second;
+        RGWOrg *rgwOrg = new RGWOrg();
+        ret = toRGWOrg(key, value, rgwOrg);
+
+        values.push_back(std::make_pair(key, *rgwOrg));
+    }
+    return 0;
+}
+
 int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j) {
     std::queue<std::string> q;
     std::map<std::string, nlohmann::json> j_map;
@@ -874,9 +910,14 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
             {"permission", nlohmann::json::array()}
         };
 
-        auto *rgwOrg = getAcl(cur_name, "/");
-        if(rgwOrg != nullptr){
-            cur_j["permission"].push_back(rgwOrg->toJson());
+        std::vector<std::pair<std::string, RGWOrg>> values;
+        aclDB &acl_db = aclDB::getInstance();
+        ret = acl_db.getAllPartialMatchAcl(cur_name + ":", values);
+
+        for (auto &pair : values) {
+            auto &key = pair.first;
+            auto &rgwOrg = pair.second;
+            cur_j["permission"].push_back(rgwOrg.toJson());
         }
 
         if (ret == RGW_ORG_KEY_NOT_FOUND) {

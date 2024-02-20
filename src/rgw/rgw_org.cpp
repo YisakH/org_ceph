@@ -712,7 +712,7 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::string dec_list_
     return putUser(user, anc, dec_list);
 }
 
-int RGWOrgUser::deleteUser(std::string &user) {
+int RGWOrgUser::deleteUser(const std::string &user) {
     std::string anc = "";
     int anc_ret = getAnc(user, &anc);
 
@@ -747,10 +747,11 @@ int RGWOrgUser::deleteWithDescendants(const std::string &user, const std::vector
 }
 
 int RGWOrgUser::deleteWithAncestor(const std::string &user) {
-    int ret = RGWOrgAnc::deleteAnc(user);
-    if(ret < 0) return ret;
-
-    return RGWOrgTier::deleteUserTier(user);
+    int ret1 = RGWOrgAnc::deleteAnc(user);
+    int ret2 = RGWOrgTier::deleteUserTier(user);
+    if(ret1 != 0) return ret1;
+    else if(ret2 != 0) return ret2;
+    else return 0;
 }
 
 int RGWOrgUser::deleteWithBoth(const std::string &user, const std::string &anc, const std::vector<std::string> &dec_list) {
@@ -891,6 +892,7 @@ int aclDB::getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pai
 int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j) {
     std::queue<std::string> q;
     std::map<std::string, nlohmann::json> j_map;
+    std::vector<std::string> visit_order;
     int id = 0; // 노드에 고유 ID 할당을 위한 변수
 
     q.push(start_user);
@@ -935,22 +937,36 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
             q.push(dec); // 큐에 자식 노드 이름을 추가하여 나중에 처리
         }
         j_map[cur_name] = cur_j; // 현재 노드를 맵에 추가
+        visit_order.push_back(cur_name); // 방문 순서를 기록
     }
 
-    // j_map을 순회하며 children 배열을 실제 노드 객체로 대체
-    for (auto &pair : j_map) {
-        auto &node = pair.second;
-        nlohmann::json &children = node["children"];
-        for (auto &child : children) {
-            const std::string &name = child["name"];
-            std::string tmp1 = child.dump();
-            child = j_map[name]; // j_map에서 찾은 실제 노드 객체로 대체
-
-            std::string tmp2 = child.dump();
-
-            int test = 0;
+    // 노드를 역순으로 방문하며 부모 노드에 대한 참조를 추가
+    for (auto it = visit_order.rbegin(); it != visit_order.rend(); ++it) {
+        const std::string &cur_name = *it;
+        std::vector<nlohmann::json> new_children;
+        for (auto &child : j_map[cur_name]["children"]) {
+            const std::string &child_name = child["name"];
+            if (j_map.find(child_name) != j_map.end()) {
+                new_children.push_back(j_map[child_name]);
+            }
         }
+        j_map[cur_name]["children"] = new_children;
     }
+
+    // // 최종적으로 j_map의 모든 노드를 순회하며 children을 업데이트
+    // for (auto &pair : j_map) {
+    //     auto &node = pair.second;
+    //     std::vector<nlohmann::json> new_children;
+    //     for (auto &child : node["children"]) {
+    //         const std::string &name = child["name"];
+    //         if (j_map.find(name) != j_map.end()) {
+    //             // j_map에서 찾은 노드로 new_children을 업데이트
+    //             new_children.push_back(j_map[name]);
+    //         }
+    //     }
+    //     // children을 새로운 배열로 업데이트
+    //     node["children"] = new_children;
+    // }
 
     j = j_map[start_user]; // 최종 JSON 객체를 설정
     return 0;

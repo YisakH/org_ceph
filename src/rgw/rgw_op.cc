@@ -4795,19 +4795,18 @@ void RGWDeleteOrg::execute(optional_yield y)
 {
   dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : op_delete called" << dendl;
 
-  auto &dbm = aclDB::getInstance();
-  if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
-  {
-    dout(0) << "socks : rgw_op.cc : RGWDeleteOrg::execute : get db instance error. error_code : " << dbm.getStatus().ok() << dendl;
-    dbm.reOpenDB();
-    return;
+  
+  int ret = -1;
+
+  if (s->decoded_uri == "/admin/org/acl"){
+    const auto &user = findValueForKey(s->http_params, "user");
+    const auto &path = findValueForKey(s->http_params, "path");
+    const auto &key = user + ":" + path;
+    ret = deleteAcl(user, path);
+  }else if(s->decoded_uri == "/admin/org/user"){
+    const auto &user = findValueForKey(s->http_params, "user");
+    ret = RGWOrgUser::deleteUser(user);
   }
-
-  const auto &user = findValueForKey(s->http_params, "user");
-  const auto &path = findValueForKey(s->http_params, "path");
-  const auto &key = user + ":" + path;
-
-  int ret = RGWOrg::deleteRGWOrg(dbm, key);
 
   if (ret == 0)
   {

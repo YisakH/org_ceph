@@ -345,7 +345,7 @@ class RGWOrgUser
 public:
     static int putUser(std::string user, std::string anc = "", std::vector<std::string> dec_list = std::vector<std::string>());
     static int putUser(std::string user, std::string anc, std::string dec_list_str);
-    static int deleteUser(std::string &user);
+    static int deleteUser(const std::string &user);
     static int updateUser();
     
     static int deleteOnlyUser(const std::string &user);

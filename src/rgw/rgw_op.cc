@@ -1224,6 +1224,7 @@ int RGWGetObj::verify_permission(optional_yield y)
   }
 
   // dout(0) << "socks : request user name : " << s->user->get_id().id;
+  return checkHAclObjRead(s->user->get_id().id);
 
   return 0;
 }
@@ -4625,6 +4626,8 @@ int RGWPutObj::verify_permission(optional_yield y)
   const bool isAccessable = validateRGWOrgPermission(user_name, path, true, true);
   dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : user id : " << user_name << " path : " << path << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : verify result : " << isAccessable << dendl;
+
+  return checkHAclObjWrite(s->user->get_id().id);
 
   return 0;
 }

@@ -559,9 +559,9 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
 }
 
 int checkHAclObjRead(const std::string& request_user, const std::string& path){
-    RGWOrg *rgwOrg = getAcl(request_user, path);
+    RGWOrg *rgwOrg = getAcl(request_user, path, false);
     if(rgwOrg == nullptr){
-        return RGW_ORG_KEY_NOT_FOUND;
+        return RGW_ORG_PERMISSION_ALLOWED;
     }
     
     if(rgwOrg->getOrgPermission()->r){
@@ -574,9 +574,9 @@ int checkHAclObjRead(const std::string& request_user, const std::string& path){
 
 
 int checkHAclObjWrite(const std::string& request_user, const std::string& path){
-    RGWOrg *rgwOrg = getAcl(request_user, path);
+    RGWOrg *rgwOrg = getAcl(request_user, path, false);
     if(rgwOrg == nullptr){
-        return RGW_ORG_KEY_NOT_FOUND;
+        return RGW_ORG_PERMISSION_ALLOWED;
     }
     
     if(rgwOrg->getOrgPermission()->w){

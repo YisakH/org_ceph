@@ -4415,7 +4415,7 @@ int RGWPutOrg::verify_permission(optional_yield y)
   if (s->decoded_uri == "/admin/org/acl")
   {
     const auto &user = findValueForKey(s->http_params, "user");
-    const auto &authorizer = findValueForKey(s->http_params, "authorizer");
+    const auto &authorizer = s->user->get_id().id;
     const int &tier = stoi(findValueForKey(s->http_params, "tier"));
     const bool &r = findValueForKey(s->http_params, "r") == "true";
     const bool &w = findValueForKey(s->http_params, "w") == "true";
@@ -4429,7 +4429,7 @@ int RGWPutOrg::verify_permission(optional_yield y)
       return checkAclWrite("admin", user, path, authorizer, tier, r, w, x, g);
   }
   else if (s->decoded_uri == "/admin/org/tier")
-  {
+  { // deprecated
     return 1;
   }
 
@@ -4439,7 +4439,11 @@ int RGWPutOrg::verify_permission(optional_yield y)
 int RGWGetOrg::verify_permission(optional_yield y)
 {
   // TODO: socks 얘도 해야함
-  return 1;
+  const auto& request_user = s->user->get_id().id;
+  const auto& target_user = findValueForKey(s->http_params, "user");
+
+  return checkAclRead(request_user, target_user);
+  //return 1;
 }
 
 // 얘는 put object시 rgw iam 권한 검사하는데 초점을 맞추고 있음.

@@ -358,7 +358,10 @@ RGWOrg* getAcl(const std::string& user, const std::string& path, bool isFullMatc
 int putAcl(const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g);
 int deleteAcl(const std::string& user, const std::string& path);
 int checkAclWrite(const std::string& request_user, const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g);
+int checkAclRead(const std::string& request_user, const std::string& target_user);
 
+int checkHAclObjRead(const std::string& request_user, const std::string& path);
+int checkHAclObjWrite(const std::string& request_user, const std::string& path);
 
 int getTier(const std::string& user, int *tier);
 int putTier(const std::string& user, int tier);

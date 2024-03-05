@@ -493,6 +493,29 @@ int RGWOrgDec::updateDec(std::string user, std::vector<std::string> dec_list){
     }
 }
 
+int checkAclRead(const std::string& request_user, const std::string& target_user)
+{
+    if(request_user == "root"){
+        return RGW_ORG_PERMISSION_ALLOWED;
+    }
+    int request_user_tier = -1, target_user_tier = -1;
+    int ret = -1;
+    ret = RGWOrgTier::getUserTier(request_user, &request_user_tier);
+    if(ret < 0){ // request user의 tier가 존재하지 않음
+        return -1;
+    }
+    ret = RGWOrgTier::getUserTier(target_user, &target_user_tier);
+    if(ret < 0){
+        return -1;
+    }
+
+    if(request_user_tier > target_user_tier){
+        return RGW_ORG_TIER_NOT_ALLOWED;
+    }
+
+    return RGW_ORG_PERMISSION_ALLOWED;
+}
+
 int checkAclWrite(const std::string& request_user, const std::string& target_user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g){
     int request_user_tier = -1, target_user_tier = -1;
     int ret = -1;
@@ -533,6 +556,36 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     }
     
     return RGW_ORG_PERMISSION_ALLOWED;
+}
+
+int checkHAclObjRead(const std::string& request_user, const std::string& path){
+    RGWOrg *rgwOrg = getAcl(request_user, path);
+    if(rgwOrg == nullptr){
+        return RGW_ORG_KEY_NOT_FOUND;
+    }
+    
+    if(rgwOrg->getOrgPermission()->r){
+        return RGW_ORG_PERMISSION_ALLOWED;
+    }
+    else{
+        return RGW_ORG_PERMISSION_NOT_ALLOWED;
+    }
+}
+
+
+int checkHAclObjWrite(const std::string& request_user, const std::string& path){
+    RGWOrg *rgwOrg = getAcl(request_user, path);
+    if(rgwOrg == nullptr){
+        return RGW_ORG_KEY_NOT_FOUND;
+    }
+    
+    if(rgwOrg->getOrgPermission()->w){
+        return RGW_ORG_PERMISSION_ALLOWED;
+    }
+    else{
+        return RGW_ORG_PERMISSION_NOT_ALLOWED;
+    }
+
 }
 
 std::string to_hex(const unsigned char *data, int len) {

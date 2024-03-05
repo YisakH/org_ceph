@@ -19,8 +19,8 @@ export class HAclService {
     let url = "http://localhost:7480/admin/org/dec";
     let service = 's3';
     let region = 'us-east-1';
-    let accessKey = 'qwer';
-    let secretKey = 'qwer';
+    let accessKey = 'root';
+    let secretKey = 'root';
     let queryParamsDict = {'user': userName, 'json': 'true'}; // 변수 이름 수정
     
     const headers: HttpHeaders = this.awsSignatureService.signRequest(method, url, service, region, accessKey, secretKey, queryParamsDict); // 수정된 변수 이름 사용

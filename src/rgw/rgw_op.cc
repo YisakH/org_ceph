@@ -1223,8 +1223,11 @@ int RGWGetObj::verify_permission(optional_yield y)
     get_legal_hold = verify_object_permission(this, s, rgw::IAM::s3GetObjectLegalHold);
   }
 
+  const string request_user = s->user->get_id().id;
+  const string bucket_name = s->bucket->get_name();
+  const string object_name = s->object->get_name();
   // dout(0) << "socks : request user name : " << s->user->get_id().id;
-  return checkHAclObjRead(s->user->get_id().id);
+  return checkHAclObjRead(request_user, bucket_name, object_name);
 
   return 0;
 }
@@ -4627,7 +4630,7 @@ int RGWPutObj::verify_permission(optional_yield y)
   dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : user id : " << user_name << " path : " << path << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : verify result : " << isAccessable << dendl;
 
-  return checkHAclObjWrite(s->user->get_id().id);
+  return checkHAclObjWrite(user_name, bucket_name, object_name);
 
   return 0;
 }

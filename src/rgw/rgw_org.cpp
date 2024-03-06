@@ -20,6 +20,10 @@ bool OrgPermission::operator<=(const OrgPermission& other) const {
            (!other.x || x);
 }
 
+std::string getPath(const std::string& user_name, const std::string& bucket_name, const std::string& object_name){
+    return user_name + ":/" + bucket_name + "/" + object_name;
+}
+
 nlohmann::json RGWOrg::toJson() {
     nlohmann::json j;
     j["user"] = user;
@@ -558,7 +562,8 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     return RGW_ORG_PERMISSION_ALLOWED;
 }
 
-int checkHAclObjRead(const std::string& request_user, const std::string& path){
+int checkHAclObjRead(const std::string& request_user, const std::string& bucket_name, const std::string& object_name){
+    const std::string path = getPath(request_user, bucket_name, object_name);
     RGWOrg *rgwOrg = getAcl(request_user, path, false);
     if(rgwOrg == nullptr){
         return RGW_ORG_PERMISSION_ALLOWED;
@@ -572,8 +577,8 @@ int checkHAclObjRead(const std::string& request_user, const std::string& path){
     }
 }
 
-
-int checkHAclObjWrite(const std::string& request_user, const std::string& path){
+int checkHAclObjWrite(const std::string& request_user, const std::string& bucket_name, const std::string& object_name){
+    const std::string path = getPath(request_user, bucket_name, object_name);
     RGWOrg *rgwOrg = getAcl(request_user, path, false);
     if(rgwOrg == nullptr){
         return RGW_ORG_PERMISSION_ALLOWED;

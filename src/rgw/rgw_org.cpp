@@ -19,6 +19,18 @@ bool OrgPermission::operator<=(const OrgPermission& other) const {
            (!other.g || g) &&
            (!other.x || x);
 }
+bool OrgPermission::operator<(const OrgPermission& other) const {
+    bool isStrictlyLess = false; // 진부분집합 여부를 판단하기 위한 변수
+    if ((!other.r || r) && (!other.w || w) &&
+        (!other.g || g) && (!other.x || x)) {
+        // 모든 권한이 other에 포함되는지 확인
+        isStrictlyLess = (r != other.r) || (w != other.w) ||
+                         (g != other.g) || (x != other.x);
+        // 적어도 하나의 권한이 other와 다르다면, 즉 진부분집합이라면 true
+    }
+    return isStrictlyLess;
+}
+
 
 std::string getPath(const std::string& user_name, const std::string& bucket_name, const std::string& object_name){
     return user_name + ":/" + bucket_name + "/" + object_name;
@@ -199,21 +211,19 @@ int RGWOrg::getPartialMatchRgwOrg(aclDB &aclDB, const std::string& user, const s
 {
     std::istringstream iss(path);
     std::string segment;
-    std::string accumulatedPath;
-    std::string key;
+    std::string accumulatedPath = "/";
+    std::string key = user + ":" + accumulatedPath;
     int ret = -1;
 
     // Check if the path is root "/" and handle it explicitly
-    if (path == "/") {
-        key = user + ":/";
-        return getFullMatchRGWOrg(aclDB, key, rgwOrg);
+    if (getFullMatchRGWOrg(aclDB, key, rgwOrg) == 0) {
+        ret = 0;
     }
 
     while (std::getline(iss, segment, '/'))
     {
         if (!segment.empty())
         {
-            accumulatedPath += "/";
             accumulatedPath += segment;
             key = user + ":" + accumulatedPath;
             int cur_ret = getFullMatchRGWOrg(aclDB, key, rgwOrg);
@@ -223,6 +233,7 @@ int RGWOrg::getPartialMatchRgwOrg(aclDB &aclDB, const std::string& user, const s
                 // Optionally break here if you only need the first match
                 // break;
             }
+            accumulatedPath += "/"; // 다음 세그먼트를 위해 '/' 추가
         }
     }
     return ret;
@@ -393,7 +404,10 @@ int putAnc(const std::string &user, const std::string &anc)
     }
     int anc_tier;
     ret = getTier(anc, &anc_tier);
-    if(ret < 0){
+    if(ret == RGW_ORG_KEY_NOT_FOUND){
+        anc_tier = 0;
+    }
+    else if(ret < 0){
         return ret;
     }
     ret = putTier(user, anc_tier + 1);
@@ -600,6 +614,7 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     }
 
     RGWOrg * request_user_org = getAcl(request_user, path);
+    //std::string tmp = request_user_org->toString();
     if(request_user_org == nullptr || !request_user_org->getOrgPermission()->g){ // grant 권한이 없는 경우
         return RGW_ORG_PERMISSION_NOT_ALLOWED;
     }
@@ -611,7 +626,7 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     RGWOrg *rgwOrg = getAcl(anc_user, path);
     OrgPermission *ancPermission = rgwOrg->getOrgPermission();
 
-    if(ancPermission != nullptr && orgPermission <= *ancPermission){ // anc의 권한이 요청한 권한보다 크거나 같은 경우
+    if(ancPermission != nullptr && orgPermission < *ancPermission){ // anc의 권한이 요청한 권한을 포함하지 못하는 경우
         return RGW_ORG_PERMISSION_NOT_ALLOWED;
     }
 
@@ -941,6 +956,9 @@ int RGWOrgTier::getUserTier(std::string user, int *tier){
     if(tierDb.status.ok()){
         *tier = value;
         return 0;
+    }
+    else if(tierDb.status.IsNotFound()){
+        return RGW_ORG_KEY_NOT_FOUND;
     }
     else{
         return -1;

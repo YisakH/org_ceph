@@ -57,6 +57,7 @@ OrgPermission() {
     OrgPermission(bool r, bool w, bool x, bool g) : r(r), w(w), x(x), g(g) {}
     OrgPermission(bool r, bool w, bool x, bool g, std::string path) : r(r), w(w), x(x), g(g), path(path){}
     bool operator<=(const OrgPermission &other) const;
+    bool operator<(const OrgPermission &other) const;
 };
 
 class DBManager

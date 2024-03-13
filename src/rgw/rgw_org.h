@@ -118,6 +118,7 @@ public:
         return instance;
     }
     int getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pair<std::string, RGWOrg>> &values);
+    static int getSuperPathsForPrefix(const std::string& prefix, std::vector<std::pair<std::string, RGWOrg>> &values);
 
 private:
     aclDB() : DBManager("/tmp/org/AclDB") {}
@@ -269,34 +270,9 @@ class RGWOrgAnc
 {
 
     public:
-    static int getAnc(const std::string& user, std::string *anc){
-        std::string value;
-        AncDB &ancDB = AncDB::getInstance();
+    static int getAnc(const std::string& user, std::string *anc);
 
-        ancDB.getData(user, value);
-
-        if(ancDB.status.ok()){
-            *anc = value;
-            return 0;
-        }else if(ancDB.status.IsNotFound()){
-            return RGW_ORG_KEY_NOT_FOUND;
-        }
-        else{
-            return -1;
-        }
-    }
-
-    static int putAnc(std::string user, std::string anc){
-        AncDB &ancDB = AncDB::getInstance();
-        ancDB.putData(user, anc);
-
-        if(ancDB.status.ok()){
-            return 0;
-        }
-        else{
-            return -1;
-        }
-    }
+    static int putAnc(std::string user, std::string anc);
 
     static int deleteAnc(std::string user){
         AncDB &ancDB = AncDB::getInstance();

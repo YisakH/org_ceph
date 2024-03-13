@@ -1211,8 +1211,10 @@ int RGWGetObj::verify_permission(optional_yield y)
       action = rgw::IAM::s3GetObjectVersion;
     }
   }
-
-  if (!verify_object_permission(this, s, action))
+  int hacl_ret = checkHAclObjRead(s->user->get_id().id, s->bucket->get_name(), s->object->get_name());
+  dout(0) << "socks(getobj::verify_reqeuster): hacl_ret : " << hacl_ret << dendl;
+  
+  if (hacl_ret != 0 && !verify_object_permission(this, s, action))
   {
     return -EACCES;
   }
@@ -4418,9 +4420,13 @@ int RGWPutOrg::verify_permission(optional_yield y)
 {
   if (s->decoded_uri == "/admin/org/acl")
   {
-    const auto &user = findValueForKey(s->http_params, "user");
-    const auto &authorizer = s->user->get_id().id;
-    const int &tier = stoi(findValueForKey(s->http_params, "tier"));
+    const auto &user = findValueForKey(s->http_params, "user");   
+    const string &authorizer = s->user->get_id().id;
+    int tier;
+    int ret = getTier(authorizer, &tier);
+    if(ret < 0){
+      tier = 999;
+    }
     const bool &r = findValueForKey(s->http_params, "r") == "true";
     const bool &w = findValueForKey(s->http_params, "w") == "true";
     const bool &x = findValueForKey(s->http_params, "x") == "true";
@@ -4430,7 +4436,7 @@ int RGWPutOrg::verify_permission(optional_yield y)
     if (authorizer == "root")
       return 1;
     else
-      return checkAclWrite("admin", user, path, authorizer, tier, r, w, x, g);
+      return checkAclWrite(authorizer, user, path, authorizer, tier, r, w, x, g);
   }
   else if (s->decoded_uri == "/admin/org/tier")
   { // deprecated
@@ -4616,9 +4622,22 @@ int RGWPutObj::verify_permission(optional_yield y)
     }
   }
 
-  if (!verify_bucket_permission_no_policy(this, s, RGW_PERM_WRITE))
+  int hacl_ret = checkHAclObjWrite(s->user->get_id().id, s->bucket->get_name(), s->object->get_name());
+  dout(0) << "socks(getobj::verify_reqeuster): hacl_ret : " << hacl_ret << dendl;
+
+  if (hacl_ret != RGW_ORG_PERMISSION_ALLOWED)
   {
-    return -EACCES;
+    if (hacl_ret == RGW_ORG_KEY_NOT_FOUND)
+    {
+      if (!verify_bucket_permission_no_policy(this, s, RGW_PERM_WRITE))
+      {
+        return -EACCES;
+      }
+    }
+    else
+    { // not allowed
+      return -EACCES;
+    }
   }
 
   const string user_name = s->user->get_id().id;
@@ -4630,7 +4649,7 @@ int RGWPutObj::verify_permission(optional_yield y)
   dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : user id : " << user_name << " path : " << path << dendl;
   dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : verify result : " << isAccessable << dendl;
 
-  return checkHAclObjWrite(user_name, bucket_name, object_name);
+  //return checkHAclObjWrite(user_name, bucket_name, object_name);
 
   return 0;
 }
@@ -4900,7 +4919,12 @@ void RGWGetOrg::execute(optional_yield y)
     const auto &path = findValueForKey(s->http_params, "path");
 
     s->rgwOrg = getAcl(user, path);
-    response_bl.append(s->rgwOrg->toString().c_str());
+
+    if(s->rgwOrg == nullptr){
+      response_bl.append("there are no request user");
+    }else{
+      response_bl.append(s->rgwOrg->toString().c_str());
+    }
 
     ret = 0;
   }
@@ -4972,8 +4996,14 @@ void RGWPutOrg::execute(optional_yield y)
   {
 
     const auto &user = findValueForKey(s->http_params, "user");
-    const auto &authorizer = findValueForKey(s->http_params, "authorizer");
-    const int &tier = stoi(findValueForKey(s->http_params, "tier"));
+    const string &authorizer = s->user->get_id().id;
+    int tier;
+    ret = getTier(authorizer, &tier);
+    if(ret < 0){
+      tier = 999;
+    }
+    //const auto &authorizer = findValueForKey(s->http_params, "authorizer");
+    //const int &tier = stoi(findValueForKey(s->http_params, "tier"));
     const bool &r = findValueForKey(s->http_params, "r") == "true";
     const bool &w = findValueForKey(s->http_params, "w") == "true";
     const bool &x = findValueForKey(s->http_params, "x") == "true";

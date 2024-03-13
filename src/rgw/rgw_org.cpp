@@ -104,6 +104,43 @@ int DBManager::deleteData(const std::string &key)
     }
 }
 
+int RGWOrgAnc::putAnc(std::string user, std::string anc)
+{
+    AncDB &ancDB = AncDB::getInstance();
+    ancDB.putData(user, anc);
+
+    if (ancDB.status.ok())
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+int RGWOrgAnc::getAnc(const std::string &user, std::string *anc)
+{
+    std::string value;
+    AncDB &ancDB = AncDB::getInstance();
+
+    ancDB.getData(user, value);
+
+    if (ancDB.status.ok())
+    {
+        *anc = value;
+        return 0;
+    }
+    else if (ancDB.status.IsNotFound())
+    {
+        return RGW_ORG_KEY_NOT_FOUND;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
 int toRGWOrg(const std::string &key, const std::string &value, RGWOrg *rgwOrg)
 {
     rgwOrg->orgPermission = new OrgPermission();
@@ -248,15 +285,41 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     auto *orgPermission = new OrgPermission(r, w, x, g, path);
     rgwOrg->setOrgPermission(*orgPermission);
 
+    RGWOrg *existingRgwOrg = getAcl(user, path);
+    if(existingRgwOrg != nullptr){
+        int defaultTier = existingRgwOrg->getTier();
+        if(defaultTier < tier){ // 기존 권한이 존재하지 않거나 기존 권한의 티어가 새로운 권한의 티어보다 작은(높은) 경우
+            return -1;
+        }
+    }
+
+    // 기존 상위 경로에 대한 권한
+    std::vector<std::pair<std::string, RGWOrg>> existingUpperPerms;
+    aclDB::getSuperPathsForPrefix(user + ":" + path, existingUpperPerms);
+    for (auto &perms : existingUpperPerms) {
+        std::string key = perms.first;
+        RGWOrg rgwOrg = perms.second;
+        if(rgwOrg.getTier() < tier){
+            return -1;
+        }
+    }
+
     int ret = rgwOrg->putRGWOrg(dbm);
     if (ret < 0)
     {
         return ret;
     }
-    else
-    {
-        return 0;
+
+    std::string anc = "";
+    getAnc(user, &anc);
+    if(anc != ""){
+        ret = putAcl(anc, path, authorizer, tier, r, w, x, g);
+        if(ret < 0){
+            return ret;
+        }
     }
+
+    return 0;
 }
 
 int putAcl(RGWOrg &rgwOrg)
@@ -537,7 +600,7 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     }
 
     RGWOrg * request_user_org = getAcl(request_user, path);
-    if(request_user_org == nullptr || !request_user_org->getOrgPermission()->g){
+    if(request_user_org == nullptr || !request_user_org->getOrgPermission()->g){ // grant 권한이 없는 경우
         return RGW_ORG_PERMISSION_NOT_ALLOWED;
     }
 
@@ -548,7 +611,7 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     RGWOrg *rgwOrg = getAcl(anc_user, path);
     OrgPermission *ancPermission = rgwOrg->getOrgPermission();
 
-    if(ancPermission != nullptr && orgPermission <= *ancPermission){
+    if(ancPermission != nullptr && orgPermission <= *ancPermission){ // anc의 권한이 요청한 권한보다 크거나 같은 경우
         return RGW_ORG_PERMISSION_NOT_ALLOWED;
     }
 
@@ -581,7 +644,7 @@ int checkHAclObjWrite(const std::string& request_user, const std::string& bucket
     const std::string path = getPath(request_user, bucket_name, object_name);
     RGWOrg *rgwOrg = getAcl(request_user, path, false);
     if(rgwOrg == nullptr){
-        return RGW_ORG_PERMISSION_ALLOWED;
+        return RGW_ORG_KEY_NOT_FOUND;
     }
     
     if(rgwOrg->getOrgPermission()->w){
@@ -760,8 +823,8 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::stri
 
         ret = RGWOrgTier::updateUserTier(user);
     }
-    RGWOrg *rgwOrg = new RGWOrg(user, anc);
-    ret = putAcl(*rgwOrg);
+    RGWOrg *blackRgwOrg = new RGWOrg(user, anc);
+    ret = putAcl(*blackRgwOrg);
     return 0;
 }
 
@@ -945,6 +1008,36 @@ int aclDB::getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pai
         values.push_back(std::make_pair(key, *rgwOrg));
     }
     return 0;
+}
+
+int aclDB::getSuperPathsForPrefix(const std::string& userPrefix, std::vector<std::pair<std::string, RGWOrg>> &values){
+    std::istringstream iss(userPrefix);
+    std::string segment;
+    std::string accumulatedPath = "";
+    std::string userPathPrefix = userPrefix.substr(0, userPrefix.find(":") + 1); // 사용자 이름 추출 (예: "user3:")
+    bool isFirstSegment = true;
+
+    while (std::getline(iss, segment, '/')) {
+        if (!segment.empty() || isFirstSegment) {
+            if (!isFirstSegment) {
+                accumulatedPath += "/";
+            } else {
+                isFirstSegment = false;
+            }
+            accumulatedPath += segment;
+
+            // 사용자 이름을 포함한 전체 경로 생성
+            std::string fullPath = userPathPrefix + accumulatedPath;
+
+            RGWOrg rgwOrg;
+            aclDB &aclDB = aclDB::getInstance();
+            // 사용자 이름을 포함한 경로로 getFullMatchRGWOrg 함수 호출
+            RGWOrg::getFullMatchRGWOrg(aclDB, fullPath, &rgwOrg);
+            values.push_back(std::make_pair(fullPath, rgwOrg));
+        }
+    }
+
+    return values.empty() ? -1 : 0;
 }
 
 int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j) {

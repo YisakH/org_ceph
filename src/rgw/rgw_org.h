@@ -37,7 +37,7 @@ namespace rocksdb{
 class DBManager;
 class RGWOrg;
 
-class OrgPermission
+class OrgPermissionFlags
 {
 public:
     bool r;
@@ -46,7 +46,7 @@ public:
     bool g;
     std::string path;
 
-OrgPermission() {
+OrgPermissionFlags() {
     r = true;
     w = true;
     x = true;
@@ -54,10 +54,10 @@ OrgPermission() {
     path = "/";
     }
 
-    OrgPermission(bool r, bool w, bool x, bool g) : r(r), w(w), x(x), g(g) {}
-    OrgPermission(bool r, bool w, bool x, bool g, std::string path) : r(r), w(w), x(x), g(g), path(path){}
-    bool operator<=(const OrgPermission &other) const;
-    bool operator<(const OrgPermission &other) const;
+    OrgPermissionFlags(bool r, bool w, bool x, bool g) : r(r), w(w), x(x), g(g) {}
+    OrgPermissionFlags(bool r, bool w, bool x, bool g, std::string path) : r(r), w(w), x(x), g(g), path(path){}
+    bool operator<=(const OrgPermissionFlags &other) const;
+    bool operator<(const OrgPermissionFlags &other) const;
 };
 
 class DBManager
@@ -169,17 +169,17 @@ public:
     std::string user;
     std::string authorizer;
     int tier;
-    OrgPermission* orgPermission;
+    OrgPermissionFlags* orgPermission;
     RGWOrg(std::string user, const std::string &authorizer, uint16_t tier,
-           OrgPermission* orgPermission) : user(std::move(user)), authorizer(authorizer), tier(tier),
-                                                 orgPermission(orgPermission) {}
+           OrgPermissionFlags* orgPermission) : user(std::move(user)), authorizer(authorizer), tier(tier),
+                                                orgPermission(orgPermission) {}
 
     RGWOrg(std::string user, const std::string &authorizer, uint16_t tier) : user(std::move(user)), authorizer(authorizer),
                                                                                      tier(tier){
-                                                                                        orgPermission = new OrgPermission();
+                                                                                        orgPermission = new OrgPermissionFlags();
                                                                                      }
     RGWOrg(){
-        orgPermission = new OrgPermission();
+        orgPermission = new OrgPermissionFlags();
         user = "";
         authorizer = "";
         tier = -1;
@@ -198,7 +198,7 @@ public:
         return tier;
     }
 
-    OrgPermission* getOrgPermission() const {
+    OrgPermissionFlags* getOrgPermission() const {
         return orgPermission;
     }
 
@@ -214,7 +214,7 @@ public:
         RGWOrg::tier = tier;
     }
 
-    void setOrgPermission(OrgPermission &newOrgPermission) {
+    void setOrgPermission(OrgPermissionFlags &newOrgPermission) {
         orgPermission = &newOrgPermission;
     }
 

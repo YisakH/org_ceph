@@ -13,13 +13,13 @@
 #include <queue>
 
 // TierDB RGWOrgTier::tierDb;
-bool OrgPermission::operator<=(const OrgPermission& other) const {
+bool OrgPermissionFlags::operator<=(const OrgPermissionFlags& other) const {
     return (!other.r || r) &&
            (!other.w || w) &&
            (!other.g || g) &&
            (!other.x || x);
 }
-bool OrgPermission::operator<(const OrgPermission& other) const {
+bool OrgPermissionFlags::operator<(const OrgPermissionFlags& other) const {
     bool isStrictlyLess = false; // 진부분집합 여부를 판단하기 위한 변수
     if ((!other.r || r) && (!other.w || w) &&
         (!other.g || g) && (!other.x || x)) {
@@ -54,7 +54,7 @@ RGWOrg::RGWOrg(const std::string &user, const std::string &authorizer){
     this->authorizer = authorizer;
 
     RGWOrgTier::getUserTier(user, &this->tier);
-    orgPermission = new OrgPermission();
+    orgPermission = new OrgPermissionFlags();
 }                                   
 
 int DBManager::getData(const std::string &key, std::string &value)
@@ -155,7 +155,7 @@ int RGWOrgAnc::getAnc(const std::string &user, std::string *anc)
 
 int toRGWOrg(const std::string &key, const std::string &value, RGWOrg *rgwOrg)
 {
-    rgwOrg->orgPermission = new OrgPermission();
+    rgwOrg->orgPermission = new OrgPermissionFlags();
 
     std::istringstream iss(key);
     std::string token;
@@ -293,7 +293,7 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     rgwOrg->setUser(user);
     rgwOrg->setAuthorizer(authorizer);
     rgwOrg->setTier(tier);
-    auto *orgPermission = new OrgPermission(r, w, x, g, path);
+    auto *orgPermission = new OrgPermissionFlags(r, w, x, g, path);
     rgwOrg->setOrgPermission(*orgPermission);
 
     RGWOrg *existingRgwOrg = getAcl(user, path);
@@ -620,7 +620,7 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     }
 
 
-    OrgPermission orgPermission(r, w, x, g, path);
+    OrgPermissionFlags orgPermission(r, w, x, g, path);
     std::string anc_user;
     ret = getAnc(target_user, &anc_user);
 
@@ -631,7 +631,7 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     RGWOrg *rgwOrg = getAcl(anc_user, path);
 
     if(rgwOrg != nullptr){
-        OrgPermission *ancPermission = rgwOrg->getOrgPermission();
+        OrgPermissionFlags *ancPermission = rgwOrg->getOrgPermission();
 
         if(ancPermission != nullptr && orgPermission < *ancPermission){ // anc의 권한이 요청한 권한을 포함하지 못하는 경우
             return RGW_ORG_PERMISSION_NOT_ALLOWED;
@@ -1006,7 +1006,7 @@ bool validateRGWOrgPermission(std::string user, std::string path, bool r, bool w
     if(rgwOrg == nullptr){
         return false;
     }
-    OrgPermission *orgPermission = rgwOrg->getOrgPermission();
+    OrgPermissionFlags *orgPermission = rgwOrg->getOrgPermission();
 
     // compare orgPermission and r, w, x, g
     // if request user has more permission than input r, w, x, g, return true

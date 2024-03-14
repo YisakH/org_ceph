@@ -32,8 +32,8 @@ bool OrgPermission::operator<(const OrgPermission& other) const {
 }
 
 
-std::string getPath(const std::string& user_name, const std::string& bucket_name, const std::string& object_name){
-    return user_name + ":/" + bucket_name + "/" + object_name;
+std::string getObjectPath(const std::string& bucket_name, const std::string& object_name){
+    return "/" + bucket_name + "/" + object_name;
 }
 
 nlohmann::json RGWOrg::toJson() {
@@ -623,25 +623,33 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     OrgPermission orgPermission(r, w, x, g, path);
     std::string anc_user;
     ret = getAnc(target_user, &anc_user);
-    RGWOrg *rgwOrg = getAcl(anc_user, path);
-    OrgPermission *ancPermission = rgwOrg->getOrgPermission();
 
-    if(ancPermission != nullptr && orgPermission < *ancPermission){ // anc의 권한이 요청한 권한을 포함하지 못하는 경우
-        return RGW_ORG_PERMISSION_NOT_ALLOWED;
+    if(anc_user == "request_user"){
+        return RGW_ORG_PERMISSION_ALLOWED;
     }
 
-    int authorizer_user_tier;
-    ret = getTier(rgwOrg->getAuthorizer(), &authorizer_user_tier);
+    RGWOrg *rgwOrg = getAcl(anc_user, path);
 
-    if(authorizer_user_tier < request_user_tier){
-        return RGW_ORG_TIER_NOT_ALLOWED;
+    if(rgwOrg != nullptr){
+        OrgPermission *ancPermission = rgwOrg->getOrgPermission();
+
+        if(ancPermission != nullptr && orgPermission < *ancPermission){ // anc의 권한이 요청한 권한을 포함하지 못하는 경우
+            return RGW_ORG_PERMISSION_NOT_ALLOWED;
+        }
+
+        int authorizer_user_tier;
+        ret = getTier(rgwOrg->getAuthorizer(), &authorizer_user_tier);
+
+        if(authorizer_user_tier < request_user_tier){
+            return RGW_ORG_TIER_NOT_ALLOWED;
+        }
     }
     
     return RGW_ORG_PERMISSION_ALLOWED;
 }
 
 int checkHAclObjRead(const std::string& request_user, const std::string& bucket_name, const std::string& object_name){
-    const std::string path = getPath(request_user, bucket_name, object_name);
+    const std::string path = getObjectPath(bucket_name, object_name);
     RGWOrg *rgwOrg = getAcl(request_user, path, false);
     if(rgwOrg == nullptr){
         return RGW_ORG_PERMISSION_ALLOWED;
@@ -656,7 +664,7 @@ int checkHAclObjRead(const std::string& request_user, const std::string& bucket_
 }
 
 int checkHAclObjWrite(const std::string& request_user, const std::string& bucket_name, const std::string& object_name){
-    const std::string path = getPath(request_user, bucket_name, object_name);
+    const std::string path = getObjectPath(bucket_name, object_name);
     RGWOrg *rgwOrg = getAcl(request_user, path, false);
     if(rgwOrg == nullptr){
         return RGW_ORG_KEY_NOT_FOUND;

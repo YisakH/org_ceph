@@ -1,6 +1,6 @@
 #!/bin/bash
 
-users=("root" "president" "dean1" "dean2" "dean3" "chair1" "chair2" "chair3" "chair4" "chair5" "chair6" "chair6" "chair7" "student1" "student2" "student3" "student4" "student5" "student6")
+users=("root" "president" "dean1" "dean2" "dean3" "chair1" "chair2" "chair3" "chair4" "chair5" "chair6" "chair7" "student1" "student2" "student3" "student4" "student5" "student6")
 
 cd /ceph/org_ceph/build/
 # Loop through users array to create each user

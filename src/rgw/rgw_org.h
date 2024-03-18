@@ -11,6 +11,7 @@
 #include <mutex>
 #include <utility>
 #include <nlohmann/json.hpp>
+#include <filesystem>
 
 #define RGW_ORG_TIER_NOT_ALLOWED -2
 #define RGW_ORG_PERMISSION_NOT_ALLOWED -3
@@ -34,6 +35,8 @@ namespace rocksdb{
   struct ColumnFamilyOptions;
 }
 
+namespace fs = std::filesystem;
+
 class DBManager;
 class RGWOrg;
 
@@ -46,13 +49,7 @@ public:
     bool g;
     std::string path;
 
-OrgPermissionFlags() {
-    r = true;
-    w = true;
-    x = true;
-    g = true;
-    path = "/";
-    }
+    OrgPermissionFlags();
 
     OrgPermissionFlags(bool r, bool w, bool x, bool g) : r(r), w(w), x(x), g(g) {}
     OrgPermissionFlags(bool r, bool w, bool x, bool g, std::string path) : r(r), w(w), x(x), g(g), path(path){}
@@ -83,6 +80,14 @@ public:
         //if(dbName == "RocksDB"){
         options.create_if_missing = true;
         options.prefix_extractor.reset(rocksdb::NewFixedPrefixTransform(1));
+
+        if (!fs::exists(dbPath)) {
+            // 폴더가 존재하지 않으면 생성
+            if (!fs::create_directory(dbPath)){
+                // 폴더 생성 실패 처리 해야함.
+            }
+        }
+
         status = rocksdb::DB::Open(options, dbPath, &db);
         //}
     }

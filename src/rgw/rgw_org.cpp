@@ -30,6 +30,13 @@ bool OrgPermissionFlags::operator<(const OrgPermissionFlags& other) const {
     }
     return isStrictlyLess;
 }
+OrgPermissionFlags::OrgPermissionFlags(){
+    r = false;
+    w = false;
+    x = false;
+    g = false;
+    path = "/";
+}
 
 
 std::string getObjectPath(const std::string& bucket_name, const std::string& object_name){
@@ -624,7 +631,7 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
     std::string anc_user;
     ret = getAnc(target_user, &anc_user);
 
-    if(anc_user == "request_user"){
+    if(anc_user == request_user){
         return RGW_ORG_PERMISSION_ALLOWED;
     }
 

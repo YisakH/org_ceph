@@ -288,6 +288,10 @@ RGWOrg *getAcl(const std::string &user, const std::string &path, bool isFullMatc
 
 int putAcl(const std::string &user, const std::string &path, const std::string &authorizer, int tier, bool r, bool w, bool x, bool g)
 {
+    if(user == authorizer){
+        return 0;
+    }
+
     auto &dbm = aclDB::getInstance();
     RGWOrg *rgwOrg;
     if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
@@ -839,6 +843,7 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::stri
 
 
     if(dec_list.size() > 0){
+        // TODO: dec가 이미 존재하는 경우에 존재하는 dec를 찾고 user의 자손이 되도록 설정해야 할 필요 있음
         ret = RGWOrgDec::appendDecEdge(user, dec_list);
         if(ret < 0){
             return ret;
@@ -853,8 +858,8 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::stri
 
         ret = RGWOrgTier::updateUserTier(user);
     }
-    RGWOrg *blackRgwOrg = new RGWOrg(user, anc);
-    ret = putAcl(*blackRgwOrg);
+    //RGWOrg *blackRgwOrg = new RGWOrg(user, anc);
+    //ret = putAcl(*blackRgwOrg);
     return 0;
 }
 
@@ -910,14 +915,17 @@ int RGWOrgUser::deleteWithBoth(const std::string &user, const std::string &anc, 
         int ret = RGWOrgAnc::putAnc(dec, anc);
         if(ret < 0) return ret;
     }
+    // 삭제하고자 하는 유저를 부모의 자식 목록에서 제거
     int ret = RGWOrgDec::deleteDecEdge(anc, user);
     if(ret < 0) return ret;
 
+    // 삭제하고자 하는 유저의 자식 목록을 부모의 자식 목록에 추가
     ret = RGWOrgDec::appendDecEdge(anc, dec_list);
     if(ret < 0) return ret;
 
-    RGWOrgDec::putDec(anc, dec_list);
-    if(ret < 0) return ret;
+    // 여기서 에러 발생하는 것 같은데 주석처리 후 문제 없으면 지워야함
+    //RGWOrgDec::putDec(anc, dec_list);
+    //if(ret < 0) return ret;
 
     ret = RGWOrgDec::deleteDec(user);
     if(ret < 0) return ret;

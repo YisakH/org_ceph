@@ -56,10 +56,10 @@ export class RgwHaclDetailsComponent implements OnInit {
     this.columns = [
       { prop: 'path', name: 'Path' },
       { prop: 'authorizer', name: 'Authorizer' },
-      { prop: 'tier', name: 'Tier' },
-      { prop: 'r', name: 'Read', pipe: this.booleanTextPipe },
-      { prop: 'w', name: 'Write', pipe: this.booleanTextPipe },
-      { prop: 'x', name: 'Execute', pipe: this.booleanTextPipe },
+      { prop: 'tier', name: 'Tier' }, //No Tier
+      { prop: 'r', name: 'Get', pipe: this.booleanTextPipe },
+      { prop: 'w', name: 'Put', pipe: this.booleanTextPipe },
+      { prop: 'x', name: 'Del', pipe: this.booleanTextPipe },
       { prop: 'g', name: 'Grant', pipe: this.booleanTextPipe }
     ];
     

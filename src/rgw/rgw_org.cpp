@@ -77,6 +77,7 @@ int DBManager::getData(const std::string &key, std::string &value)
     }
 }
 
+// DB에서 prefix로 시작하는 모든 데이터를 가져오는 함수
 int DBManager::getAllPartialMatchData(const std::string& prefix, std::vector<std::pair<std::string, std::string>> &values){
     auto iter = db->NewIterator(rocksdb::ReadOptions());
 
@@ -261,6 +262,9 @@ int RGWOrg::getFullMatchRGWOrg(aclDB &aclDB, const std::string& key, RGWOrg *rgw
     return ret;
 }
 
+// acl을 받아 오는 함수
+// isFullMatch = true: 정확하게 일치하는 acl을 받아옴
+// isFullMatch = false: 가장 근사하게 일치하는 acl을 받아옴 (path가 가장 긴 acl)
 RGWOrg *getAcl(const std::string &user, const std::string &path, bool isFullMatch)
 {
     auto &dbm = aclDB::getInstance();
@@ -308,25 +312,29 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     rgwOrg->setOrgPermission(*orgPermission);
 
     RGWOrg *existingRgwOrg = getAcl(user, path);
-    if(existingRgwOrg != nullptr){
-        int defaultTier = existingRgwOrg->getTier();
-        if(defaultTier < tier){ // 기존 권한이 존재하지 않거나 기존 권한의 티어가 새로운 권한의 티어보다 작은(높은) 경우
-            return -1;
-        }
+
+    // 기존 권한이 있다면 신규 권한과 티어 비교
+    if (existingRgwOrg != nullptr && existingRgwOrg->getTier() < tier) {
+        return -1;
     }
+
 
     // 기존 상위 경로에 대한 권한
     std::vector<std::pair<std::string, RGWOrg>> existingUpperPerms;
     aclDB::getSuperPathsForPrefix(user + ":" + path, existingUpperPerms);
-    for (auto &perms : existingUpperPerms) {
-        std::string key = perms.first;
-        RGWOrg rgwOrg = perms.second;
-        if(rgwOrg.getTier() < tier){
-            return -1;
-        }
+    
+    // 기존 권한에 포함되는 경우
+    if (existingUpperPerms.size() > 0) {
+        return -1;
+    }
+    // 기존 권한을 포함하는 경우
+    aclDB acldb = aclDB::getInstance();
+    int ret = acldb.existPrefixAcl(user + ":" + path);
+    if (ret != 0) { // 아무 값도 존재하지 않는 경우 return 0
+        return ret;
     }
 
-    int ret = rgwOrg->putRGWOrg(dbm);
+    ret = rgwOrg->putRGWOrg(dbm);
     if (ret < 0)
     {
         return ret;
@@ -1036,9 +1044,22 @@ bool validateRGWOrgPermission(std::string user, std::string path, bool r, bool w
     return true;
 }
 
+int aclDB::existPrefixAcl(const std::string& prefix){
+    std::vector<std::pair<std::string, std::string>> values;
+    int ret = getAllPartialMatchData(prefix, values);
+    if(ret < 0){
+        return ret;
+    }
+    return values.size() > 0 ? 1 : 0;
+}
+
+// 접두사 일치하는 모든 acl을 가져오는 함수
 int aclDB::getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pair<std::string, RGWOrg>> &values){
     std::vector<std::pair<std::string, std::string>> str_values;
     int ret = getAllPartialMatchData(prefix, str_values);
+    if (ret < 0){
+        return ret;
+    }
 
     for (auto &pair : str_values) {
         std::string key = pair.first;
@@ -1051,6 +1072,8 @@ int aclDB::getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pai
     return 0;
 }
 
+// getPartialMatchRgwOrg 함수와 겹치는 부분이 있는 것 같음
+// TODO: getPartialMatchRgwOrg 함수와 통합
 int aclDB::getSuperPathsForPrefix(const std::string& userPrefix, std::vector<std::pair<std::string, RGWOrg>> &values){
     std::istringstream iss(userPrefix);
     std::string segment;
@@ -1109,7 +1132,6 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
         ret = acl_db.getAllPartialMatchAcl(cur_name + ":", values);
 
         for (auto &pair : values) {
-            auto &key = pair.first;
             auto &rgwOrg = pair.second;
             cur_j["permission"].push_back(rgwOrg.toJson());
         }

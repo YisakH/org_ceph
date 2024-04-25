@@ -125,6 +125,9 @@ public:
     }
     int getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pair<std::string, RGWOrg>> &values);
     static int getSuperPathsForPrefix(const std::string& prefix, std::vector<std::pair<std::string, RGWOrg>> &values);
+    // 특정 프리픽스로 시작하는 acl이 존재하는지 확인
+    
+    int existPrefixAcl(const std::string& prefix);
 
 private:
     aclDB() : DBManager("/tmp/org/AclDB") {}

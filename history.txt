@@ -1,0 +1,1000 @@
+  265  ps -ef | grep radosgw
+  266  kill -9 1308950
+  267  ps -ef | grep radosgw
+  268  /ceph/gdbserver_start.sh 
+  269  cat out/client.admin.1314507.log 
+  270  int process_request(const RGWProcessEnv& penv,
+  271  		    rgw::dmclock::Scheduler *scheduler,
+  272  {   int ret = client_io->init(g_ceph_context);
+  273  	  << " =====" << dendl;
+  274    perfcounter->inc(l_rgw_req);
+  275    RGWEnv& rgw_env = client_io->get_env();
+  276    req_state rstate(g_ceph_context, penv, &rgw_env, req->id);
+  277    req_state *s = &rstate;
+  278    s->ratelimit_data = penv.ratelimiting->get_active();
+  279    rgw::sal::Driver* driver = penv.driver;
+  280    std::unique_ptr<rgw::sal::User> u = driver->get_user(rgw_user());
+  281    s->set_user(u);
+  282    if (ret < 0) {
+  283      s->cio = client_io;
+  284      abort_early(s, nullptr, ret, nullptr, yield);
+  285      return ret;
+  286    }
+  287    s->req_id = driver->zone_unique_id(req->id);
+  288    s->trans_id = driver->zone_unique_trans_id(req->id);
+  289    s->host_id = driver->get_host_id();
+  290    s->yield = yield;
+  291    ldpp_dout(s, 2) << "initializing for trans_id = " << s->trans_id << dendl;
+  292    RGWOp* op = nullptr;
+  293    int init_error = 0;
+  294    bool should_log = false;
+  295    RGWREST* rest = penv.rest;
+  296    RGWRESTMgr *mgr;
+  297    RGWHandler_REST *handler = rest->get_handler(driver, s,
+  298                                                 *penv.auth_registry,
+  299                                                 frontend_prefix,
+  300                                                 client_io, &mgr, &init_error);
+  301    rgw::dmclock::SchedulerCompleter c;
+  302    string tmp = s->decoded_uri;
+  303    if (init_error != 0) {
+  304      dout(0) << "socks: init_error occured" <<  dendl;
+  305      abort_early(s, nullptr, init_error, nullptr, yield);
+  306      goto done;
+  307    }
+  308    ldpp_dout(s, 10) << "handler=" << typeid(*handler).name() << dendl;
+  309    should_log = mgr->get_logging();
+  310    ldpp_dout(s, 2) << "getting op " << s->op << dendl;
+  311    op = handler->get_op();
+  312    if (!op) {
+  313      abort_early(s, NULL, -ERR_METHOD_NOT_ALLOWED, handler, yield);
+  314      goto done;
+  315    }
+  316    {
+  317      s->trace_enabled = tracing::rgw::tracer.is_enabled();
+  318      std::string script;
+  319      auto rc = rgw::lua::read_script(s, penv.lua.manager.get(), s->bucket_tenant, s->yield, rgw::lua::context::preRequest, script);
+  320      if (rc == -ENOENT) {
+  321        // no script, nothing to do
+  322      } else if (rc < 0) {
+  323        ldpp_dout(op, 5) << "WARNING: failed to read pre request script. error: " << rc << dendl;
+  324      } else {
+  325        rc = rgw::lua::request::execute(driver, rest, penv.olog, s, op, script);
+  326        if (rc < 0) {
+  327          ldpp_dout(op, 5) << "WARNING: failed to execute pre request script. error: " << rc << dendl;
+  328        }
+  329      }
+  330    }
+  331    std::tie(ret,c) = schedule_request(scheduler, s, op);
+  332    if (ret < 0) {
+  333      if (ret == -EAGAIN) {
+  334        ret = -ERR_RATE_LIMITED;
+  335      }
+  336      ldpp_dout(op,0) << "Scheduling request failed with " << ret << dendl;
+  337      abort_early(s, op, ret, handler, yield);
+  338      goto done;
+  339    }
+  340    req->op = op;
+  341    ldpp_dout(op, 10) << "op=" << typeid(*op).name() << dendl;
+  342    s->op_type = op->get_type();
+  343    try {
+  344      ldpp_dout(op, 2) << "verifying requester" << dendl;
+  345      ret = op->verify_requester(*penv.auth_registry, yield);
+  346      if (ret < 0) {
+  347        dout(10) << "failed to authorize request" << dendl;
+  348        abort_early(s, op, ret, handler, yield);
+  349        goto done;
+  350      }
+  351      /* FIXME: remove this after switching all handlers to the new authentication
+  352       * infrastructure. */
+  353      if (nullptr == s->auth.identity) {
+  354        s->auth.identity = rgw::auth::transform_old_authinfo(s);
+  355      }
+  356      ldpp_dout(op, 2) << "normalizing buckets and tenants" << dendl;
+  357      ret = handler->postauth_init(yield);
+  358      if (ret < 0) {
+  359        dout(10) << "failed to run post-auth init" << dendl;
+  360        abort_early(s, op, ret, handler, yield);
+  361        goto done;
+  362      }
+  363      if (s->user->get_info().suspended) {
+  364        dout(10) << "user is suspended, uid=" << s->user->get_id() << dendl;
+  365        abort_early(s, op, -ERR_USER_SUSPENDED, handler, yield);
+  366        goto done;
+  367      }
+  368      s->http_params = parseStringToVector(s->info.request_params);
+  369      for (auto &param : s->http_params) {
+  370        dout(0) << "socks : param : " << param.first << " : " << param.second << dendl;
+  371      }
+  372      s->trace = tracing::rgw::tracer.start_trace(op->name(), s->trace_enabled);
+  373      s->trace->SetAttribute(tracing::rgw::TRANS_ID, s->trans_id);
+  374      ret = rgw_process_authenticated(handler, op, req, s, yield, driver);
+  375      if (ret < 0) {
+  376        abort_early(s, op, ret, handler, yield);
+  377        goto done;
+  378      }
+  379    } catch (const ceph::crypto::DigestException& e) {
+  380      dout(0) << "authentication failed" << e.what() << dendl;
+  381      abort_early(s, op, -ERR_INVALID_SECRET_KEY, handler, yield);
+  382    }
+  383  done:
+  384    if (op) {
+  385      if (s->trace) {
+  386        s->trace->SetAttribute(tracing::rgw::OP_RESULT, op->get_ret());
+  387        s->trace->SetAttribute(tracing::rgw::HOST_ID, driver->get_host_id());
+  388        if (!rgw::sal::User::empty(s->user)) {
+  389          s->trace->SetAttribute(tracing::rgw::USER_ID, s->user->get_id().id);
+  390        }
+  391        if (!rgw::sal::Bucket::empty(s->bucket)) {
+  392          s->trace->SetAttribute(tracing::rgw::BUCKET_NAME, s->bucket->get_name());
+  393        }
+  394        if (!rgw::sal::Object::empty(s->object)) {
+  395          s->trace->SetAttribute(tracing::rgw::OBJECT_NAME, s->object->get_name());
+  396        }
+  397      }
+  398      std::string script;
+  399      auto rc = rgw::lua::read_script(s, penv.lua.manager.get(), s->bucket_tenant, s->yield, rgw::lua::context::postRequest, script);
+  400      if (rc == -ENOENT) {
+  401        // no script, nothing to do
+  402      } else if (rc < 0) {
+  403        ldpp_dout(op, 5) << "WARNING: failed to read post request script. error: " << rc << dendl;
+  404      } else {
+  405        rc = rgw::lua::request::execute(driver, rest, penv.olog, s, op, script);
+  406        if (rc < 0) {
+  407          ldpp_dout(op, 5) << "WARNING: failed to execute post request script. error: " << rc << dendl;
+  408        }
+  409      }
+  410    }
+  411    try {
+  412      client_io->complete_request();
+  413    } catch (rgw::io::Exception& e) {
+  414      dout(0) << "ERROR: client_io->complete_request() returned "
+  415              << e.what() << dendl;
+  416    }
+  417    if (should_log) {
+  418      rgw_log_op(rest, s, op, penv.olog);
+  419    }
+  420    if (http_ret != nullptr) {
+  421      *http_ret = s->err.http_ret;
+  422    }
+  423    int op_ret = 0;
+  424    if (user && !rgw::sal::User::empty(s->user.get())) {
+  425      *user = s->user->get_id().to_str();
+  426    }
+  427    if (op) {
+  428      op_ret = op->get_ret();
+  429      ldpp_dout(op, 2) << "op status=" << op_ret << dendl;
+  430      ldpp_dout(op, 2) << "http status=" << s->err.http_ret << dendl;
+  431    } else {
+  432      ldpp_dout(s, 2) << "http status=" << s->err.http_ret << dendl;
+  433    }
+  434    if (handler)
+  435      handler->put_op(op);
+  436    rest->put_handler(handler);
+  437    const auto lat = s->time_elapsed();
+  438    if (latency) {
+  439      *latency = lat;
+  440    }
+  441    dout(1) << "====== req done req=" << hex << req << dec
+  442  	  << " op status=" << op_ret
+  443  	  << " http_status=" << s->err.http_ret
+  444  	  << " latency=" << lat
+  445  	  << " ======"
+  446  	  << dendl;
+  447    return (ret < 0 ? ret : s->err.ret);
+  448  } /* process_request */
+  449  ls
+  450  clear
+  451  ls
+  452  netstat -nltp | grep mgr
+  453  ps -ef | grep radosgw
+  454  ./bin/radosgw ceph.conf 
+  455  ls
+  456  cd build/
+  457  ls
+  458  netstat -nltp | grep mgr
+  459  git status
+  460  ls
+  461  df -=h
+  462  df -h
+  463  cd /ceph
+  464  ls
+  465  clear
+  466  cd org_ceph/
+  467  ls
+  468  cd build/out/
+  469  cd ..
+  470  ../src/stop.sh 
+  471  rm -rf out/
+  472  top
+  473  htop
+  474  ls
+  475  vim /ceph/create_user.sh
+  476  chmod +x /ceph/create_user.sh 
+  477  git status
+  478  git commit -am "edit parameter"
+  479  git push
+  480  cat build/out/client.admin.105993.log 
+  481  top
+  482  /bin/python3 /root/.vscode-server/extensions/ms-python.python-2024.2.1/pythonFiles/printEnvVariablesToFile.py /root/.vscode-server/extensions/ms-python.python-2024.2.1/pythonFiles/deactivate/bash/envVars.txt
+  483  ls
+  484  top
+  485  ls
+  486  cd build/
+  487  ninja vstart
+  488  ls
+  489  history | grep vstart
+  490  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf 
+  491  cat out/client.admin.8257.log 
+  492  cat out/client.admin.6923.log 
+  493  top
+  494  htop
+  495  cat out/client.admin.8257.log 
+  496  ll out/client.admin.*
+  497  tail -2000 out/client.admin.10875.log 
+  498  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf 
+  499  cat out/client.admin.43639.log 
+  500  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  501  unzip awscliv2.zip
+  502  sudo ./aws/install
+  503  ./aws/install
+  504  rm -rf ./aws
+  505  aws s3-api
+  506  aws s3api 
+  507  aws s3api help
+  508  aws help
+  509  aws s3 hlep
+  510  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf 
+  511  /ceph/create_user.sh 
+  512  ls
+  513  rm awscliv2.zip 
+  514  git commit -am "adding acl func..."
+  515  git status
+  516  git push
+  517  git pull
+  518  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  519  history | grep user
+  520  vim /ceph/create_user.sh 
+  521  ls
+  522  /ceph/gdbserver_start.sh 
+  523  top
+  524  htop
+  525  git status
+  526  git checkout acl
+  527  history | grep get
+  528  ls
+  529  history | grep build
+  530  history | grep vstart
+  531  ls
+  532  cd /ceph/org_ceph/
+  533  mkdir util
+  534  cp /ceph/*.sh ./util/
+  535  cd util/
+  536  ls
+  537  cp ~/bucket-policy* ./
+  538  git add --all
+  539  git commit -am "add utils"
+  540  git push
+  541  history | vstart
+  542  history | grep vstart
+  543  clear
+  544  ls
+  545  history | grep vstart
+  546  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  547  cd build/
+  548  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  549  git pull
+  550  git log
+  551  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  552  vim /ceph/create_user.sh 
+  553  /ceph/create_user.sh 
+  554  ps -ef | grep radosgw
+  555  cat out/client.admin.448415.log 
+  556  /ceph/gdbserver_start.sh 
+  557  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  558  /ceph/gdbserver_start.sh 
+  559  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  560  ps -ef | grep radosgw
+  561  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  562  /ceph/gdbserver_start.sh 
+  563  ./bin/radosgw ceph.conf 
+  564  /ceph/gdbserver_start.sh 
+  565  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  566  ./bin/radosgw ceph.conf 
+  567  /ceph/gdbserver_start.sh 
+  568  ./bin/radosgw ceph.conf 
+  569  ps -ef | grep radosgw
+  570  /ceph/gdbserver_start.sh 
+  571  cat build/out/client.admin.648403.log 
+  572  cd build/
+  573  ll out/client.admin.6*
+  574  cat out/client.admin.647507.log
+  575  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  576  ps -ef | grep radsogw
+  577  ps -ef | grep rados
+  578  /ceph/gdbserver_start.sh 
+  579  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  580  ll out/client.admin.7*
+  581  cat out/client.admin.740760.log
+  582  /ceph/gdbserver_start.sh 
+  583  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  584  /ceph/gdbserver_start.sh 
+  585  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  586  netstat -nltp | grep mgr
+  587  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  588  ../src/stop.sh 
+  589  ps -ef | grep mgr
+  590  ps -ef | grep rgw
+  591  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  592  ./bin/ceph status
+  593  vim ceph.conf 
+  594  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  595  netstat -nltp | grep mgr
+  596  netstat -nltp | grep 41000
+  597  ../src/stop.sh 
+  598  vim ceph.conf 
+  599  ../src/stop.sh 
+  600  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  601  vim build/ceph.conf 
+  602  vim bucket-policy.json
+  603  aws --endpoint-url=http://your-ceph-s3-endpoint s3api put-bucket-policy --bucket test-bucket --policy file://bucket-policy.json
+  604  aws configure
+  605  aws --endpoint-url=http://your-ceph-s3-endpoint s3api put-bucket-policy --bucket test-bucket --policy file://bucket-policy.json
+  606  aws s3api put-bucket-policy --bucket test-bucket --policy file://bucket-policy.json
+  607  history | grep s3
+  608  aws configure
+  609  sws s3-api list-buckets
+  610  aws s3-api list-buckets
+  611  aws s3api list-buckets
+  612  aws --endpoint-url=http://localhost:7480 s3api put-bucket-policy --bucket test-bucket --policy file://bucket-policy.json
+  613  aws  --endpoint-url=http://localhost:7480 s3api list-buckets
+  614  aws configure
+  615  aws s3api list-buckets
+  616  aws  --endpoint-url=http://localhost:7480 s3api list-buckets
+  617  aws  --endpoint-url=http://localhost:7480 s3 ls s3://test-bucket --profile root
+  618  vim ~/.aws/config 
+  619  vim ~/.aws/credentials 
+  620  aws  --endpoint-url=http://localhost:7480 s3 ls s3://test-bucket --profile root
+  621  vim bucket-policy.json 
+  622  vim bucket-policy-all.json
+  623  history | grep bucket
+  624  aws --endpoint-url=http://localhost:7480 s3api put-bucket-policy --bucket test-bucket --policy file://bucket-policy-all.json
+  625  aws configure
+  626  aws --endpoint-url=http://localhost:7480 s3api put-bucket-policy --bucket test-bucket --policy file://bucket-policy-all.json 
+  627  vim bucket-policy.json 
+  628  cd .aws/
+  629  ls
+  630  vim config 
+  631  vim credentials 
+  632  cd ..
+  633  ls
+  634  aws  --endpoint-url=http://localhost:7480 s3 ls s3://test-bucket --profile user5
+  635  aws configure
+  636  aws  --endpoint-url=http://localhost:7480 s3 ls s3://test-bucket
+  637  aws  --endpoint-url=http://localhost:7480 s3 ls s3://test-bucket --profile user5
+  638  aws  --endpoint-url=http://localhost:7480 s3 ls s3://test-bucket --profile root
+  639  aws  --endpoint-url=http://localhost:7480 s3api list-buckets
+  640  aws  --endpoint-url=http://localhost:7480 s3api list-buckets --profile root
+  641  aws  --endpoint-url=http://localhost:7480 s3api list-buckets --profile user5
+  642  aws s3 ls s3://test-bucket --endpoint-url=http://localhost:7480 --profile user5
+  643  vim bucket-policy
+  644  vim bucket-policy.json 
+  645  history | grep bucket
+  646  history | grep policy
+  647  aws --endpoint-url=http://your-ceph-s3-endpoint s3api put-bucket-policy --bucket test-bucket --policy file://bucket-policy.json
+  648  aws --endpoint-url=http://localhost:7480 s3api put-bucket-policy --bucket test-bucket --policy file://bucket-policy.json
+  649  aws --endpoint-url=http://localhost:7480 s3api put-bucket-policy --bucket test-bucket --policy file://bucket-policy.json --profile root
+  650  history | grep ls
+  651  aws s3 ls s3://test-bucket --endpoint-url=http://localhost:7480 --profile user5
+  652  vim bucket-policy
+  653  vim bucket-policy.json 
+  654  cp bucket-policy.json bucket-policy-test.json
+  655  vim bucket-policy-test.json 
+  656  aws --endpoint-url=http://localhost:7480 s3api put-bucket-policy --bucket test-bucket --policy file://bucket-policy-test.json --profile root
+  657  aws s3 ls s3://test-bucket --endpoint-url=http://localhost:7480 --profile user5
+  658  cat /ceph/org_ceph/build/out/client.admin.106975.log 
+  659  cat /ceph/org_ceph/build/out/client.admin.106027.log 
+  660  ll /ceph/org_ceph/build/out/client.admin.10*
+  661  tail -2000 /ceph/org_ceph/build/out/client.admin.105993.log
+  662  aws s3 ls s3://test-bucket --endpoint-url=http://localhost:7480 --profile user5
+  663  tail -2000 /ceph/org_ceph/build/out/client.admin.105993.log
+  664  aws s3 ls s3://test-bucket --endpoint-url=http://localhost:7480 --profile user5
+  665  ls
+  666  hisotry | grep ls
+  667  history | grep ls
+  668  aws  --endpoint-url=http://localhost:7480 s3 ls s3://test-bucket --profile root
+  669  ls
+  670  find . -name '*.json' -exec wc -l {} +
+  671  find . -name '*.json' -exec wc -l {} + | awk '{s+=$1} END {print s}'
+  672  ls
+  673  history | grep acl
+  674  history | grep aws
+  675  aws  --endpoint-url=http://localhost:7480 s3api help
+  676  aws  --endpoint-url=http://localhost:7480 s3api get-object
+  677  aws  --endpoint-url=http://localhost:7480 s3api get-object help
+  678  cd /ceph/org_ceph/build/
+  679  ps -ef | grep radosgw
+  680  ./bin/radosgw ceph.conf 
+  681  aws  --endpoint-url=http://localhost:7480 s3api get-object --key desktop.ini --bucket test-bucket
+  682  aws  --endpoint-url=http://localhost:7480 s3api get-object help
+  683  aws  --endpoint-url=http://localhost:7480 s3api get-object --key desktop.ini --bucket test-bucket
+  684  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket
+  685  aws  --endpoint-url=http://localhost:7480 s3api get-object help 
+  686  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt
+  687  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile root
+  688  ls
+  689  history | grep ninja
+  690  history
+  691  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt
+  692  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile user5
+  693  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile root
+  694  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile user5
+  695  grep -r socks out/client.admin.4*
+  696  aws configure
+  697  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt
+  698  grep -r socks out/client.admin.4*
+  699  cat out/client.admin.4*
+  700  cat out/client.admin.411976.log 
+  701  cat out/client.admin.410993.log 
+  702  cat out/client.admin.410965.log 
+  703  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile root
+  704  cat out/client.admin.410965.log 
+  705  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile root
+  706  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile user5
+  707  ls
+  708  clear
+  709  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile user5
+  710  ps -ef | grep radosgw
+  711  cat out/client.admin.424723.log 
+  712  cat out/client.admin.425763.log 
+  713  cat out/client.admin.424701.log 
+  714  ./bin/radosgw ceph.conf
+  715  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile user5
+  716  ls
+  717  clear
+  718  ps -ef | grep radosgw
+  719  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile user5
+  720  ps -ef | grep radosgw
+  721  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile user5
+  722  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile root
+  723  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile user5
+  724  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile root
+  725  cat out/client.admin.539502.log 
+  726  cat out/client.admin.538414.log 
+  727  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile root
+  728  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile user5
+  729  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile test-user
+  730  aws configure
+  731  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt
+  732  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile test-user
+  733  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile user5
+  734  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt --profile test-user
+  735  aws s3api --endpoint-url=http://localhost:7480 get-object --key desktop.ini --bucket test-bucket test.txt
+  736  cat out/client.admin.616136.log 
+  737  cat out/client.admin.617118.log 
+  738  cat out/client.admin.617191.log 
+  739  cat out/client.admin.616102.log 
+  740  ./bin/radosgw ceph.conf 
+  741  cat out/client.admin.723902.log 
+  742  ll out/client.admin.7*
+  743  ll out/client.admin.722769.log 
+  744  cat out/client.admin.722769.log 
+  745  history | grep localhost
+  746  aws s3api --endpoint-url=http://localhost:7480 put-object --key test.txt --bucket test-bucket --profile user5
+  747  ./bin/ceph config set mgr mgr/dashboard/port 41000
+  748  ls
+  749  vim /ceph/create_user.sh 
+  750  /ceph/create_user.sh 
+  751  history | grep test-bucket
+  752  vim /ceph/create_user.sh 
+  753  /ceph/create_user.sh 
+  754  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  755  ps -ef | grep mgr
+  756  cd build/
+  757  ../src/stop.sh 
+  758  rm -rf out/
+  759  ls
+  760  ninja vstart
+  761  ls
+  762  rm -rf /tmp/org/
+  763  mkdir -p /tmp/org/TierDB
+  764  mkdir -p /tmp/org/AncDB
+  765  mkdir -p /tmp/org/DecDB
+  766  mkdir -p /tmp/org/AclDB
+  767  ninja vstart
+  768  history | grep vstart
+  769  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  770  netstat -nltp | grep mgr
+  771  /ceph/gdbserver_start.sh 
+  772  top
+  773  git status
+  774  git commit -am "edit add hacl user func.."
+  775  git push
+  776  ps -ef | grep mgr
+  777  cd build/
+  778  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  779  ls
+  780  clear
+  781  ls
+  782  cd /ceph
+  783  ls
+  784  ll build
+  785  rm -rf build
+  786  ls
+  787  cd org_ceph/
+  788  ls
+  789  cd u
+  790  cd util/
+  791  ls
+  792  vim create_user.sh 
+  793  cp /ceph/*.sh ./
+  794  ls
+  795  vim create_user.sh 
+  796  ./create_user.sh 
+  797  vim create_user.sh 
+  798  ./create_user.sh 
+  799  ps -ef | gremp mgr
+  800  ps -ef | grep mgr
+  801  /ceph/org_ceph/build/bin/ceph status
+  802  cd /ceph/org_ceph/build/
+  803  ./bin/ceph status
+  804  cd ..
+  805  vim util/
+  806  vim util/create_user.sh 
+  807  ./util/create_user.sh 
+  808  vim util/create_user.sh 
+  809  cd util/
+  810  ls
+  811  vim create_hierarchical.sh
+  812  ps -ef | grep mgr
+  813  ll /tmp/org/DecDB/
+  814  cat /tmp/org/DecDB/LO
+  815  cat /tmp/org/DecDB/LOG 
+  816  history
+  817  cd /ceph
+  818  ls
+  819  cd org_ceph/
+  820  ls
+  821  ./util/create_user.sh 
+  822  ps -ef | grep mgr
+  823  cd build/
+  824  ps -ef | grep radosgw
+  825  tail -2000 out/client.admin.3489841.log 
+  826  ls
+  827  history | grep aws
+  828  vim ~/.aws/config 
+  829  cat ../util/create_
+  830  cat ../util/create_user.sh 
+  831  vim ../util/create_user.sh 
+  832  vim ~/.aws/credentials 
+  833  vim ~/.aws/config 
+  834  vim ~/.aws/credentials 
+  835  history | grep aws
+  836  clear
+  837  history | grep aws
+  838  vim ~/.aws/config 
+  839  et test-bucket --profile student1
+  840  aws s3api --endpoint-url=http://localhost:7480 put-object --key test.txt --bucket test-bucket --profile student1
+  841  vim ~/.aws/config 
+  842  vim ~/.aws/credentials 
+  843  vim ~/.aws/config 
+  844  aws s3api --endpoint-url=http://localhost:7480 put-object --key test.txt --bucket test-bucket --profile student1
+  845  aws s3api --endpoint-url=http://localhost:7480 put-object --key /share/test.txt --bucket test-bucket --profile student1
+  846  ps -ef | grep radosgw
+  847  tail -2000 out/client.admin.3712799.log 
+  848  aws s3api --endpoint-url=http://localhost:7480 put-object --key /share/test.txt --bucket test-bucket --profile student1
+  849  tail -2000 out/client.admin.3712799.log 
+  850  aws s3api --endpoint-url=http://localhost:7480 put-object --key /share/test.txt --bucket test-bucket --profile student1
+  851  tail -2000 out/client.admin.3712799.log 
+  852  aws s3api --endpoint-url=http://localhost:7480 put-object --key /share/test.txt --bucket test-bucket --profile student1
+  853  tail -2000 out/client.admin.3712799.log 
+  854  aws s3api --endpoint-url=http://localhost:7480 put-object --key /share/test.txt --bucket test-bucket --profile student1
+  855  aws s3api --endpoint-url=http://localhost:7480 put-object --key test.txt --bucket test-bucket --profile student1
+  856  aws s3api --endpoint-url=http://localhost:7480 put-object --key test.txt --bucket share --profile student1
+  857  aws s3api --endpoint-url=http://localhost:7480 put-object --key test.txt --bucket test-bucket --profile student1
+  858  aws s3api --endpoint-url=http://localhost:7480 put-object --key test.txt --bucket share --profile student1
+  859  aws s3api --endpoint-url=http://localhost:7480 put-object --key test.txt --bucket share --profile student2
+  860  ps -ef | grep radosgw
+  861  ll out/
+  862  ll out/client.admin.37*
+  863  tail -2000 out/client.admin.3739847.log
+  864  ps -ef | grep radosgw
+  865  tail -2000 out/client.admin.4058279.log 
+  866  history | grep aws
+  867  aws s3api --endpoint-url=http://localhost:7480 put-object --key /cs/stu4/test.txt --bucket col --profile student5
+  868  history | grep ls
+  869  aws  --endpoint-url=http://localhost:7480 s3 ls s3://col --profile president
+  870  aws s3api --endpoint-url=http://localhost:7480 put-object --key cs/stu4/test.txt --bucket col --profile student5
+  871  ps -ef | grep radosgw
+  872  tail -2000 out/client.admin.4134560.log 
+  873  aws s3api --endpoint-url=http://localhost:7480 put-object --key cs/stu4/test.txt --bucket col --profile student5
+  874  ps -ef | grep radosgw
+  875  tail -2000 out/client.admin.4157818.log 
+  876  aws s3api --endpoint-url=http://localhost:7480 put-object --key cs/stu4/test.txt --bucket col --profile student5
+  877  ../src/stop.sh 
+  878  top
+  879  cd build/
+  880  ./bin/radosgw ceph.conf 
+  881  /ceph/gdbserver_start.sh 
+  882  ps -ef | grep radosgw
+  883  tail -2000 out/client.admin.3712799.log 
+  884  ps -ef | grep radosgw
+  885  history | grep vstart
+  886  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  887  ../util/create_user.sh 
+  888  ./bin/radosgw ceph.conf 
+  889  /ceph/gdbserver_start.sh 
+  890  ps -ef | grep radosgw
+  891  tail -2000 out/client.admin.4058279.log 
+  892  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  893  git commit -am "edit anc user check algorithm"
+  894  git push
+  895  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  896  ninja vstart
+  897  git status
+  898  git diff
+  899  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  900  ../util/create_user.sh 
+  901  /ceph/gdbserver_start.sh 
+  902  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  903  ../util/create_user.sh 
+  904  /ceph/gdbserver_start.sh 
+  905  ./bin/radosgw ceph.conf 
+  906  /ceph/gdbserver_start.sh 
+  907  ninja vstart
+  908  ./bin/radosgw ceph.conf 
+  909  ../src/stop.sh 
+  910  rm -rf /tmp/org/
+  911  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  912  cd build/
+  913  ls
+  914  rm -rf out/
+  915  history
+  916  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  917  ls
+  918  ps -ef | grep radosgw
+  919  ../util/create_user.sh 
+  920  ps -ef | grep radosgw
+  921  ll out/client.admin.*
+  922  cat out/client.admin.9178.log 
+  923  ls
+  924  mkdir -p /tmp/org/
+  925  ./bin/radosgw ceph.conf 
+  926  ll /tmp/org/
+  927  netstat -ntlp | grep mgr
+  928  ninja vstart
+  929  rm -rf /tmp/org/*
+  930  ll /tmp/org/
+  931  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  932  ../util/create_user.sh 
+  933  git commit -am "acl default value setting..."
+  934  git push
+  935  htop
+  936  cd build/
+  937  ../util/create_user.sh 
+  938  rm -rf /tmp/org/*
+  939  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  940  ../util/create_user.sh 
+  941  ../src/stop.sh 
+  942  rm -rf /tmp/org/*
+  943  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  944  ../util/create_user.sh 
+  945  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  946  ../util/create_user.sh 
+  947  rm -rf /tmp/org/*
+  948  /ceph/gdbserver_start.sh 
+  949  ./bin/radosgw ceph.conf 
+  950  /ceph/gdbserver_start.sh 
+  951  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  952  ../util/create_user.sh 
+  953  netstat -nltp | grep mgr
+  954  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+  955  #
+  956  ../util/create_user.sh 
+  957  netstat -nltp | grep mgr
+  958  ls
+  959  cd /tmp/org/
+  960  ls
+  961  ll
+  962  rm -rf *
+  963  ll
+  964  ls
+  965  ll
+  966  ls
+  967  cd /ceph/org_ceph/build/
+  968  ps -ef | grep radosgw
+  969  kill -9 190147
+  970  rm -rf /tmp/org/*
+  971  ./bin/radosgw ceph.conf 
+  972  ll /tmp/org/
+  973  rm -rf /tmp/org/*
+  974  ps -ef | grep radosgw
+  975  kill -9 193896
+  976  ps -ef | grep radosgw
+  977  ./bin/radosgw ceph.conf 
+  978  ls
+  979  git status
+  980  git commit -am "modified user delete operation"
+  981  git push
+  982  ls
+  983  rm -rf /tmp/org/*
+  984  ./bin/radosgw ceph.conf 
+  985  ll /tmp/org/
+  986  ps -ef | grep radosgw
+  987  kill -9 217816
+  988  ps -ef | grep radosgw
+  989  kill -9 221478
+  990  ps -ef | grep radosgw
+  991  ./bin/radosgw ceph.conf 
+  992  ps -ef | grep radosgw
+  993  kill -9 223128
+  994  ps -ef | grep radosgw
+  995  ./bin/radosgw ceph.conf 
+  996  rm -rf out/client.admin.*
+  997  ./bin/radosgw ceph.conf 
+  998  ll /tmp/org/
+  999  rm -rf /tmp/org/*
+ 1000  ps -ef | grep radosgw
+ 1001  kill -9 430948 431651
+ 1002  ./bin/radosgw ceph.conf 
+ 1003  ps -ef | grep radosgw
+ 1004  kill -9 432743
+ 1005  ps -ef | grep radosgw
+ 1006  ./bin/radosgw ceph.conf 
+ 1007  rm -rf /tmp/org/*
+ 1008  ps -ef | grep radosgw
+ 1009  kill -9 450154
+ 1010  ls
+ 1011  ./bin/radosgw ceph.conf 
+ 1012  ls
+ 1013  cd /ceph/org_ceph/
+ 1014  ls
+ 1015  git status
+ 1016  git push
+ 1017  ls
+ 1018  cd /ceph/org_ceph/build/
+ 1019  ninja vstart
+ 1020  history
+ 1021  history | grep vstart
+ 1022  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1023  ls
+ 1024  cd /ceph/org_ceph/
+ 1025  ls
+ 1026  cd build/
+ 1027  ../src/stop.sh 
+ 1028  cat ../util/create_user.sh 
+ 1029  history | grep acl
+ 1030  cd build/
+ 1031  ../src/stop.sh 
+ 1032  rm -rf out/*
+ 1033  ninja vstart
+ 1034  history | grep vstart
+ 1035  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1036  ls
+ 1037  cd build/
+ 1038  netstat -nltp | grep mgr
+ 1039  ls
+ 1040  ../util/create_user.sh 
+ 1041  ls
+ 1042  cd ../util/
+ 1043  wget https://github.com/s3tools/s3cmd/releases/download/v2.4.0/s3cmd-2.4.0.tar.gz
+ 1044  tar -xvf s3cmd-2.4.0.tar.gz 
+ 1045  ls
+ 1046  cd s3cmd-2.4.0
+ 1047  ls
+ 1048  apt install s3cmd
+ 1049  s3cmd 
+ 1050  s3cmd --configure
+ 1051  ls
+ 1052  cd ..
+ 1053  ls
+ 1054  vim bucket-policy.json 
+ 1055  history | grep bucket-policy
+ 1056  ls
+ 1057  vim bucket-policy-all.json 
+ 1058  cat bucket-policy.json 
+ 1059  cd build/
+ 1060  ls
+ 1061  ninja vstart
+ 1062  netstat -ntlp | | grep mgr
+ 1063  netstat -ntlp | grep mgr
+ 1064  ll out/client.admin.1*
+ 1065  cat out/client.admin.144409.log
+ 1066  git status
+ 1067  top
+ 1068  ps -ef | grep 112081
+ 1069  cat out/client.admin.144409.log
+ 1070  tail -2000 out/mgr.x.log 
+ 1071  git diff
+ 1072  git log
+ 1073  ../src/stop.sh 
+ 1074  ll /tmp/org/
+ 1075  ls
+ 1076  cat bucket-policy.json 
+ 1077  ls
+ 1078  history | grep aws
+ 1079  aws s3api --endpoint-url=http://localhost:7480 list-objects --bucket test-bucket --profile student1
+ 1080  cd /ceph/org_ceph/
+ 1081  ls
+ 1082  cd build/
+ 1083  ll out/
+ 1084  ll out/client.admin.*
+ 1085  ll out/client.admin.44561.log 
+ 1086  cat out/client.admin.44561.log 
+ 1087  ../src/stop.sh 
+ 1088  history | grep vstart
+ 1089  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1090  history | grep create
+ 1091  vim ../util/create_user.sh 
+ 1092  ../util/create_user.sh 
+ 1093  ls /tmp/org/
+ 1094  ls
+ 1095  rm -rf /tmp/org/*
+ 1096  cd build/
+ 1097  ninja vstart
+ 1098  history | grep vstart
+ 1099  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1100  ps -ef | grep mgr
+ 1101  netstat -ntlp | grep mgr
+ 1102  top
+ 1103  git log
+ 1104  git push
+ 1105  git log
+ 1106  git diff f11e4ae932743418495dd645fc18a3384042160e
+ 1107  top
+ 1108  tail -2000 out/mgr.x.log 
+ 1109  ls
+ 1110  cd build/
+ 1111  ls
+ 1112  ll out/
+ 1113  ps -ef | grep mgr
+ 1114  rm -rf out/
+ 1115  ninja vstart
+ 1116  history | grep vstart
+ 1117  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1118  ../util/create_user.sh 
+ 1119  cat out/client.admin.9477.log 
+ 1120  cat out/client.admin.9460.log 
+ 1121  ll /tmp/org/AclDB/
+ 1122  tail -2000 out/client.admin.9460.log 
+ 1123  ps -ef | grep radosgw
+ 1124  tail -2000 out/client.admin.9460.log 
+ 1125  clear
+ 1126  git status
+ 1127  cd /ceph/org_ceph/build/
+ 1128  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1129  ../util/create_user.sh 
+ 1130  ../src/stop.sh 
+ 1131  ps -ef | grep mgr
+ 1132  cd /ceph/org_ceph/
+ 1133  ls
+ 1134  cd build/
+ 1135  ls
+ 1136  ll out/
+ 1137  rm -rf out/
+ 1138  history | grep stop
+ 1139  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1140  ../util/create_user.sh 
+ 1141  rm -rf /tmp/org/*
+ 1142  netstat -nltp | grep radosgw
+ 1143  netstat -nltp | grep mgr
+ 1144  ls
+ 1145  cd /ceph/org_ceph/
+ 1146  ls
+ 1147  cd build/
+ 1148  ls
+ 1149  cat /proc/cpuinfo | grep Xeon
+ 1150  netstat -nltp | grpe mgr
+ 1151  netstat -nltp | grep mgr
+ 1152  cd /ceph/org_ceph/
+ 1153  cd build/
+ 1154  history | grep stop
+ 1155  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1156  ps -ef | grep mgr
+ 1157  cd build/
+ 1158  ../src/stop.sh 
+ 1159  rm -rf out/
+ 1160  git status
+ 1161  git add --all
+ 1162  git commit -am "graduating"
+ 1163  git branch graduate
+ 1164  git checkout graduate
+ 1165  git log
+ 1166  ls
+ 1167  cd build/
+ 1168  ls
+ 1169  ninja vstart
+ 1170  cd build/
+ 1171  ll
+ 1172  ls
+ 1173  ninja vstart
+ 1174  rm -rf /tmp/org/*
+ 1175  htop
+ 1176  top
+ 1177  ninja vstart
+ 1178  ls
+ 1179  history | grep vstart
+ 1180  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1181  ../util/create_user.sh 
+ 1182  netstat -nltp | grep mgr
+ 1183  ps -ef | grep mgr
+ 1184  ps -ef | grep rados
+ 1185  tail -2000 out/client.admin.391505.log 
+ 1186  ps -ef | grep radosgw
+ 1187  ps -ef | grep mgr
+ 1188  tail -200 out/mgr.x.log 
+ 1189  tail -2000 out/mgr.x.log 
+ 1190  top
+ 1191  ps -ef | grep 344297
+ 1192  ../src/stop.sh
+ 1193  cd ..
+ 1194  rm -rf build/
+ 1195  git status
+ 1196  git commit -am "add new algorithm"
+ 1197  git push
+ 1198  git push --set-upstream origin graduate
+ 1199  ./do_cmake.sh 
+ 1200  cd build/
+ 1201  ls
+ 1202  ls /ceph
+ 1203  ls /root/
+ 1204  ninja vstart
+ 1205  history | grep vstart
+ 1206  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1207  ../util/create_user.sh 
+ 1208  ls
+ 1209  cat out/client.admin.5
+ 1210  grep -r error
+ 1211  ls
+ 1212  ../src/stop.sh 
+ 1213  rm -rf out/
+ 1214  ls
+ 1215  vim logrotate.conf 
+ 1216  ls
+ 1217  history | grep vstart
+ 1218  ../src/stop.sh && ninja vstart && ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf && /ceph/create_user.sh 
+ 1219  ../src/stop.sh 
+ 1220  ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf
+ 1221  cd out/
+ 1222  ls
+ 1223  cat mgr.x.log 
+ 1224  ls
+ 1225  cat client.admin.533268.log 
+ 1226  ll -h
+ 1227  ll -h client.admin.5*
+ 1228  cat client.admin.533268.log 
+ 1229  ll -h client.admin.5*
+ 1230  cat client.admin.533268.log
+ 1231  vim client.admin.533268.log 
+ 1232  ps -ef | grep radosgw
+ 1233  kill -9 533268
+ 1234  ps -ef | grep radosgw
+ 1235  cd ..
+ 1236  ./bin/radosgw ceph.conf 
+ 1237  ll -h out/client.admin.5*
+ 1238  cat out/client.admin.536193.log 
+ 1239  cd /ceph/org_ceph/
+ 1240  ./install-deps.sh 
+ 1241  ls
+ 1242  git log
+ 1243  git reset --hard f16fd31bc67ebacc5f00e3ce9d28be3dccf53532
+ 1244  cd build/
+ 1245  ninja vstart
+ 1246  history | grep vstart
+ 1247  ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf
+ 1248  git status
+ 1249  git log
+ 1250  ninja vstart
+ 1251  ../src/stop.sh 
+ 1252  ps -ef | grep radosgw
+ 1253  ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf
+ 1254  cd build/
+ 1255  ninja vstart
+ 1256  git pull
+ 1257  git status
+ 1258  git log
+ 1259  ninja vstart
+ 1260  history | grep vstart
+ 1261  ../src/vstart.sh --debug --new -x --localhost --bluestore && ./bin/ceph mgr module enable rgw && ./bin/radosgw ceph.conf
+ 1262  ls
+ 1263  cd ..
+ 1264  history >> history.txt

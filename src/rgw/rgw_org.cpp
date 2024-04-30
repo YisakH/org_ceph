@@ -221,12 +221,12 @@ int RGWOrg::putRGWOrg(DBManager &dbManager)
     return dbManager.putData(key, value);
 }
 
-int RGWOrg::deleteRGWOrg(aclDB &aclDB, const std::string& key)
+int RGWOrg::deleteRGWOrg(AclDB &aclDB, const std::string& key)
 {
     return aclDB.deleteData(key);
 }
 
-int RGWOrg::getPartialMatchRgwOrg(aclDB &aclDB, const std::string& user, const std::string& path, RGWOrg *rgwOrg)
+int RGWOrg::getPartialMatchRgwOrg(AclDB &aclDB, const std::string& user, const std::string& path, RGWOrg *rgwOrg)
 {
     std::istringstream iss(path);
     std::string segment;
@@ -259,7 +259,7 @@ int RGWOrg::getPartialMatchRgwOrg(aclDB &aclDB, const std::string& user, const s
 }
 
 
-int RGWOrg::getFullMatchRGWOrg(aclDB &aclDB, const std::string& key, RGWOrg *rgwOrg)
+int RGWOrg::getFullMatchRGWOrg(AclDB &aclDB, const std::string& key, RGWOrg *rgwOrg)
 {
     std::string value;
     int ret = aclDB.getData(key, value);
@@ -278,7 +278,7 @@ int RGWOrg::getFullMatchRGWOrg(aclDB &aclDB, const std::string& key, RGWOrg *rgw
 // isFullMatch = false: 가장 근사하게 일치하는 acl을 받아옴 (path가 가장 긴 acl)
 RGWOrg *getAcl(const std::string &user, const std::string &path, bool isFullMatch)
 {
-    auto &dbm = aclDB::getInstance();
+    auto &dbm = AclDB::getInstance();
     if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
     {
         dbm.reOpenDB();
@@ -307,7 +307,7 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
         return 0;
     }
 
-    auto &dbm = aclDB::getInstance();
+    auto &dbm = AclDB::getInstance();
     RGWOrg *rgwOrg;
     if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
     {
@@ -315,10 +315,8 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
         return -1;
     }
 
-    rgwOrg = new RGWOrg();
-    rgwOrg->setUser(user);
-    rgwOrg->setAuthorizer(authorizer);
-    rgwOrg->setTier(tier);
+    rgwOrg = new RGWOrg(user, authorizer, tier);
+    
     auto *orgPermission = new OrgPermissionFlags(r, w, x, g, path);
     rgwOrg->setOrgPermission(*orgPermission);
 
@@ -332,14 +330,14 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
 
     // 기존 상위 경로에 대한 권한
     std::vector<std::pair<std::string, RGWOrg>> existingUpperPerms;
-    aclDB::getSuperPathsForPrefix(user + ":" + path, existingUpperPerms);
+    AclDB::getSuperPathsForPrefix(user + ":" + path, existingUpperPerms);
     
     // 기존 권한에 포함되는 경우
     if (existingUpperPerms.size() > 0) {
         return -1;
     }
     // 기존 권한을 포함하는 경우
-    aclDB acldb = aclDB::getInstance();
+    AclDB acldb = AclDB::getInstance();
     int ret = acldb.existPrefixAcl(user + ":" + path);
     if (ret != 0) { // 아무 값도 존재하지 않는 경우 return 0
         return ret;
@@ -379,7 +377,7 @@ int putAcl(RGWOrg &rgwOrg)
 
 int deleteAcl(const std::string &user, const std::string &path)
 {
-    auto &dbm = aclDB::getInstance();
+    auto &dbm = AclDB::getInstance();
     if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
     {
         dbm.reOpenDB();
@@ -1055,7 +1053,7 @@ bool validateRGWOrgPermission(std::string user, std::string path, bool r, bool w
     return true;
 }
 
-int aclDB::existPrefixAcl(const std::string& prefix){
+int AclDB::existPrefixAcl(const std::string& prefix){
     std::vector<std::pair<std::string, std::string>> values;
     int ret = getAllPartialMatchData(prefix, values);
     if(ret < 0){
@@ -1065,7 +1063,7 @@ int aclDB::existPrefixAcl(const std::string& prefix){
 }
 
 // 접두사 일치하는 모든 acl을 가져오는 함수
-int aclDB::getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pair<std::string, RGWOrg>> &values){
+int AclDB::getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pair<std::string, RGWOrg>> &values){
     std::vector<std::pair<std::string, std::string>> str_values;
     int ret = getAllPartialMatchData(prefix, str_values);
     if (ret < 0){
@@ -1085,7 +1083,7 @@ int aclDB::getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pai
 
 // getPartialMatchRgwOrg 함수와 겹치는 부분이 있는 것 같음
 // TODO: getPartialMatchRgwOrg 함수와 통합
-int aclDB::getSuperPathsForPrefix(const std::string& userPrefix, std::vector<std::pair<std::string, RGWOrg>> &values) {
+int AclDB::getSuperPathsForPrefix(const std::string& userPrefix, std::vector<std::pair<std::string, RGWOrg>> &values) {
     std::istringstream iss(userPrefix);
     std::string segment;
     std::string accumulatedPath;
@@ -1105,7 +1103,7 @@ int aclDB::getSuperPathsForPrefix(const std::string& userPrefix, std::vector<std
         std::string fullPath = accumulatedPath;
 
         RGWOrg rgwOrg;
-        aclDB &aclDB = aclDB::getInstance();
+        AclDB &aclDB = AclDB::getInstance();
         // 사용자 이름을 포함한 경로로 getFullMatchRGWOrg 함수 호출
         int ret = RGWOrg::getFullMatchRGWOrg(aclDB, fullPath, &rgwOrg);
         if (ret == 0) {  // 성공적으로 rgwOrg 객체를 가져온 경우에만 추가
@@ -1140,7 +1138,7 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
         };
 
         std::vector<std::pair<std::string, RGWOrg>> values;
-        aclDB &acl_db = aclDB::getInstance();
+        AclDB &acl_db = AclDB::getInstance();
         ret = acl_db.getAllPartialMatchAcl(cur_name + ":", values);
 
         for (auto &pair : values) {

@@ -117,10 +117,10 @@ public:
 
 
 // aclDB class
-class aclDB : public DBManager {
+class AclDB : public DBManager {
 public:
-    static aclDB& getInstance() {
-        static aclDB instance;
+    static AclDB& getInstance() {
+        static AclDB instance;
         return instance;
     }
     int getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pair<std::string, RGWOrg>> &values);
@@ -130,7 +130,7 @@ public:
     int existPrefixAcl(const std::string& prefix);
 
 private:
-    aclDB() : DBManager("/tmp/org/AclDB") {}
+    AclDB() : DBManager("/tmp/org/AclDB") {}
 };
 
 // TierDB class
@@ -228,15 +228,15 @@ public:
 
     int putRGWOrg(DBManager &dbManager);
 
-    static int getFullMatchRGWOrg(aclDB &aclDB, const std::string& key, RGWOrg *rgwOrg);
+    static int getFullMatchRGWOrg(AclDB &aclDB, const std::string& key, RGWOrg *rgwOrg);
 
-    static int deleteRGWOrg(aclDB &aclDB, const std::string& key);
+    static int deleteRGWOrg(AclDB &aclDB, const std::string& key);
 
     std::string toString();
 
     nlohmann::json toJson();
 
-    static int getPartialMatchRgwOrg(aclDB &aclDB, const std::string& user, const std::string& path, RGWOrg *rgwOrg);
+    static int getPartialMatchRgwOrg(AclDB &aclDB, const std::string& user, const std::string& path, RGWOrg *rgwOrg);
 };
 
 

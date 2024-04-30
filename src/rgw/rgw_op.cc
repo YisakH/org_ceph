@@ -4899,10 +4899,19 @@ std::string RGWGetOrg::callTreeDec(string user)
 {
   nlohmann::json dec_tree;
 
-  RGWOrgDec::getRGWOrgDecTree(user, dec_tree);
-  string tree_str = dec_tree.dump(2);
+  int ret = RGWOrgDec::getRGWOrgDecTree(user, dec_tree);
+  if(ret == -1){
+    return "error occured!";
+  }
+  else if(ret == RGW_ORG_KEY_NOT_FOUND){
+    return "there are no dec user";
+  }
+  else{
+    return dec_tree.dump(2);
+  }
+  //string tree_str = dec_tree.dump(2);
 
-  return tree_str;
+  //return tree_str;
 }
 
 void RGWGetOrg::execute(optional_yield y)

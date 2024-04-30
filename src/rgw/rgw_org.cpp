@@ -66,7 +66,11 @@ RGWOrg::RGWOrg(const std::string &user, const std::string &authorizer){
 
 int DBManager::getData(const std::string &key, std::string &value)
 {
-    status = db->Get(rocksdb::ReadOptions(), key, &value);
+    std::string tmp1 = key;
+    std::string tmp2 = value;
+    this->status = db->Get(rocksdb::ReadOptions(), key, &value);
+    //status = db->Get(rocksdb::ReadOptions(), key, &value);
+    db->Get(rocksdb::ReadOptions(), key, &value);
     if (status.ok())
     {
         return 0;
@@ -80,16 +84,23 @@ int DBManager::getData(const std::string &key, std::string &value)
 // DB에서 prefix로 시작하는 모든 데이터를 가져오는 함수
 int DBManager::getAllPartialMatchData(const std::string& prefix, std::vector<std::pair<std::string, std::string>> &values){
     auto iter = db->NewIterator(rocksdb::ReadOptions());
+    rocksdb::Status status;
 
     for (iter->Seek(prefix); iter->Valid() && iter->key().starts_with(prefix); iter->Next()) {
         values.push_back(std::make_pair(iter->key().ToString(), iter->value().ToString()));
+        status = iter->status();
+        if (!status.ok()) {
+            delete iter;
+            return -1;
+        }
     }
+    delete iter;
 
     if(values.size() > 0){
         return 0;
     }
     else{
-        return -1;
+        return RGW_ORG_KEY_NOT_FOUND;
     }
 }
 
@@ -1074,34 +1085,35 @@ int aclDB::getAllPartialMatchAcl(const std::string& prefix, std::vector<std::pai
 
 // getPartialMatchRgwOrg 함수와 겹치는 부분이 있는 것 같음
 // TODO: getPartialMatchRgwOrg 함수와 통합
-int aclDB::getSuperPathsForPrefix(const std::string& userPrefix, std::vector<std::pair<std::string, RGWOrg>> &values){
+int aclDB::getSuperPathsForPrefix(const std::string& userPrefix, std::vector<std::pair<std::string, RGWOrg>> &values) {
     std::istringstream iss(userPrefix);
     std::string segment;
-    std::string accumulatedPath = "";
+    std::string accumulatedPath;
     std::string userPathPrefix = userPrefix.substr(0, userPrefix.find(":") + 1); // 사용자 이름 추출 (예: "user3:")
     bool isFirstSegment = true;
 
+    // accumulatedPath 초기화
+    accumulatedPath = userPathPrefix;
+
     while (std::getline(iss, segment, '/')) {
-        if (!segment.empty() || isFirstSegment) {
-            if (!isFirstSegment) {
-                accumulatedPath += "/";
-            } else {
-                isFirstSegment = false;
-            }
-            accumulatedPath += segment;
+        if (!isFirstSegment && !segment.empty()) {
+            accumulatedPath += "/" + segment;
+        }
+        isFirstSegment = false;
 
-            // 사용자 이름을 포함한 전체 경로 생성
-            std::string fullPath = userPathPrefix + accumulatedPath;
+        // 사용자 이름을 포함한 전체 경로 생성
+        std::string fullPath = accumulatedPath;
 
-            RGWOrg rgwOrg;
-            aclDB &aclDB = aclDB::getInstance();
-            // 사용자 이름을 포함한 경로로 getFullMatchRGWOrg 함수 호출
-            RGWOrg::getFullMatchRGWOrg(aclDB, fullPath, &rgwOrg);
+        RGWOrg rgwOrg;
+        aclDB &aclDB = aclDB::getInstance();
+        // 사용자 이름을 포함한 경로로 getFullMatchRGWOrg 함수 호출
+        int ret = RGWOrg::getFullMatchRGWOrg(aclDB, fullPath, &rgwOrg);
+        if (ret == 0) {  // 성공적으로 rgwOrg 객체를 가져온 경우에만 추가
             values.push_back(std::make_pair(fullPath, rgwOrg));
         }
     }
 
-    return values.empty() ? -1 : 0;
+    return values.empty() ? RGW_ORG_KEY_NOT_FOUND : 0;
 }
 
 int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j) {
@@ -1136,12 +1148,14 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
             cur_j["permission"].push_back(rgwOrg.toJson());
         }
 
+        // acl이 없는 경우에 자식 노드가 있음에도 이를 표현하지 못하는 것 같은데? 일단 주석처리 해보자
+        /*
         if (ret == RGW_ORG_KEY_NOT_FOUND) {
             j_map[cur_name] = cur_j; // 현재 노드를 맵에 추가
             continue;
         } else if (ret < 0) {
             return ret;
-        }
+        }*/
 
         // 자식 노드 이름을 바탕으로 자식 노드의 JSON 객체를 children에 추가
         for (auto &dec : dec_list) {

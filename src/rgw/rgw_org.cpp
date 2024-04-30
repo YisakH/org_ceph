@@ -48,11 +48,11 @@ nlohmann::json RGWOrg::toJson() {
     j["user"] = user;
     j["authorizer"] = authorizer;
     j["tier"] = tier;
-    j["r"] = orgPermission->r;
-    j["w"] = orgPermission->w;
-    j["x"] = orgPermission->x;
-    j["g"] = orgPermission->g;
-    j["path"] = orgPermission->path;
+    j["r"] = orgPermissionFlags->r;
+    j["w"] = orgPermissionFlags->w;
+    j["x"] = orgPermissionFlags->x;
+    j["g"] = orgPermissionFlags->g;
+    j["path"] = orgPermissionFlags->path;
     return j;
 }
 
@@ -61,16 +61,17 @@ RGWOrg::RGWOrg(const std::string &user, const std::string &authorizer){
     this->authorizer = authorizer;
 
     RGWOrgTier::getUserTier(user, &this->tier);
-    orgPermission = new OrgPermissionFlags();
+    orgPermissionFlags = new OrgPermissionFlags();
 }                                   
 
 int DBManager::getData(const std::string &key, std::string &value)
 {
-    std::string tmp1 = key;
-    std::string tmp2 = value;
-    this->status = db->Get(rocksdb::ReadOptions(), key, &value);
-    //status = db->Get(rocksdb::ReadOptions(), key, &value);
-    db->Get(rocksdb::ReadOptions(), key, &value);
+    if(status.ok()){
+        status = db->Get(rocksdb::ReadOptions(), key, &value);
+    }else{
+        reOpenDB();
+        status = db->Get(rocksdb::ReadOptions(), key, &value);
+    }
     if (status.ok())
     {
         return 0;
@@ -90,11 +91,11 @@ int DBManager::getAllPartialMatchData(const std::string& prefix, std::vector<std
         values.push_back(std::make_pair(iter->key().ToString(), iter->value().ToString()));
         status = iter->status();
         if (!status.ok()) {
-            delete iter;
+            //delete iter;
             return -1;
         }
     }
-    delete iter;
+    //delete iter;
 
     if(values.size() > 0){
         return 0;
@@ -174,7 +175,7 @@ int RGWOrgAnc::getAnc(const std::string &user, std::string *anc)
 
 int toRGWOrg(const std::string &key, const std::string &value, RGWOrg *rgwOrg)
 {
-    rgwOrg->orgPermission = new OrgPermissionFlags();
+    rgwOrg->orgPermissionFlags = new OrgPermissionFlags();
 
     std::istringstream iss(key);
     std::string token;
@@ -182,7 +183,7 @@ int toRGWOrg(const std::string &key, const std::string &value, RGWOrg *rgwOrg)
     std::getline(iss, token, ':');
     rgwOrg->user = token;
     std::getline(iss, token, ':');
-    rgwOrg->orgPermission->path = token;
+    rgwOrg->orgPermissionFlags->path = token;
 
     std::istringstream iss2(value);
     std::string token2;
@@ -193,13 +194,13 @@ int toRGWOrg(const std::string &key, const std::string &value, RGWOrg *rgwOrg)
         std::getline(iss2, token2, ' ');
         rgwOrg->tier = std::stoi(token2);
         std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermission->r = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        rgwOrg->orgPermissionFlags->r = std::stoi(token2) != 0; // 문자열을 bool로 변환
         std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermission->w = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        rgwOrg->orgPermissionFlags->w = std::stoi(token2) != 0; // 문자열을 bool로 변환
         std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermission->x = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        rgwOrg->orgPermissionFlags->x = std::stoi(token2) != 0; // 문자열을 bool로 변환
         std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermission->g = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        rgwOrg->orgPermissionFlags->g = std::stoi(token2) != 0; // 문자열을 bool로 변환
     }
     catch (const std::invalid_argument &e)
     {
@@ -214,11 +215,12 @@ int toRGWOrg(const std::string &key, const std::string &value, RGWOrg *rgwOrg)
     return 0;
 }
 
-int RGWOrg::putRGWOrg(DBManager &dbManager)
+int RGWOrg::putRGWOrg()
 {// 여기서 orgPermission이 그냥 기본으로 들어오는 문제 발생.
-    std::string key = user + ":" + orgPermission->path;
-    std::string value = authorizer + " " + std::to_string(tier) + " " + std::to_string(orgPermission->r) + " " + std::to_string(orgPermission->w) + " " + std::to_string(orgPermission->x) + " " + std::to_string(orgPermission->g);
-    return dbManager.putData(key, value);
+    std::string key = user + ":" + orgPermissionFlags->path;
+    std::string value = authorizer + " " + std::to_string(tier) + " " + std::to_string(orgPermissionFlags->r) + " " + std::to_string(orgPermissionFlags->w) + " " + std::to_string(orgPermissionFlags->x) + " " + std::to_string(orgPermissionFlags->g);
+    AclDB &aclDB = AclDB::getInstance();
+    return aclDB.putData(key, value);
 }
 
 int RGWOrg::deleteRGWOrg(AclDB &aclDB, const std::string& key)
@@ -226,8 +228,8 @@ int RGWOrg::deleteRGWOrg(AclDB &aclDB, const std::string& key)
     return aclDB.deleteData(key);
 }
 
-int RGWOrg::getPartialMatchRgwOrg(AclDB &aclDB, const std::string& user, const std::string& path, RGWOrg *rgwOrg)
-{
+int RGWOrg::getPartialMatchRgwOrg(const std::string& user, const std::string& path, RGWOrg *rgwOrg)
+{ // TODO: 조금 더 효율적인 방법으로 수정 필요. 예를 들어 ret를 설정하지 말고 바로 return 해도 됨
     std::istringstream iss(path);
     std::string segment;
     std::string accumulatedPath = "/";
@@ -235,7 +237,7 @@ int RGWOrg::getPartialMatchRgwOrg(AclDB &aclDB, const std::string& user, const s
     int ret = -1;
 
     // Check if the path is root "/" and handle it explicitly
-    if (getFullMatchRGWOrg(aclDB, key, rgwOrg) == 0) {
+    if (getFullMatchRGWOrg(key, rgwOrg) == 0) {
         ret = 0;
     }
 
@@ -245,7 +247,7 @@ int RGWOrg::getPartialMatchRgwOrg(AclDB &aclDB, const std::string& user, const s
         {
             accumulatedPath += segment;
             key = user + ":" + accumulatedPath;
-            int cur_ret = getFullMatchRGWOrg(aclDB, key, rgwOrg);
+            int cur_ret = getFullMatchRGWOrg(key, rgwOrg);
             if (cur_ret == 0)
             {
                 ret = 0;
@@ -259,9 +261,11 @@ int RGWOrg::getPartialMatchRgwOrg(AclDB &aclDB, const std::string& user, const s
 }
 
 
-int RGWOrg::getFullMatchRGWOrg(AclDB &aclDB, const std::string& key, RGWOrg *rgwOrg)
+int RGWOrg::getFullMatchRGWOrg(const std::string& key, RGWOrg *rgwOrg)
 {
     std::string value;
+    AclDB &aclDB = AclDB::getInstance();
+    std::string tmp = aclDB.getStatus().ToString();
     int ret = aclDB.getData(key, value);
     if (ret < 0)
     {
@@ -278,18 +282,12 @@ int RGWOrg::getFullMatchRGWOrg(AclDB &aclDB, const std::string& key, RGWOrg *rgw
 // isFullMatch = false: 가장 근사하게 일치하는 acl을 받아옴 (path가 가장 긴 acl)
 RGWOrg *getAcl(const std::string &user, const std::string &path, bool isFullMatch)
 {
-    auto &dbm = AclDB::getInstance();
-    if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
-    {
-        dbm.reOpenDB();
-        return nullptr;
-    }
     auto *rgwOrg = new RGWOrg();
     int ret;
     if (isFullMatch)
-        ret = RGWOrg::getFullMatchRGWOrg(dbm, user + ":" + path, rgwOrg);
+        ret = RGWOrg::getFullMatchRGWOrg(user + ":" + path, rgwOrg);
     else{
-        ret = RGWOrg::getPartialMatchRgwOrg(dbm, user, path, rgwOrg);
+        ret = RGWOrg::getPartialMatchRgwOrg(user, path, rgwOrg);
     }
     if (ret < 0)
     {
@@ -308,15 +306,16 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     }
 
     auto &dbm = AclDB::getInstance();
-    RGWOrg *rgwOrg;
     if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
     {
-        dbm.reOpenDB();
-        return -1;
+        int ret = dbm.reOpenDB();
+        if (ret < 0)
+        {
+            return ret;
+        }
     }
 
-    rgwOrg = new RGWOrg(user, authorizer, tier);
-    
+    RGWOrg *rgwOrg = new RGWOrg(user, authorizer, tier);
     auto *orgPermission = new OrgPermissionFlags(r, w, x, g, path);
     rgwOrg->setOrgPermission(*orgPermission);
 
@@ -343,7 +342,7 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
         return ret;
     }
 
-    ret = rgwOrg->putRGWOrg(dbm);
+    ret = rgwOrg->putRGWOrg();
     if (ret < 0)
     {
         return ret;
@@ -518,7 +517,7 @@ int RGWOrgDec::deleteDecEdge(const std::string& user, const std::string& dec){
 }
 
 std::string RGWOrg::toString() {
-    return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermission->r) + ", w: " + std::to_string(orgPermission->w) + ", x: " + std::to_string(orgPermission->x) + ", g: " + std::to_string(orgPermission->g) + ", path: " + orgPermission->path;
+    return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermissionFlags->r) + ", w: " + std::to_string(orgPermissionFlags->w) + ", x: " + std::to_string(orgPermissionFlags->x) + ", g: " + std::to_string(orgPermissionFlags->g) + ", path: " + orgPermissionFlags->path;
 };
 
 
@@ -1105,7 +1104,7 @@ int AclDB::getSuperPathsForPrefix(const std::string& userPrefix, std::vector<std
         RGWOrg rgwOrg;
         AclDB &aclDB = AclDB::getInstance();
         // 사용자 이름을 포함한 경로로 getFullMatchRGWOrg 함수 호출
-        int ret = RGWOrg::getFullMatchRGWOrg(aclDB, fullPath, &rgwOrg);
+        int ret = RGWOrg::getFullMatchRGWOrg(fullPath, &rgwOrg);
         if (ret == 0) {  // 성공적으로 rgwOrg 객체를 가져온 경우에만 추가
             values.push_back(std::make_pair(fullPath, rgwOrg));
         }

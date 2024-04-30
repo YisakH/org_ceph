@@ -17,6 +17,7 @@
 #define RGW_ORG_PERMISSION_NOT_ALLOWED -3
 #define RGW_ORG_PERMISSION_ALLOWED 0
 #define RGW_ORG_KEY_NOT_FOUND -4
+#define RGW_DB_ERROR -5
 
 namespace rocksdb{
   class DB;
@@ -74,7 +75,7 @@ public:
     rocksdb::Status status;
 
     ~DBManager() {
-        delete db;
+        //delete db;
     }
     DBManager(const std::string& dbPath) : dbPath(std::move(dbPath)), db(nullptr) {
         //if(dbName == "RocksDB"){
@@ -94,12 +95,13 @@ public:
 
     int reOpenDB() {
         delete db;
+        db = nullptr;
         status = rocksdb::DB::Open(options, dbPath, &db);
         if(status.ok()){
             return 0;
         }
         else{
-            return -1;
+            return RGW_DB_ERROR;
         }
     }
 
@@ -177,17 +179,17 @@ public:
     std::string user;
     std::string authorizer;
     int tier;
-    OrgPermissionFlags* orgPermission;
+    OrgPermissionFlags* orgPermissionFlags;
     RGWOrg(std::string user, const std::string &authorizer, uint16_t tier,
            OrgPermissionFlags* orgPermission) : user(std::move(user)), authorizer(authorizer), tier(tier),
-                                                orgPermission(orgPermission) {}
+                                                orgPermissionFlags(orgPermission) {}
 
     RGWOrg(std::string user, const std::string &authorizer, uint16_t tier) : user(std::move(user)), authorizer(authorizer),
                                                                                      tier(tier){
-                                                                                        orgPermission = new OrgPermissionFlags();
+                                                                                        orgPermissionFlags = new OrgPermissionFlags();
                                                                                      }
     RGWOrg(){
-        orgPermission = new OrgPermissionFlags();
+        orgPermissionFlags = new OrgPermissionFlags();
         user = "";
         authorizer = "";
         tier = -1;
@@ -207,7 +209,7 @@ public:
     }
 
     OrgPermissionFlags* getOrgPermission() const {
-        return orgPermission;
+        return orgPermissionFlags;
     }
 
     void setUser(const std::string &user) {
@@ -223,12 +225,12 @@ public:
     }
 
     void setOrgPermission(OrgPermissionFlags &newOrgPermission) {
-        orgPermission = &newOrgPermission;
+        orgPermissionFlags = &newOrgPermission;
     }
 
-    int putRGWOrg(DBManager &dbManager);
+    int putRGWOrg();
 
-    static int getFullMatchRGWOrg(AclDB &aclDB, const std::string& key, RGWOrg *rgwOrg);
+    static int getFullMatchRGWOrg(const std::string& key, RGWOrg *rgwOrg);
 
     static int deleteRGWOrg(AclDB &aclDB, const std::string& key);
 
@@ -236,7 +238,7 @@ public:
 
     nlohmann::json toJson();
 
-    static int getPartialMatchRgwOrg(AclDB &aclDB, const std::string& user, const std::string& path, RGWOrg *rgwOrg);
+    static int getPartialMatchRgwOrg(const std::string& user, const std::string& path, RGWOrg *rgwOrg);
 };
 
 

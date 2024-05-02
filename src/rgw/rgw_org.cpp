@@ -66,18 +66,20 @@ RGWOrg::RGWOrg(const std::string &user, const std::string &authorizer){
 
 int DBManager::getData(const std::string &key, std::string &value)
 {
-    if(status.ok()){
-        status = db->Get(rocksdb::ReadOptions(), key, &value);
-    }else{
+    if(db == nullptr){
         reOpenDB();
-        status = db->Get(rocksdb::ReadOptions(), key, &value);
     }
-    if (status.ok())
-    {
+    
+    status = db->Get(rocksdb::ReadOptions(), key, &value);
+    std::string tmp = status.ToString();
+
+    if (status.ok()){
         return 0;
     }
-    else
-    {
+    else if (status.IsNotFound()){
+        return RGW_ORG_KEY_NOT_FOUND;
+    }
+    else{
         return -1;
     }
 }
@@ -1055,8 +1057,10 @@ bool validateRGWOrgPermission(std::string user, std::string path, bool r, bool w
 int AclDB::existPrefixAcl(const std::string& prefix){
     std::vector<std::pair<std::string, std::string>> values;
     int ret = getAllPartialMatchData(prefix, values);
-    if(ret < 0){
+    if(ret == -1){
         return ret;
+    }else if(ret == RGW_ORG_KEY_NOT_FOUND){
+        return 0;
     }
     return values.size() > 0 ? 1 : 0;
 }

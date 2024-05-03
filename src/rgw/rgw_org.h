@@ -317,7 +317,7 @@ class RGWOrgDec
     public:
     static int getDec(const std::string& user, std::vector<std::string> *dec_list);
     static int putDec(std::string user, std::vector<std::string> dec_list);
-    static int deleteDec(std::string user);
+    static int deleteAllDec(std::string user);
     static int updateDec(std::string user, std::vector<std::string> dec_list);
     static int decListToString(std::vector<std::string> &dec_list, std::string *dec_list_str);
     static int appendDecEdge(const std::string& user, const std::string& dec);
@@ -333,7 +333,7 @@ public:
     static int putUser(std::string user, std::string anc = "", std::vector<std::string> dec_list = std::vector<std::string>());
     static int putUser(std::string user, std::string anc, std::string dec_list_str);
     static int deleteUser(const std::string &user);
-    static int updateUser();
+    static int deleteUserRelation(const std::string &user, const std::vector<std::string> &dec_list);
     
     static int deleteOnlyUser(const std::string &user);
     static int deleteWithDescendants(const std::string &user, const std::vector<std::string> &dec_list);

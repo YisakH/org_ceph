@@ -463,8 +463,8 @@ int deleteAnc(const std::string &user)
 
 int RGWOrgDec::appendDecEdge(const std::string& user, const std::string& dec){
     std::vector<std::string> dec_list(1, dec);
-    int ret = appendDecEdge(user, dec_list);
-    return ret;
+
+    return appendDecEdge(user, dec_list);
 }
 
 int RGWOrgDec::appendDecEdge(const std::string& user, const std::vector<std::string>& dec_list){
@@ -481,8 +481,9 @@ int RGWOrgDec::appendDecEdge(const std::string& user, const std::vector<std::str
         return ret;
     }
     else{
-        for(auto dec : dec_list){
-            if(!existDecEdge(user, dec)){
+        for(const auto& dec : dec_list){
+            // std::find를 사용하여 existing_dec_list 내에서 dec를 검색
+            if(std::find(existing_dec_list.begin(), existing_dec_list.end(), dec) == existing_dec_list.end()){
                 existing_dec_list.push_back(dec);
             }
         }
@@ -490,6 +491,7 @@ int RGWOrgDec::appendDecEdge(const std::string& user, const std::vector<std::str
     }
     return ret;
 }
+
 
 bool RGWOrgDec::existDecEdge(const std::string& user, const std::string& dec){
     std::vector<std::string> existing_dec_list;
@@ -547,12 +549,15 @@ int RGWOrgDec::decListToString(std::vector<std::string> &dec_list, std::string *
 }
 
 int RGWOrgDec::getDec(const std::string& user, std::vector<std::string> *dec_list){
-    std::string value;
+    std::string value = "";
     DecDB &decDB = DecDB::getInstance();
 
     decDB.getData(user, value);
 
-    if(decDB.status.ok()){
+    if(value == ""){
+       return RGW_ORG_KEY_NOT_FOUND; 
+    }
+    else if(decDB.status.ok()){
         *dec_list = str_split_to_vec(value);
         return 0;
     } else if(decDB.status.IsNotFound()){
@@ -568,23 +573,25 @@ int RGWOrgDec::putDec(std::string user, std::vector<std::string> dec_list){
     TierDB &tierDB = TierDB::getInstance();
 
     std::string dec_list_string = str_join(dec_list);
-    decDB.putData(user, dec_list_string);
+
+    int ret = decDB.putData(user, dec_list_string);
+    if(ret < 0){
+        return ret;
+    }
 
     int tier;
-    tierDB.getData(user, tier);
+    ret = tierDB.getData(user, tier);
+    if(ret < 0){
+        return ret;
+    }
+
     for (auto dec : dec_list){
         tierDB.putData(dec, tier + 1);
     }
-
-    if(decDB.status.ok()){
-        return 0;
-    }
-    else{
-        return -1;
-    }
+    return 0;
 }
 
-int RGWOrgDec::deleteDec(std::string user){
+int RGWOrgDec::deleteAllDec(std::string user){
     DecDB &decDB = DecDB::getInstance();
     decDB.deleteData(user);
 
@@ -833,16 +840,7 @@ std::string str_join(const std::vector<std::string>& v){
 int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::string> dec_list){
     int ret = -1;
 
-    // auto * ancAcl = getAcl(anc, "/");
-
-    // if(ancAcl == nullptr){
-    //     return -1;
-    // }
-
-
-
     ret = deleteUser(user);
-
 
     if (anc != ""){ // anc가 존재하는 경우
         int anc_tier = -1;
@@ -880,6 +878,15 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::stri
         }
 
         for (auto dec : dec_list){
+            std::string anc_dec = "";
+            ret = getAnc(dec, &anc_dec);
+            if(ret == 0){
+                ret = RGWOrgDec::deleteDecEdge(anc_dec, dec);
+                if(ret < 0){
+                    return ret;
+                }
+            }
+
             ret = putAnc(dec, user);
             if(ret < 0){
                 return ret;
@@ -891,6 +898,22 @@ int RGWOrgUser::putUser(std::string user, std::string anc, std::vector<std::stri
     //RGWOrg *blackRgwOrg = new RGWOrg(user, anc);
     //ret = putAcl(*blackRgwOrg);
     return 0;
+}
+
+int RGWOrgUser::deleteUserRelation(const std::string &user, const std::vector<std::string> &dec_list){
+    std::vector<std::string> existing_dec_list;
+
+    int ret = RGWOrgDec::getDec(user, &existing_dec_list);
+    if(ret < 0){
+        return ret;
+    }
+
+    for(auto dec : dec_list){
+        auto it = std::find(existing_dec_list.begin(), existing_dec_list.end(), dec);
+        if(it != existing_dec_list.end()){
+            existing_dec_list.erase(it);
+        }
+    }
 }
 
 int RGWOrgUser::putUser(std::string user, std::string anc, std::string dec_list_str){
@@ -926,7 +949,7 @@ int RGWOrgUser::deleteWithDescendants(const std::string &user, const std::vector
         int ret = RGWOrgAnc::deleteAnc(dec);
         if(ret < 0) return ret;
     }
-    int ret = RGWOrgDec::deleteDec(user);
+    int ret = RGWOrgDec::deleteAllDec(user);
     if(ret < 0) return ret;
 
     return RGWOrgTier::deleteUserTier(user);
@@ -957,7 +980,7 @@ int RGWOrgUser::deleteWithBoth(const std::string &user, const std::string &anc, 
     //RGWOrgDec::putDec(anc, dec_list);
     //if(ret < 0) return ret;
 
-    ret = RGWOrgDec::deleteDec(user);
+    ret = RGWOrgDec::deleteAllDec(user);
     if(ret < 0) return ret;
 
     ret = RGWOrgAnc::deleteAnc(user);

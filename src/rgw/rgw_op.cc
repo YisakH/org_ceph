@@ -1212,7 +1212,7 @@ int RGWGetObj::verify_permission(optional_yield y)
     }
   }
   int hacl_ret = checkHAclObjRead(s->user->get_id().id, s->bucket->get_name(), s->object->get_name());
-  dout(0) << "socks(getobj::verify_reqeuster): hacl_ret : " << hacl_ret << dendl;
+  dout(0) << "socks(getobj::verify_requester): hacl_ret : " << hacl_ret << dendl;
   
   if (hacl_ret != 0 && !verify_object_permission(this, s, action))
   {
@@ -4623,7 +4623,7 @@ int RGWPutObj::verify_permission(optional_yield y)
   }
 
   int hacl_ret = checkHAclObjWrite(s->user->get_id().id, s->bucket->get_name(), s->object->get_name());
-  dout(0) << "socks(getobj::verify_reqeuster): hacl_ret : " << hacl_ret << dendl;
+  dout(0) << "socks(putobj::verify_reqeuster): hacl_ret : " << hacl_ret << dendl;
 
   if (hacl_ret != RGW_ORG_PERMISSION_ALLOWED)
   {
@@ -4990,15 +4990,7 @@ void RGWPutOrg::execute(optional_yield y)
   {
     dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
   }
-  /*
-  dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : args = " << s->info.args.get_str() << dendl;
-  dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : args = " << s->info.args.get_str() << dendl;
-  dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : env = " << s->info.env->get_map() << dendl;
-  for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it) {
-    dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
-  }
-  dout(0) << "socks : rgw_op.cc : request_params : " << s->info.request_params << dendl;
-  */
+  
   int ret = -1;
 
   if (s->decoded_uri == "/admin/org/acl")

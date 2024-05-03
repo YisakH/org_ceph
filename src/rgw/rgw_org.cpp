@@ -38,9 +38,21 @@ OrgPermissionFlags::OrgPermissionFlags(){
     path = "/";
 }
 
+// Helper function to trim slashes at the start and end of a string
+std::string trimSlashes(const std::string& str) {
+    size_t start = str.find_first_not_of('/');
+    if (start == std::string::npos) return ""; // String consists only of slashes
 
-std::string getObjectPath(const std::string& bucket_name, const std::string& object_name){
-    return "/" + bucket_name + "/" + object_name;
+    size_t end = str.find_last_not_of('/');
+    return str.substr(start, end - start + 1);
+}
+
+
+std::string getObjectPath(const std::string& bucket_name, const std::string& object_name) {
+    std::string trimmed_bucket = trimSlashes(bucket_name);
+    std::string trimmed_object = trimSlashes(object_name);
+
+    return "/" + trimmed_bucket + "/" + trimmed_object;
 }
 
 nlohmann::json RGWOrg::toJson() {
@@ -561,7 +573,7 @@ int RGWOrgDec::putDec(std::string user, std::vector<std::string> dec_list){
     int tier;
     tierDB.getData(user, tier);
     for (auto dec : dec_list){
-        tierDB.putData(user, tier + 1);
+        tierDB.putData(dec, tier + 1);
     }
 
     if(decDB.status.ok()){
@@ -1106,7 +1118,7 @@ int AclDB::getSuperPathsForPrefix(const std::string& userPrefix, std::vector<std
         std::string fullPath = accumulatedPath;
 
         RGWOrg rgwOrg;
-        AclDB &aclDB = AclDB::getInstance();
+        //AclDB &aclDB = AclDB::getInstance();
         // 사용자 이름을 포함한 경로로 getFullMatchRGWOrg 함수 호출
         int ret = RGWOrg::getFullMatchRGWOrg(fullPath, &rgwOrg);
         if (ret == 0) {  // 성공적으로 rgwOrg 객체를 가져온 경우에만 추가

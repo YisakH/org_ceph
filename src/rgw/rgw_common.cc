@@ -131,6 +131,8 @@ rgw_http_errors rgw_http_s3_errors({
     { ERR_ZERO_IN_URL, {400, "InvalidRequest" }},
     { ERR_NO_SUCH_TAG_SET, {404, "NoSuchTagSet"}},
     { ERR_NO_SUCH_BUCKET_ENCRYPTION_CONFIGURATION, {404, "ServerSideEncryptionConfigurationNotFoundError"}},
+    { RGW_ORG_PERMISSION_NOT_ALLOWED, {400, "HBACPermissionNotAllowed"}},
+    { RGW_ORG_TIER_NOT_ALLOWED, {400, "HBACTierNotAllowed"}},
 });
 
 rgw_http_errors rgw_http_swift_errors({

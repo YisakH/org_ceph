@@ -412,6 +412,39 @@ int RGWGetOrg_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
     return 0;
 }
 
+int RGWPutOrg_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
+                                         off_t bl_len)
+{
+    string origin = "*";
+    string req_meth = "GET, POST, PUT, DELETE, OPTIONS";
+    string hdrs = "Authorization, Content-Type, X-Requested-With, x-amz-content-sha256, x-amz-date";
+    string exp_hdrs = "Content-Length, Content-Type";
+    uint32_t max_age = CORS_MAX_AGE_INVALID;
+    // Set the HTTP status code based on the operation result
+    set_req_state_err(s, op_ret);
+    dump_errno(s);
+
+    // Check if the operation was successful
+    if (op_ret < 0)
+        return op_ret; // If not, return the error code
+
+    // Set content length and type headers
+    dump_content_length(s, bl_len);
+    const char* content_type = "binary/octet-stream"; // default content type
+    dump_header(s, "Content-Type", content_type);
+
+    dump_header(s, "Access-Control-Allow-Origin", origin);
+    dump_header(s, "Access-Control-Allow-Methods", req_meth);
+    dump_header(s, "Access-Control-Allow-Headers", hdrs);
+    dump_header(s, "Access-Control-Expose-Headers", exp_hdrs);
+    dump_header(s, "Access-Control-Max-Age", max_age);
+
+    // Finalize and send the headers
+    end_header(s, this);
+
+    dump_body(s, bl.c_str() + bl_ofs, bl_len);
+    return 0;
+}
 
 
 int RGWGetObj_ObjStore_S3::send_response_data(bufferlist& bl, off_t bl_ofs,
@@ -2764,7 +2797,7 @@ void RGWPutOrg_ObjStore_S3::send_response()
     set_req_state_err(s, 0);
     dump_errno(s);
     // The response string
-    std::string response_str = "put org suceeded";
+    std::string response_str = "put HBAC suceeded";
     bufferlist response_bl;
     response_bl.append(response_str);
     // Set Content-Length header

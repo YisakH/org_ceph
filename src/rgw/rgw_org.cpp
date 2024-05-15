@@ -14,27 +14,27 @@
 
 // TierDB RGWOrgTier::tierDb;
 bool OrgPermissionFlags::operator<=(const OrgPermissionFlags& other) const {
-    return (!other.r || r) &&
-           (!other.w || w) &&
-           (!other.g || g) &&
-           (!other.x || x);
+    return (!other.get || get) &&
+           (!other.put || put) &&
+           (!other.gra || gra) &&
+           (!other.del || del);
 }
 bool OrgPermissionFlags::operator<(const OrgPermissionFlags& other) const {
     bool isStrictlyLess = false; // 진부분집합 여부를 판단하기 위한 변수
-    if ((!other.r || r) && (!other.w || w) &&
-        (!other.g || g) && (!other.x || x)) {
+    if ((!other.get || get) && (!other.put || put) &&
+        (!other.gra || gra) && (!other.del || del)) {
         // 모든 권한이 other에 포함되는지 확인
-        isStrictlyLess = (r != other.r) || (w != other.w) ||
-                         (g != other.g) || (x != other.x);
+        isStrictlyLess = (get != other.get) || (put != other.put) ||
+                         (gra != other.gra) || (del != other.del);
         // 적어도 하나의 권한이 other와 다르다면, 즉 진부분집합이라면 true
     }
     return isStrictlyLess;
 }
 OrgPermissionFlags::OrgPermissionFlags(){
-    r = false;
-    w = false;
-    x = false;
-    g = false;
+    get = false;
+    put = false;
+    del = false;
+    gra = false;
     path = "/";
 }
 
@@ -60,10 +60,10 @@ nlohmann::json RGWOrg::toJson() {
     j["user"] = user;
     j["authorizer"] = authorizer;
     j["tier"] = tier;
-    j["r"] = orgPermissionFlags->r;
-    j["w"] = orgPermissionFlags->w;
-    j["x"] = orgPermissionFlags->x;
-    j["g"] = orgPermissionFlags->g;
+    j["get"] = orgPermissionFlags->get;
+    j["put"] = orgPermissionFlags->put;
+    j["del"] = orgPermissionFlags->del;
+    j["gra"] = orgPermissionFlags->gra;
     j["path"] = orgPermissionFlags->path;
     return j;
 }
@@ -208,13 +208,13 @@ int toRGWOrg(const std::string &key, const std::string &value, RGWOrg *rgwOrg)
         std::getline(iss2, token2, ' ');
         rgwOrg->tier = std::stoi(token2);
         std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermissionFlags->r = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        rgwOrg->orgPermissionFlags->get = std::stoi(token2) != 0; // 문자열을 bool로 변환
         std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermissionFlags->w = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        rgwOrg->orgPermissionFlags->put = std::stoi(token2) != 0; // 문자열을 bool로 변환
         std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermissionFlags->x = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        rgwOrg->orgPermissionFlags->del = std::stoi(token2) != 0; // 문자열을 bool로 변환
         std::getline(iss2, token2, ' ');
-        rgwOrg->orgPermissionFlags->g = std::stoi(token2) != 0; // 문자열을 bool로 변환
+        rgwOrg->orgPermissionFlags->gra = std::stoi(token2) != 0; // 문자열을 bool로 변환
     }
     catch (const std::invalid_argument &e)
     {
@@ -232,7 +232,7 @@ int toRGWOrg(const std::string &key, const std::string &value, RGWOrg *rgwOrg)
 int RGWOrg::putRGWOrg()
 {// 여기서 orgPermission이 그냥 기본으로 들어오는 문제 발생.
     std::string key = user + ":" + orgPermissionFlags->path;
-    std::string value = authorizer + " " + std::to_string(tier) + " " + std::to_string(orgPermissionFlags->r) + " " + std::to_string(orgPermissionFlags->w) + " " + std::to_string(orgPermissionFlags->x) + " " + std::to_string(orgPermissionFlags->g);
+    std::string value = authorizer + " " + std::to_string(tier) + " " + std::to_string(orgPermissionFlags->get) + " " + std::to_string(orgPermissionFlags->put) + " " + std::to_string(orgPermissionFlags->del) + " " + std::to_string(orgPermissionFlags->gra);
     AclDB &aclDB = AclDB::getInstance();
     return aclDB.putData(key, value);
 }
@@ -313,16 +313,17 @@ RGWOrg *getAcl(const std::string &user, const std::string &path, bool isFullMatc
     }
 }
 
-int putAcl(const std::string &user, const std::string &path, const std::string &authorizer, int tier, bool r, bool w, bool x, bool g)
+int putAcl(const std::string &user, const std::string &path, const std::string &authorizer, int tier, bool get, bool put, bool del, bool gra)
 {
+    int ret = 0;
     if(user == authorizer){
         return 0;
     }
 
-    auto &dbm = AclDB::getInstance();
-    if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
+    auto &aclDB = AclDB::getInstance();
+    if (!aclDB.getStatus().ok() && !aclDB.getStatus().IsNotFound())
     {
-        int ret = dbm.reOpenDB();
+        ret = aclDB.reOpenDB();
         if (ret < 0)
         {
             return ret;
@@ -330,7 +331,7 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     }
 
     RGWOrg *rgwOrg = new RGWOrg(user, authorizer, tier);
-    auto *orgPermission = new OrgPermissionFlags(r, w, x, g, path);
+    auto *orgPermission = new OrgPermissionFlags(get, put, del, gra, path);
     rgwOrg->setOrgPermission(*orgPermission);
 
     RGWOrg *existingRgwOrg = getAcl(user, path);
@@ -347,28 +348,32 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     
     // 기존 권한에 포함되는 경우
     if (existingUpperPerms.size() > 0) {
-        return -1;
-    }
-    // 기존 권한을 포함하는 경우
-    AclDB acldb = AclDB::getInstance();
-    int ret = acldb.existPrefixAcl(user + ":" + path);
-    if (ret != 0) { // 아무 값도 존재하지 않는 경우 return 0
-        return ret;
-    }
+        if(existingUpperPerms[0].second.getTier() < tier){
+            return RGW_ORG_TIER_NOT_ALLOWED;
+        }else{
+            aclDB.deleteData(existingUpperPerms[0].first);
+        }
+    }else{
+        // 기존 권한을 포함하는 경우
+        ret = aclDB.existPrefixAcl(user + ":" + path);
+        if (ret != 0) { // 아무 값도 존재하지 않는 경우 return 0
+            return ret;
+        }
 
-    ret = rgwOrg->putRGWOrg();
-    if (ret < 0)
-    {
-        return ret;
     }
 
     std::string anc = "";
     getAnc(user, &anc);
     if(anc != ""){
-        ret = putAcl(anc, path, authorizer, tier, r, w, x, g);
+        ret = putAcl(anc, path, authorizer, tier, get, put, del, gra);
         if(ret < 0){
             return ret;
         }
+    }
+    ret = rgwOrg->putRGWOrg();
+    if (ret < 0)
+    {
+        return ret;
     }
 
     return 0;
@@ -381,33 +386,52 @@ int putAcl(RGWOrg &rgwOrg)
         rgwOrg.getOrgPermission()->path, 
         rgwOrg.getAuthorizer(), 
         rgwOrg.getTier(), 
-        rgwOrg.getOrgPermission()->r, 
-        rgwOrg.getOrgPermission()->w, 
-        rgwOrg.getOrgPermission()->x, 
-        rgwOrg.getOrgPermission()->g
+        rgwOrg.getOrgPermission()->get, 
+        rgwOrg.getOrgPermission()->put, 
+        rgwOrg.getOrgPermission()->del, 
+        rgwOrg.getOrgPermission()->gra
     );
 }
 
-int deleteAcl(const std::string &user, const std::string &path)
-{
+int deleteAcl(const std::string &request_user, const std::string &user, const std::string &path) {
     auto &dbm = AclDB::getInstance();
-    if (!dbm.getStatus().ok() && !dbm.getStatus().IsNotFound())
-    {
+
+    // Check and re-open the database if necessary
+    auto status = dbm.getStatus();
+    if (!status.ok() && !status.IsNotFound()) {
         dbm.reOpenDB();
-        return -1;
+        status = dbm.getStatus();
+        if (!status.ok()) {
+            return -1; // Failed to re-open the database
+        }
     }
 
     std::string key = user + ":" + path;
-    int ret = RGWOrg::deleteRGWOrg(dbm, key);
-    if (ret < 0)
-    {
-        return -1;
+    RGWOrg *rgwOrg = getAcl(user, path, true);
+    if (rgwOrg == nullptr) {
+        return RGW_ORG_KEY_NOT_FOUND;
     }
-    else
-    {
-        return 0;
+
+    int permTier = rgwOrg->getTier();
+    int requestTier = 0;
+    
+    int ret = RGWOrgTier::getUserTier(request_user, &requestTier);
+    if (ret == 0) {
+        if (permTier <= requestTier) {
+            return RGW_ORG_TIER_NOT_ALLOWED;
+        }
+    } else {
+        return -1; // Failed to get user tier
+    }
+
+    ret = dbm.deleteData(key);
+    if (ret < 0) {
+        return -1; // Failed to delete data
+    } else {
+        return 0; // Success
     }
 }
+
 
 int getTier(const std::string &user, int *tier)
 {
@@ -533,7 +557,7 @@ int RGWOrgDec::deleteDecEdge(const std::string& user, const std::string& dec){
 }
 
 std::string RGWOrg::toString() {
-    return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", r: " + std::to_string(orgPermissionFlags->r) + ", w: " + std::to_string(orgPermissionFlags->w) + ", x: " + std::to_string(orgPermissionFlags->x) + ", g: " + std::to_string(orgPermissionFlags->g) + ", path: " + orgPermissionFlags->path;
+    return "user: " + user + ", authorizer: " + authorizer + ", tier: " + std::to_string(tier) + ", get: " + std::to_string(orgPermissionFlags->get) + ", put: " + std::to_string(orgPermissionFlags->put) + ", del: " + std::to_string(orgPermissionFlags->del) + ", gra: " + std::to_string(orgPermissionFlags->gra) + ", path: " + orgPermissionFlags->path;
 };
 
 
@@ -645,7 +669,7 @@ int checkAclRead(const std::string& request_user, const std::string& target_user
     return RGW_ORG_PERMISSION_ALLOWED;
 }
 
-int checkAclWrite(const std::string& request_user, const std::string& target_user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g){
+int checkAclWrite(const std::string& request_user, const std::string& target_user, const std::string& path, const std::string& authorizer, int tier, bool get, bool put, bool del, bool gra){
     int request_user_tier = -1, target_user_tier = -1;
     int ret = -1;
     ret = RGWOrgTier::getUserTier(request_user, &request_user_tier);
@@ -663,12 +687,12 @@ int checkAclWrite(const std::string& request_user, const std::string& target_use
 
     RGWOrg * request_user_org = getAcl(request_user, path);
     //std::string tmp = request_user_org->toString();
-    if(request_user_org == nullptr || !request_user_org->getOrgPermission()->g){ // grant 권한이 없는 경우
+    if(request_user_org == nullptr || !request_user_org->getOrgPermission()->gra){ // grant 권한이 없는 경우
         return RGW_ORG_PERMISSION_NOT_ALLOWED;
     }
 
 
-    OrgPermissionFlags orgPermission(r, w, x, g, path);
+    OrgPermissionFlags orgPermission(get, put, del, gra, path);
     std::string anc_user;
     ret = getAnc(target_user, &anc_user);
 
@@ -703,7 +727,7 @@ int checkHAclObjRead(const std::string& request_user, const std::string& bucket_
         return RGW_ORG_PERMISSION_ALLOWED;
     }
     
-    if(rgwOrg->getOrgPermission()->r){
+    if(rgwOrg->getOrgPermission()->get){
         return RGW_ORG_PERMISSION_ALLOWED;
     }
     else{
@@ -718,7 +742,7 @@ int checkHAclObjWrite(const std::string& request_user, const std::string& bucket
         return RGW_ORG_KEY_NOT_FOUND;
     }
     
-    if(rgwOrg->getOrgPermission()->w){
+    if(rgwOrg->getOrgPermission()->put){
         return RGW_ORG_PERMISSION_ALLOWED;
     }
     else{
@@ -766,7 +790,7 @@ std::string sha256_hex(const std::string &data) {
 }
 
 std::string generateCanonicalHeaders(const std::string &hostHeader, const std::string &amzDate) {
-    std::string canonicalHeaders = "host:" + hostHeader + "\n" + "x-amz-content-sha256:" + sha256_hex("") + "\n" + "x-amz-date:" + amzDate + "\n";
+    std::string canonicalHeaders = "host:" + hostHeader + "\n" + "del-amz-content-sha256:" + sha256_hex("") + "\n" + "del-amz-date:" + amzDate + "\n";
     return canonicalHeaders;
 }
 
@@ -1069,20 +1093,20 @@ int RGWOrgTier::updateUserTier(const std::string &start_user){
     return 0;
 }
 
-bool validateRGWOrgPermission(std::string user, std::string path, bool r, bool w, bool x, bool g){
+bool validateRGWOrgPermission(std::string user, std::string path, bool get, bool put, bool del, bool gra){
     RGWOrg *rgwOrg = getAcl(user, path);
     if(rgwOrg == nullptr){
         return false;
     }
     OrgPermissionFlags *orgPermission = rgwOrg->getOrgPermission();
 
-    // compare orgPermission and r, w, x, g
-    // if request user has more permission than input r, w, x, g, return true
+    // compare orgPermission and get, put, del, gra
+    // if request user has more permission than input get, put, del, gra, return true
     
-    if ((r && !orgPermission->r) ||
-        (w && !orgPermission->w) ||
-        (x && !orgPermission->x) ||
-        (g && !orgPermission->g)) {
+    if ((get && !orgPermission->get) ||
+        (put && !orgPermission->put) ||
+        (del && !orgPermission->del) ||
+        (gra && !orgPermission->gra)) {
         return false;
     }
 
@@ -1234,4 +1258,24 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
 
     j = j_map[start_user]; // 최종 JSON 객체를 설정
     return 0;
+}
+
+std::string makeResponse(int status){
+    switch (status)
+    {
+    case RGW_ORG_TIER_NOT_ALLOWED:
+        return "RGW_HBAC_TIER_NOT_ALLOWED";
+    case RGW_ORG_PERMISSION_NOT_ALLOWED:
+        return "RGW_HBAC_PERMISSION_NOT_ALLOWED";
+    case RGW_ORG_PERMISSION_ALLOWED:
+
+        return "RGW_HBAC_PERMISSION_ALLOWED";
+    case RGW_ORG_KEY_NOT_FOUND:
+        return "RGW_HBAC_KEY_NOT_FOUND";
+
+    case RGW_DB_ERROR:
+        return "RGW_DB_ERROR";
+    default:
+        return "UNKNOWN";
+    }
 }

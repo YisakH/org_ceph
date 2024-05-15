@@ -1576,6 +1576,8 @@ public:
 
   int verify_requester(const rgw::auth::StrategyRegistry& auth_registry, optional_yield y) override;
   void send_response() override = 0;
+
+  virtual int send_response_data(bufferlist& bl, off_t ofs, off_t len) = 0;
   const char* name() const override { return "put_org"; }
   RGWOpType get_type() override { return RGW_OP_PUT_ORG; }
   uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }

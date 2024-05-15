@@ -13,11 +13,11 @@
 #include <nlohmann/json.hpp>
 #include <filesystem>
 
-#define RGW_ORG_TIER_NOT_ALLOWED -2
-#define RGW_ORG_PERMISSION_NOT_ALLOWED -3
+#define RGW_ORG_TIER_NOT_ALLOWED -30002
+#define RGW_ORG_PERMISSION_NOT_ALLOWED -30003
 #define RGW_ORG_PERMISSION_ALLOWED 0
-#define RGW_ORG_KEY_NOT_FOUND -4
-#define RGW_DB_ERROR -5
+#define RGW_ORG_KEY_NOT_FOUND -30004
+#define RGW_DB_ERROR -30005
 
 namespace rocksdb{
   class DB;
@@ -44,16 +44,16 @@ class RGWOrg;
 class OrgPermissionFlags
 {
 public:
-    bool r;
-    bool w;
-    bool x;
-    bool g;
+    bool get;
+    bool put;
+    bool del;
+    bool gra;
     std::string path;
 
     OrgPermissionFlags();
 
-    OrgPermissionFlags(bool r, bool w, bool x, bool g) : r(r), w(w), x(x), g(g) {}
-    OrgPermissionFlags(bool r, bool w, bool x, bool g, std::string path) : r(r), w(w), x(x), g(g), path(path){}
+    OrgPermissionFlags(bool get, bool put, bool del, bool gra) : get(get), put(put), del(del), gra(gra) {}
+    OrgPermissionFlags(bool get, bool put, bool del, bool gra, std::string path) : get(get), put(put), del(del), gra(gra), path(path){}
     bool operator<=(const OrgPermissionFlags &other) const;
     bool operator<(const OrgPermissionFlags &other) const;
 };
@@ -342,9 +342,9 @@ public:
 };
 
 RGWOrg* getAcl(const std::string& user, const std::string& path, bool isFullMatch = false);
-int putAcl(const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g);
-int deleteAcl(const std::string& user, const std::string& path);
-int checkAclWrite(const std::string& request_user, const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool r, bool w, bool x, bool g);
+int putAcl(const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool get, bool put, bool del, bool gra);
+int deleteAcl(const std::string& request_user, const std::string& user, const std::string& path);
+int checkAclWrite(const std::string& request_user, const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool get, bool put, bool del, bool gra);
 int checkAclRead(const std::string& request_user, const std::string& target_user);
 
 int checkHAclObjRead(const std::string& request_user, const std::string& bucket_name, const std::string& object_name);
@@ -373,7 +373,8 @@ std::string createAuthHeader(const std::string& accessKey, const std::string& da
                              const std::string& region, const std::string& service, 
                              const std::string& signedHeaders, const std::string& signature);
 
-bool validateRGWOrgPermission(std::string user, std::string path, bool r = false, bool w = false, bool x = false, bool g = false);
+bool validateRGWOrgPermission(std::string user, std::string path, bool get = false, bool put = false, bool del = false, bool gra = false);
+std::string makeResponse(int status);
 
 std::vector<std::string> str_split_to_vec(const std::string& s);
 std::string str_join(const std::vector<std::string>& v);

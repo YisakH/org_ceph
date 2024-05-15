@@ -290,6 +290,7 @@ public:
   ~RGWPutOrg_ObjStore_S3() override {}
 
   int get_params(optional_yield y) override;
+  int send_response_data(bufferlist &bl, off_t bl_ofs, off_t bl_len) override;
   void send_response() override;
 };
 

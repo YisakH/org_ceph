@@ -56,11 +56,11 @@ export class RgwHaclDetailsComponent implements OnInit {
     this.columns = [
       { prop: 'path', name: 'Path' },
       { prop: 'authorizer', name: 'Authorizer' },
-      { prop: 'tier', name: 'Tier' }, //No Tier
-      { prop: 'r', name: 'Get', pipe: this.booleanTextPipe },
-      { prop: 'w', name: 'Put', pipe: this.booleanTextPipe },
-      { prop: 'x', name: 'Del', pipe: this.booleanTextPipe },
-      { prop: 'g', name: 'Grant', pipe: this.booleanTextPipe }
+      //{ prop: 'tier', name: 'Tier' }, //No Tier
+      { prop: 'get', name: 'Get', pipe: this.booleanTextPipe },
+      { prop: 'put', name: 'Put', pipe: this.booleanTextPipe },
+      { prop: 'del', name: 'Del', pipe: this.booleanTextPipe },
+      { prop: 'gra', name: 'Grant', pipe: this.booleanTextPipe }
     ];
     
     this.loadHAclTreeData();

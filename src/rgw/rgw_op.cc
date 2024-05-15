@@ -4427,10 +4427,10 @@ int RGWPutOrg::verify_permission(optional_yield y)
     if(ret < 0){
       tier = 999;
     }
-    const bool &r = findValueForKey(s->http_params, "r") == "true";
-    const bool &w = findValueForKey(s->http_params, "w") == "true";
-    const bool &x = findValueForKey(s->http_params, "x") == "true";
-    const bool &g = findValueForKey(s->http_params, "g") == "true";
+    const bool &r = findValueForKey(s->http_params, "get") == "true";
+    const bool &w = findValueForKey(s->http_params, "put") == "true";
+    const bool &x = findValueForKey(s->http_params, "del") == "true";
+    const bool &g = findValueForKey(s->http_params, "gra") == "true";
     const auto &path = findValueForKey(s->http_params, "path");
 
     if (authorizer == "root")
@@ -4828,10 +4828,11 @@ void RGWDeleteOrg::execute(optional_yield y)
   int ret = -1;
 
   if (s->decoded_uri == "/admin/org/acl"){
+    const auto &request_user = s->user->get_id().id;
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &path = findValueForKey(s->http_params, "path");
     const auto &key = user + ":" + path;
-    ret = deleteAcl(user, path);
+    ret = deleteAcl(request_user, user, path);
   }else if(s->decoded_uri == "/admin/org/user"){
     const auto &user = findValueForKey(s->http_params, "user");
     ret = RGWOrgUser::deleteUser(user);
@@ -4992,6 +4993,7 @@ void RGWPutOrg::execute(optional_yield y)
   }
   
   int ret = -1;
+  bufferlist response_bl;
 
   if (s->decoded_uri == "/admin/org/acl")
   {
@@ -5005,10 +5007,10 @@ void RGWPutOrg::execute(optional_yield y)
     }
     //const auto &authorizer = findValueForKey(s->http_params, "authorizer");
     //const int &tier = stoi(findValueForKey(s->http_params, "tier"));
-    const bool &r = findValueForKey(s->http_params, "r") == "true";
-    const bool &w = findValueForKey(s->http_params, "w") == "true";
-    const bool &x = findValueForKey(s->http_params, "x") == "true";
-    const bool &g = findValueForKey(s->http_params, "g") == "true";
+    const bool &r = findValueForKey(s->http_params, "get") == "true";
+    const bool &w = findValueForKey(s->http_params, "put") == "true";
+    const bool &x = findValueForKey(s->http_params, "del") == "true";
+    const bool &g = findValueForKey(s->http_params, "gra") == "true";
     const auto &path = findValueForKey(s->http_params, "path");
 
     ret = putAcl(user, path, authorizer, tier, r, w, x, g);
@@ -5037,7 +5039,12 @@ void RGWPutOrg::execute(optional_yield y)
   else
   {
     dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : wrong uri" << dendl;
+    response_bl.append("wrong uri");
   }
+  string return_str = makeResponse(ret);
+  response_bl.append(return_str.c_str());
+  send_response_data(response_bl, 0, response_bl.length());
+
 
   dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : rocksdb ret = " << ret << dendl;
 }

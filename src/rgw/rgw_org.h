@@ -13,11 +13,12 @@
 #include <nlohmann/json.hpp>
 #include <filesystem>
 
-#define RGW_ORG_TIER_NOT_ALLOWED -30002
-#define RGW_ORG_PERMISSION_NOT_ALLOWED -30003
+#define RGW_ORG_TIER_NOT_ALLOWED 30002
+#define RGW_ORG_PERMISSION_NOT_ALLOWED 30003
 #define RGW_ORG_PERMISSION_ALLOWED 0
-#define RGW_ORG_KEY_NOT_FOUND -30004
-#define RGW_DB_ERROR -30005
+#define RGW_ORG_KEY_NOT_FOUND 30004
+#define RGW_DB_ERROR 30005
+#define RGW_HBAC_NO_PERMISSION 30006
 
 namespace rocksdb{
   class DB;
@@ -101,7 +102,7 @@ public:
             return 0;
         }
         else{
-            return RGW_DB_ERROR;
+            return -RGW_DB_ERROR;
         }
     }
 
@@ -346,6 +347,8 @@ int putAcl(const std::string& user, const std::string& path, const std::string& 
 int deleteAcl(const std::string& request_user, const std::string& user, const std::string& path);
 int checkAclWrite(const std::string& request_user, const std::string& user, const std::string& path, const std::string& authorizer, int tier, bool get, bool put, bool del, bool gra);
 int checkAclRead(const std::string& request_user, const std::string& target_user);
+// int를 반환하며 유저가 해당 퍼미션이 있는지 검사하는 함수
+int checkAclPermission(const std::string& request_user, const bool get, const bool put, const bool del, const bool gra, const std::string& path);
 
 int checkHAclObjRead(const std::string& request_user, const std::string& bucket_name, const std::string& object_name);
 int checkHAclObjWrite(const std::string& request_user, const std::string& bucket_name, const std::string& object_name);

@@ -131,8 +131,12 @@ rgw_http_errors rgw_http_s3_errors({
     { ERR_ZERO_IN_URL, {400, "InvalidRequest" }},
     { ERR_NO_SUCH_TAG_SET, {404, "NoSuchTagSet"}},
     { ERR_NO_SUCH_BUCKET_ENCRYPTION_CONFIGURATION, {404, "ServerSideEncryptionConfigurationNotFoundError"}},
-    { RGW_ORG_PERMISSION_NOT_ALLOWED, {400, "HBACPermissionNotAllowed"}},
-    { RGW_ORG_TIER_NOT_ALLOWED, {400, "HBACTierNotAllowed"}},
+
+    { RGW_ORG_PERMISSION_NOT_ALLOWED, {403, "HBACPermissionNotAllowed"}},
+    { RGW_ORG_TIER_NOT_ALLOWED, {403, "HBACTierNotAllowed"}},
+    { RGW_ORG_KEY_NOT_FOUND, {404, "HBACKeyNotFound"}},
+    { RGW_DB_ERROR, {404, "HBACRocksdbError"}},
+    { RGW_HBAC_NO_PERMISSION, {403, "HBACNoPermission"}},
 });
 
 rgw_http_errors rgw_http_swift_errors({

@@ -4427,23 +4427,23 @@ int RGWPutOrg::verify_permission(optional_yield y)
     if(ret < 0){
       tier = 999;
     }
-    const bool &r = findValueForKey(s->http_params, "get") == "true";
-    const bool &w = findValueForKey(s->http_params, "put") == "true";
-    const bool &x = findValueForKey(s->http_params, "del") == "true";
-    const bool &g = findValueForKey(s->http_params, "gra") == "true";
+    const bool &get = findValueForKey(s->http_params, "get") == "true";
+    const bool &put = findValueForKey(s->http_params, "put") == "true";
+    const bool &del = findValueForKey(s->http_params, "del") == "true";
+    const bool &gra = findValueForKey(s->http_params, "gra") == "true";
     const auto &path = findValueForKey(s->http_params, "path");
 
-    if (authorizer == "root")
-      return 1;
-    else
-      return checkAclWrite(authorizer, user, path, authorizer, tier, r, w, x, g);
-  }
-  else if (s->decoded_uri == "/admin/org/tier")
-  { // deprecated
-    return 1;
-  }
 
-  return 1;
+    // authorizer가 root인 경우 정상 반환하지만 그 외의 경우는 checkAclPermission, checkAclWrite를 통해 권한 검사
+    if (authorizer == "root")
+      return RGW_ORG_PERMISSION_ALLOWED;
+    else{
+      if ((ret = checkAclPermission(authorizer, get, put, del, gra, path))<0){
+        return ret;
+      }
+      return checkAclWrite(authorizer, user, path, authorizer, tier, get, put, del, gra);
+    }
+  }
 }
 
 int RGWGetOrg::verify_permission(optional_yield y)
@@ -4625,9 +4625,9 @@ int RGWPutObj::verify_permission(optional_yield y)
   int hacl_ret = checkHAclObjWrite(s->user->get_id().id, s->bucket->get_name(), s->object->get_name());
   dout(0) << "socks(putobj::verify_reqeuster): hacl_ret : " << hacl_ret << dendl;
 
-  if (hacl_ret != RGW_ORG_PERMISSION_ALLOWED)
+  if (hacl_ret != -RGW_ORG_PERMISSION_ALLOWED)
   {
-    if (hacl_ret == RGW_ORG_KEY_NOT_FOUND)
+    if (hacl_ret == -RGW_ORG_KEY_NOT_FOUND)
     {
       if (!verify_bucket_permission_no_policy(this, s, RGW_PERM_WRITE))
       {
@@ -4904,7 +4904,7 @@ std::string RGWGetOrg::callTreeDec(string user)
   if(ret == -1){
     return "error occured!";
   }
-  else if(ret == RGW_ORG_KEY_NOT_FOUND){
+  else if(ret == -RGW_ORG_KEY_NOT_FOUND){
     return "there are no dec user";
   }
   else{

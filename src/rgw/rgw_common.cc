@@ -137,6 +137,7 @@ rgw_http_errors rgw_http_s3_errors({
     { RGW_ORG_KEY_NOT_FOUND, {404, "HBACKeyNotFound"}},
     { RGW_DB_ERROR, {404, "HBACRocksdbError"}},
     { RGW_HBAC_NO_PERMISSION, {403, "HBACNoPermission"}},
+    { RGW_UNKNOWN_ERROR, {404, "HBACUnKnownError"}},
 });
 
 rgw_http_errors rgw_http_swift_errors({

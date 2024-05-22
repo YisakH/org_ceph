@@ -335,7 +335,7 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     if (existingRgwOrg != nullptr) {
         if (existingRgwOrg->getTier() < tier) {
             delete existingRgwOrg;
-            return -1; // 기존 권한의 티어가 더 낮으면 실패
+            return -RGW_ORG_TIER_NOT_ALLOWED; // 기존 권한의 티어가 더 낮으면 실패
         }
         delete existingRgwOrg;
     }
@@ -353,8 +353,10 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
     } else {
         // 기존 권한을 포함하는 경우
         int ret = aclDB.existPrefixAcl(user + ":" + path);
-        if (ret != 0) {
-            return ret; // 권한이 존재하지 않으면 반환
+        if (ret < 0) {
+            return ret;
+        }else if(ret == 1){
+
         }
     }
 

@@ -19,6 +19,7 @@
 #define RGW_ORG_KEY_NOT_FOUND 30004
 #define RGW_DB_ERROR 30005
 #define RGW_HBAC_NO_PERMISSION 30006
+#define RGW_UNKNOWN_ERROR 30001
 
 namespace rocksdb{
   class DB;
@@ -259,7 +260,7 @@ public:
             return 0;
         }
         else{
-            return -1;
+            return -RGW_UNKNOWN_ERROR;
         }
     }
 
@@ -271,7 +272,7 @@ public:
             return 0;
         }
         else{
-            return -1;
+            return -RGW_UNKNOWN_ERROR;
         }
     }
 
@@ -296,7 +297,7 @@ class RGWOrgAnc
             return 0;
         }
         else{
-            return -1;
+            return -RGW_UNKNOWN_ERROR;
         }
     }
 
@@ -308,7 +309,7 @@ class RGWOrgAnc
             return 0;
         }
         else{
-            return -1;
+            return -RGW_UNKNOWN_ERROR;
         }
     }
 };

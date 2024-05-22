@@ -5007,10 +5007,10 @@ void RGWPutOrg::execute(optional_yield y)
     }
     //const auto &authorizer = findValueForKey(s->http_params, "authorizer");
     //const int &tier = stoi(findValueForKey(s->http_params, "tier"));
-    const bool &r = findValueForKey(s->http_params, "get") == "true";
-    const bool &w = findValueForKey(s->http_params, "put") == "true";
-    const bool &x = findValueForKey(s->http_params, "del") == "true";
-    const bool &g = findValueForKey(s->http_params, "gra") == "true";
+    const bool r = findValueForKey(s->http_params, "get") == "true";
+    const bool w = findValueForKey(s->http_params, "put") == "true";
+    const bool x = findValueForKey(s->http_params, "del") == "true";
+    const bool g = findValueForKey(s->http_params, "gra") == "true";
     const auto &path = findValueForKey(s->http_params, "path");
 
     ret = putAcl(user, path, authorizer, tier, r, w, x, g);

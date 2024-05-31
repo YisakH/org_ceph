@@ -1178,6 +1178,9 @@ namespace
 
 int RGWGetObj::verify_permission(optional_yield y)
 {
+  // 시간 측정을 위한 변수 선언
+  auto start = std::chrono::high_resolution_clock::now();
+
   s->object->set_atomic();
 
   if (prefetch_data())
@@ -1211,8 +1214,10 @@ int RGWGetObj::verify_permission(optional_yield y)
       action = rgw::IAM::s3GetObjectVersion;
     }
   }
+  auto startTime = std::chrono::high_resolution_clock::now();
   int hacl_ret = checkHAclObjRead(s->user->get_id().id, s->bucket->get_name(), s->object->get_name());
-  dout(0) << "socks(getobj::verify_requester): hacl_ret : " << hacl_ret << dendl;
+  auto endTime = std::chrono::high_resolution_clock::now();
+  //dout(0) << "socks(getobj::verify_requester): hacl_ret : " << hacl_ret << dendl;
   
   if (hacl_ret != 0 && !verify_object_permission(this, s, action))
   {
@@ -1225,13 +1230,33 @@ int RGWGetObj::verify_permission(optional_yield y)
     get_legal_hold = verify_object_permission(this, s, rgw::IAM::s3GetObjectLegalHold);
   }
 
-  const string request_user = s->user->get_id().id;
-  const string bucket_name = s->bucket->get_name();
-  const string object_name = s->object->get_name();
+  //const std::string request_user = s->user->get_id().id;
+  //const std::string bucket_name = s->bucket->get_name();
+  //const std::string object_name = s->object->get_name();
   // dout(0) << "socks : request user name : " << s->user->get_id().id;
-  return checkHAclObjRead(request_user, bucket_name, object_name);
+  //int result = checkHAclObjRead(request_user, bucket_name, object_name);
 
-  return 0;
+  // 종료 시간 측정
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = end - start;
+
+  // 실행 시간 파일에 기록
+  std::ofstream logfile("execution_time.log", std::ios_base::app);
+  if (logfile.is_open())
+  {
+    logfile << "Execution time: " << elapsed.count() << " seconds\n";
+    logfile.close();
+  }
+
+  std::chrono::duration<double> duration = endTime - startTime;
+  std::ofstream logfile2("hacl_time.log", std::ios_base::app);
+  if (logfile2.is_open())
+  {
+    logfile2 << "HAcl Execution time: " << duration.count() << " milliseconds\n";
+    logfile2.close();
+  }
+
+  return hacl_ret;
 }
 
 RGWOp::~RGWOp(){};

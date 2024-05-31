@@ -352,11 +352,19 @@ int putAcl(const std::string &user, const std::string &path, const std::string &
         }
     } else {
         // 기존 권한을 포함하는 경우
-        int ret = aclDB.existPrefixAcl(user + ":" + path);
+        std::vector<std::pair<std::string, std::string>> values;
+        int ret = aclDB.existPrefixAcl(user + ":" + path, values);
         if (ret < 0) {
             return ret;
-        }else if(ret == 1){
-
+        }else if(values.size() > 0){
+            // 기존 권한 삭제
+            int srcTier = 0;
+            int ret = getTier(values[0].first, &srcTier);
+            if (srcTier < tier) {
+                return -RGW_ORG_TIER_NOT_ALLOWED; // 기존 권한의 티어가 더 낮으면 실패
+            }else{
+                aclDB.deleteData(values[0].first);
+            }
         }
     }
 
@@ -1126,8 +1134,7 @@ bool validateRGWOrgPermission(std::string user, std::string path, bool get, bool
     return true;
 }
 
-int AclDB::existPrefixAcl(const std::string& prefix){
-    std::vector<std::pair<std::string, std::string>> values;
+int AclDB::existPrefixAcl(const std::string& prefix, std::vector<std::pair<std::string, std::string>> &values){
     int ret = getAllPartialMatchData(prefix, values);
     if(ret == -1){
         return ret;
@@ -1265,7 +1272,7 @@ int RGWOrgDec::getRGWOrgDecTree(const std::string &start_user, nlohmann::json &j
 }
 
 std::string makeResponse(int status){
-    switch (status)
+    switch (-status)
     {
     case RGW_ORG_TIER_NOT_ALLOWED:
         return "RGW_HBAC_TIER_NOT_ALLOWED";

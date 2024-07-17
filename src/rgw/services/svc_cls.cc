@@ -11,6 +11,7 @@
 #include "cls/log/cls_log_client.h"
 #include "cls/lock/cls_lock_client.h"
 
+#include <chrono>
 
 #define dout_subsys ceph_subsys_rgw
 
@@ -186,18 +187,32 @@ int RGWSI_Cls::MFA::otp_get_current_time(const DoutPrefixProvider *dpp, const rg
 }
 
 int RGWSI_Cls::MFA::set_mfa(const DoutPrefixProvider *dpp, const string& oid, const list<rados::cls::otp::otp_info_t>& entries,
-			    bool reset_obj, RGWObjVersionTracker *objv_tracker,
-			    const real_time& mtime,
-			    optional_yield y)
-{
+                            bool reset_obj, RGWObjVersionTracker *objv_tracker,
+                            const real_time& mtime,
+                            optional_yield y) {
+  auto overall_start = chrono::system_clock::now(); // 전체 작업의 시작 시간
+
+  std::ofstream logfile("/tmp/time-mfa-set.log", std::ios::app);
+  chrono::microseconds duration;
+
+  // RADOS reference 가져오기
+  auto start = chrono::system_clock::now();
   rgw_rados_ref obj;
   int r = rgw_get_rados_ref(dpp, cls->rados,
-			    { cls->zone_svc->get_zone_params().otp_pool, oid },
-			    &obj);
+                            { cls->zone_svc->get_zone_params().otp_pool, oid },
+                            &obj);
+  auto end = chrono::system_clock::now();
+  duration = chrono::duration_cast<chrono::microseconds>(end - start);
+  logfile << "Get RADOS ref duration: " << duration.count() << " microseconds" << std::endl;
+
   if (r < 0) {
     ldpp_dout(dpp, 4) << "failed to open rados context for " << oid << dendl;
+    logfile.close();
     return r;
   }
+
+  // 객체 리셋 및 OTP 설정
+  start = chrono::system_clock::now();
   librados::ObjectWriteOperation op;
   if (reset_obj) {
     op.remove();
@@ -206,12 +221,28 @@ int RGWSI_Cls::MFA::set_mfa(const DoutPrefixProvider *dpp, const string& oid, co
   }
   prepare_mfa_write(&op, objv_tracker, mtime);
   rados::cls::otp::OTP::set(&op, entries);
+  end = chrono::system_clock::now();
+  duration = chrono::duration_cast<chrono::microseconds>(end - start);
+  logfile << "Prepare and set OTP duration: " << duration.count() << " microseconds" << std::endl;
+
+  // RADOS 작업 수행
+  start = chrono::system_clock::now();
   r = obj.operate(dpp, &op, y);
+  end = chrono::system_clock::now();
+  duration = chrono::duration_cast<chrono::microseconds>(end - start);
+  logfile << "RADOS operate duration: " << duration.count() << " microseconds" << std::endl;
+
   if (r < 0) {
     ldpp_dout(dpp, 20) << "OTP set entries.size()=" << entries.size() << " result=" << (int)r << dendl;
+    logfile.close();
     return r;
   }
 
+  auto overall_end = chrono::system_clock::now(); // 전체 작업의 종료 시간
+  duration = chrono::duration_cast<chrono::microseconds>(overall_end - overall_start);
+  logfile << "Total operation duration: " << duration.count() << " microseconds" << std::endl;
+
+  logfile.close();
   return 0;
 }
 

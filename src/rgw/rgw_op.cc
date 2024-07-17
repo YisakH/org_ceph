@@ -4422,23 +4422,8 @@ int RGWGetOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry
 
 int RGWPutOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
 {
-  /*std::string getAuthHeader(const std::string &secret_key, const std::string &host, const std::string &method, const std::string &canonicalUri, const std::string &canonicalQueryString,
-                        const std::string &signedHeaders);*/
-  const std::string request_method = s->info.env->get("REQUEST_METHOD");
-  const std::string request_uri = s->info.env->get("REQUEST_URI");
-  const std::string http_host = s->info.env->get("HTTP_HOST");
-  const std::string query_string = s->info.env->get("QUERY_STRING");
-  const std::string signedHeaders = "host;x-amz-content-sha256;x-amz-date";
-  const std::string access_key = "qwer";
-  const std::string secret_key = "qwer";
-
-  // getAuthHeader의 반환값을 직접 변수에 저장
-  std::string auth_header = getAuthHeader(access_key, secret_key, http_host, request_method, request_uri, query_string, signedHeaders);
-  s->hacl_auth.auth_header = auth_header;
-
-  int ret = RGWOp::verify_requester(auth_registry, y);
-  dout(0) << "socks : rgw_op.cc : RGWPutOrg::verify_requester() : verify requester return : " << ret << dendl;
-  return ret;
+  return RGWOp::verify_requester(auth_registry, y);
+  //dout(0) << "socks : rgw_op.cc : RGWPutOrg::verify_requester() : verify requester return : " << ret << dendl;
 }
 
 int RGWPutOrg::verify_permission(optional_yield y)

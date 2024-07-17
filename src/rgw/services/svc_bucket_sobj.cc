@@ -15,6 +15,8 @@
 #include "rgw_tools.h"
 #include "rgw_zone.h"
 
+#include <chrono>
+
 #define dout_subsys ceph_subsys_rgw
 
 #define RGW_BUCKET_INSTANCE_MD_PREFIX ".bucket.meta."
@@ -496,72 +498,76 @@ int RGWSI_Bucket_SObj::store_bucket_instance_info(RGWSI_Bucket_BI_Ctx& ctx,
                                                   optional_yield y,
                                                   const DoutPrefixProvider *dpp)
 {
-  bufferlist bl;
-  encode(info, bl);
+    std::ofstream logfile("/tmp/time-store.log", std::ios::app);
+    auto overall_start = chrono::system_clock::now();
+    auto start = chrono::system_clock::now();
+    auto end = start;
+    chrono::microseconds duration;
 
-  /*
-   * we might need some special handling if overwriting
-   */
-  RGWBucketInfo shared_bucket_info;
-  if (!orig_info && !exclusive) {  /* if exclusive, we're going to fail when try
-                                      to overwrite, so the whole check here is moot */
-    /*
-     * we're here because orig_info wasn't passed in
-     * we don't have info about what was there before, so need to fetch first
-     */
-    int r  = read_bucket_instance_info(ctx,
-                                       key,
-                                       &shared_bucket_info,
-                                       nullptr, nullptr,
-                                       y,
-                                       dpp,
-                                       nullptr, boost::none);
-    if (r < 0) {
-      if (r != -ENOENT) {
-        ldpp_dout(dpp, 0) << "ERROR: " << __func__ << "(): read_bucket_instance_info() of key=" << key << " returned r=" << r << dendl;
-        return r;
-      }
-    } else {
-      orig_info = &shared_bucket_info;
+    // Encoding the info
+    bufferlist bl;
+    encode(info, bl);
+    end = chrono::system_clock::now();
+    duration = chrono::duration_cast<chrono::microseconds>(end - start);
+    logfile << "Encoding duration: " << duration.count() << " microseconds" << std::endl;
+
+    start = chrono::system_clock::now();
+    RGWBucketInfo shared_bucket_info;
+    if (!orig_info && !exclusive) {
+        int r  = read_bucket_instance_info(ctx, key, &shared_bucket_info, nullptr, nullptr, y, dpp, nullptr, boost::none);
+        if (r < 0) {
+            if (r != -ENOENT) {
+                ldpp_dout(dpp, 0) << "ERROR: " << __func__ << "(): read_bucket_instance_info() of key=" << key << " returned r=" << r << dendl;
+                logfile.close();
+                return r;
+            }
+        } else {
+            orig_info = &shared_bucket_info;
+        }
     }
-  }
+    end = chrono::system_clock::now();
+    duration = chrono::duration_cast<chrono::microseconds>(end - start);
+    logfile << "Read bucket instance info duration: " << duration.count() << " microseconds" << std::endl;
 
-  if (orig_info && *orig_info && !exclusive) {
-    int r = svc.bi->handle_overwrite(dpp, info, *(orig_info.value()), y);
-    if (r < 0) {
-      ldpp_dout(dpp, 0) << "ERROR: " << __func__ << "(): svc.bi->handle_overwrite() of key=" << key << " returned r=" << r << dendl;
-      return r;
+    if (orig_info && *orig_info && !exclusive) {
+        start = chrono::system_clock::now();
+        int r = svc.bi->handle_overwrite(dpp, info, *(orig_info.value()), y);
+        if (r < 0) {
+            ldpp_dout(dpp, 0) << "ERROR: " << __func__ << "(): svc.bi->handle_overwrite() of key=" << key << " returned r=" << r << dendl;
+            logfile.close();
+            return r;
+        }
+        end = chrono::system_clock::now();
+        duration = chrono::duration_cast<chrono::microseconds>(end - start);
+        logfile << "Handle overwrite duration: " << duration.count() << " microseconds" << std::endl;
     }
-  }
 
-  RGWSI_MBSObj_PutParams params(bl, pattrs, mtime, exclusive);
+    // Storing bucket instance info
+    start = chrono::system_clock::now();
+    RGWSI_MBSObj_PutParams params(bl, pattrs, mtime, exclusive);
+    int ret = svc.meta_be->put(ctx.get(), key, params, &info.objv_tracker, y, dpp);
+    end = chrono::system_clock::now();
+    duration = chrono::duration_cast<chrono::microseconds>(end - start);
+    logfile << "Meta backend put duration: " << duration.count() << " microseconds" << std::endl;
 
-  int ret = svc.meta_be->put(ctx.get(), key, params, &info.objv_tracker, y, dpp);
-
-  if (ret >= 0) {
-    int r = svc.bucket_sync->handle_bi_update(dpp, info,
-                                              orig_info.value_or(nullptr),
-                                              y);
-    if (r < 0) {
-      return r;
+    if (ret >= 0) {
+        start = chrono::system_clock::now();
+        int r = svc.bucket_sync->handle_bi_update(dpp, info, orig_info.value_or(nullptr), y);
+        if (r < 0) {
+            logfile.close();
+            return r;
+        }
+        end = chrono::system_clock::now();
+        duration = chrono::duration_cast<chrono::microseconds>(end - start);
+        logfile << "Handle BI update duration: " << duration.count() << " microseconds" << std::endl;
     }
-  } else if (ret == -EEXIST) {
-    /* well, if it's exclusive we shouldn't overwrite it, because we might race with another
-     * bucket operation on this specific bucket (e.g., being synced from the master), but
-     * since bucket instance meta object is unique for this specific bucket instance, we don't
-     * need to return an error.
-     * A scenario where we'd get -EEXIST here, is in a multi-zone config, we're not on the
-     * master, creating a bucket, sending bucket creation to the master, we create the bucket
-     * locally, while in the sync thread we sync the new bucket.
-     */
-    ret = 0;
-  }
 
-  if (ret < 0) {
+    auto overall_end = chrono::system_clock::now();
+    duration = chrono::duration_cast<chrono::microseconds>(overall_end - overall_start);
+    logfile << "Total operation duration: " << duration.count() << " microseconds" << std::endl;
+
+    logfile.close();
     return ret;
-  }
-
-  return ret;
 }
 
 int RGWSI_Bucket_SObj::remove_bucket_instance_info(RGWSI_Bucket_BI_Ctx& ctx,

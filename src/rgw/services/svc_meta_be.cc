@@ -8,6 +8,8 @@
 
 #define dout_subsys ceph_subsys_rgw
 
+#include <chrono>
+
 using namespace std;
 
 RGWSI_MetaBackend::Context::~Context() {} // needed, even though destructor is pure virtual
@@ -84,7 +86,7 @@ int RGWSI_MetaBackend::do_mutate(RGWSI_MetaBackend::Context *ctx,
                                  const DoutPrefixProvider *dpp)
 {
   int ret;
-
+  auto start = std::chrono::system_clock::now();
   if (generic_prepare) {
     ret = prepare_mutate(ctx, key, mtime, objv_tracker, y, dpp);
     if (ret < 0 ||
@@ -92,20 +94,33 @@ int RGWSI_MetaBackend::do_mutate(RGWSI_MetaBackend::Context *ctx,
       return ret;
     }
   }
+  auto end = std::chrono::system_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  auto file = std::ofstream("/tmp/log-mutate.txt", std::ios_base::app | std::ios_base::out);
+  file << "prepare_mutate: " << duration.count() << " microseconds" << std::endl;
 
   RGWMetadataLogData log_data;
+  start = std::chrono::system_clock::now();
   ret = pre_modify(dpp, ctx, key, log_data, objv_tracker, op_type, y);
   if (ret < 0) {
     return ret;
   }
 
   ret = f();
+  end = std::chrono::system_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  file << "f: " << duration.count() << " microseconds" << std::endl;
 
   /* cascading ret into post_modify() */
 
+  start = std::chrono::system_clock::now();
   ret = post_modify(dpp, ctx, key, log_data, objv_tracker, ret, y);
   if (ret < 0)
     return ret;
+
+  end = std::chrono::system_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  file << "post_modify: " << duration.count() << " microseconds" << std::endl;
 
   return 0;
 }

@@ -24,6 +24,9 @@
 
 #include "services/svc_zone_utils.h"
 
+#include <chrono>
+#include <fstream>
+
 #define dout_subsys ceph_subsys_rgw
 
 using namespace std;
@@ -170,6 +173,8 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
                               rgw::sal::Driver* driver,
                               const bool skip_retarget)
 {
+  auto start_time = std::chrono::high_resolution_clock::now();  // 전체 처리 시작 시간 측정
+
   ldpp_dout(op, 2) << "init permissions" << dendl;
   int ret = handler->init_permissions(op, y);
   if (ret < 0) {
@@ -248,6 +253,10 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
   if (rate_limit(driver, s)) {
     return -ERR_RATE_LIMITED;
   }
+
+
+  auto end_time = std::chrono::high_resolution_clock::now(); // 종료 시간 기록
+
   ldpp_dout(op, 2) << "executing" << dendl;
   {
     auto span = tracing::rgw::tracer.add_span("execute", s->trace);
@@ -258,6 +267,14 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
 
   ldpp_dout(op, 2) << "completing" << dendl;
   op->complete();
+
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+
+  std::ofstream log_file("/tmp/time.log", std::ios::app); // 파일 열기
+  log_file << "authenticated Request processing time: " << duration << " milliseconds\n"; // 시간 로깅
+  log_file.close(); // 파일 닫기
+
+
 
   return 0;
 }
@@ -447,6 +464,7 @@ done:
       if (rc < 0) {
         ldpp_dout(op, 5) << "WARNING: failed to execute post request script. error: " << rc << dendl;
       }
+
     }
   }
 

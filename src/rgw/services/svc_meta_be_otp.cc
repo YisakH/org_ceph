@@ -67,6 +67,7 @@ int RGWSI_MetaBackend_OTP::put_entry(const DoutPrefixProvider *dpp,
                                      optional_yield y)
 {
   RGWSI_MBOTP_PutParams& params = static_cast<RGWSI_MBOTP_PutParams&>(_params);
+  __asm__("int $3"); // 이 줄을 추가하여 해당 위치에서 중단점을 강제로 트리거합니다. (GCC 기준)
 
   return cls_svc->mfa.set_mfa(dpp, key, params.devices, true, objv_tracker, params.mtime, y);
 }

@@ -60,6 +60,15 @@ public:
     bool operator<(const OrgPermissionFlags &other) const;
 };
 
+class HBACRadosManager
+{
+public:
+    int putData();
+    int getData();
+    int deleteData();
+    int updateData();
+};
+
 class DBManager
 {
 private:

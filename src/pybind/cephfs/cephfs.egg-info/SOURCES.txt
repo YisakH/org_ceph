@@ -1,0 +1,8 @@
+MANIFEST.in
+cephfs.c
+cephfs.pyx
+setup.py
+cephfs.egg-info/PKG-INFO
+cephfs.egg-info/SOURCES.txt
+cephfs.egg-info/dependency_links.txt
+cephfs.egg-info/top_level.txt

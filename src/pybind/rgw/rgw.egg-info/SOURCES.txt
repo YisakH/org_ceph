@@ -1,0 +1,8 @@
+MANIFEST.in
+rgw.c
+rgw.pyx
+setup.py
+rgw.egg-info/PKG-INFO
+rgw.egg-info/SOURCES.txt
+rgw.egg-info/dependency_links.txt
+rgw.egg-info/top_level.txt

@@ -1,0 +1,8 @@
+MANIFEST.in
+rbd.c
+rbd.pyx
+setup.py
+rbd.egg-info/PKG-INFO
+rbd.egg-info/SOURCES.txt
+rbd.egg-info/dependency_links.txt
+rbd.egg-info/top_level.txt

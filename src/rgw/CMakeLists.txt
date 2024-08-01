@@ -56,6 +56,7 @@ set(librgw_common_srcs
   services/svc_tier_rados.cc
   services/svc_user.cc
   services/svc_user_rados.cc
+  services/svc_hbac.cc
   services/svc_zone.cc
   services/svc_zone_utils.cc
   rgw_acl.cc

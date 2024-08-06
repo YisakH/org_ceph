@@ -498,75 +498,41 @@ int RGWSI_Bucket_SObj::store_bucket_instance_info(RGWSI_Bucket_BI_Ctx& ctx,
                                                   optional_yield y,
                                                   const DoutPrefixProvider *dpp)
 {
-    std::ofstream logfile("/tmp/time-store.log", std::ios::app);
-    auto overall_start = chrono::system_clock::now();
-    auto start = chrono::system_clock::now();
-    auto end = start;
-    chrono::microseconds duration;
-
     // Encoding the info
     bufferlist bl;
     encode(info, bl);
-    end = chrono::system_clock::now();
-    duration = chrono::duration_cast<chrono::microseconds>(end - start);
-    logfile << "Encoding duration: " << duration.count() << " microseconds" << std::endl;
-
-    start = chrono::system_clock::now();
+ 
     RGWBucketInfo shared_bucket_info;
     if (!orig_info && !exclusive) {
         int r  = read_bucket_instance_info(ctx, key, &shared_bucket_info, nullptr, nullptr, y, dpp, nullptr, boost::none);
         if (r < 0) {
             if (r != -ENOENT) {
                 ldpp_dout(dpp, 0) << "ERROR: " << __func__ << "(): read_bucket_instance_info() of key=" << key << " returned r=" << r << dendl;
-                logfile.close();
                 return r;
             }
         } else {
             orig_info = &shared_bucket_info;
         }
     }
-    end = chrono::system_clock::now();
-    duration = chrono::duration_cast<chrono::microseconds>(end - start);
-    logfile << "Read bucket instance info duration: " << duration.count() << " microseconds" << std::endl;
 
     if (orig_info && *orig_info && !exclusive) {
-        start = chrono::system_clock::now();
         int r = svc.bi->handle_overwrite(dpp, info, *(orig_info.value()), y);
         if (r < 0) {
             ldpp_dout(dpp, 0) << "ERROR: " << __func__ << "(): svc.bi->handle_overwrite() of key=" << key << " returned r=" << r << dendl;
-            logfile.close();
             return r;
         }
-        end = chrono::system_clock::now();
-        duration = chrono::duration_cast<chrono::microseconds>(end - start);
-        logfile << "Handle overwrite duration: " << duration.count() << " microseconds" << std::endl;
     }
 
     // Storing bucket instance info
-    start = chrono::system_clock::now();
     RGWSI_MBSObj_PutParams params(bl, pattrs, mtime, exclusive);
     int ret = svc.meta_be->put(ctx.get(), key, params, &info.objv_tracker, y, dpp);
-    end = chrono::system_clock::now();
-    duration = chrono::duration_cast<chrono::microseconds>(end - start);
-    logfile << "Meta backend put duration: " << duration.count() << " microseconds" << std::endl;
-
+    
     if (ret >= 0) {
-        start = chrono::system_clock::now();
         int r = svc.bucket_sync->handle_bi_update(dpp, info, orig_info.value_or(nullptr), y);
         if (r < 0) {
-            logfile.close();
             return r;
         }
-        end = chrono::system_clock::now();
-        duration = chrono::duration_cast<chrono::microseconds>(end - start);
-        logfile << "Handle BI update duration: " << duration.count() << " microseconds" << std::endl;
     }
-
-    auto overall_end = chrono::system_clock::now();
-    duration = chrono::duration_cast<chrono::microseconds>(overall_end - overall_start);
-    logfile << "Total operation duration: " << duration.count() << " microseconds" << std::endl;
-
-    logfile.close();
     return ret;
 }
 

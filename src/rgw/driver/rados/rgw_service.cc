@@ -434,10 +434,12 @@ int RGWCtl::init(RGWServices *_svc, rgw::sal::Driver* driver, const DoutPrefixPr
   meta.bucket_instance = _ctl.meta.bucket_instance.get();
   meta.otp = _ctl.meta.otp.get();
   meta.role = _ctl.meta.role.get();
+  meta.hbac = _ctl.meta.hbac.get();
 
   user = _ctl.user.get();
   bucket = _ctl.bucket.get();
   otp = _ctl.otp.get();
+  hbac = _ctl.hbac.get();
 
   r = meta.user->attach(meta.mgr);
   if (r < 0) {
@@ -468,6 +470,13 @@ int RGWCtl::init(RGWServices *_svc, rgw::sal::Driver* driver, const DoutPrefixPr
     ldout(cct, 0) << "ERROR: failed to start init otp ctl (" << cpp_strerror(-r) << dendl;
     return r;
   }
+
+  r = meta.hbac->attach(meta.mgr);
+  if (r < 0) {
+    ldout(cct, 0) << "ERROR: failed to start init hbac ctl (" << cpp_strerror(-r) << dendl;
+    return r;
+  }
+
   return 0;
 }
 

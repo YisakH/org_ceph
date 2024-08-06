@@ -37,6 +37,8 @@ class RGWGetUserHeader_CB;
 template <class T>
 class RGWChainedCacheImpl;
 
+
+
 class RGWSI_User_RADOS : public RGWSI_User
 {
   friend class PutOperation;

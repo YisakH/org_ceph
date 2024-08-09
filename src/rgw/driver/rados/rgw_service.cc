@@ -26,6 +26,8 @@
 #include "services/svc_sys_obj_core.h"
 #include "services/svc_user_rados.h"
 #include "services/svc_role_rados.h"
+#include "services/svc_hbac.h"
+#include "services/svc_hbac_sobj.h"
 
 #include "common/errno.h"
 
@@ -36,6 +38,7 @@
 #include "rgw_otp.h"
 #include "rgw_user.h"
 #include "rgw_role.h"
+#include "rgw_hbac.h"
 
 #define dout_subsys ceph_subsys_rgw
 
@@ -77,6 +80,7 @@ int RGWServices_Def::init(CephContext *cct,
   sysobj_core = std::make_unique<RGWSI_SysObj_Core>(cct);
   user_rados = std::make_unique<RGWSI_User_RADOS>(cct);
   role_rados = std::make_unique<RGWSI_Role_RADOS>(cct);
+  hbac = std::make_unique<RGWSI_HBAC_SObj>(cct);
   async_processor = std::make_unique<RGWAsyncRadosProcessor>(
     cct, cct->_conf->rgw_num_async_rados_threads);
 
@@ -120,6 +124,9 @@ int RGWServices_Def::init(CephContext *cct,
   user_rados->init(rados, zone.get(), sysobj.get(), sysobj_cache.get(),
                    meta.get(), meta_be_sobj.get(), sync_modules.get());
   role_rados->init(zone.get(), meta.get(), meta_be_sobj.get(), sysobj.get());
+
+  hbac->init(rados, zone.get(), sysobj.get(), sysobj_cache.get(),
+             meta.get(), meta_be_sobj.get(), sync_modules.get());
 
   can_shutdown = true;
 
@@ -252,6 +259,12 @@ int RGWServices_Def::init(CephContext *cct,
       return r;
     }
 
+    r = hbac->start(y, dpp);
+    if (r < 0) {
+      ldout(cct, 0) << "ERROR: failed to start hbac service (" << cpp_strerror(-r) << dendl;
+      return r;
+    }
+
   }
 
   /* cache or core services will be started by sysobj */
@@ -296,6 +309,7 @@ void RGWServices_Def::shutdown()
   quota->shutdown();
   zone_utils->shutdown();
   zone->shutdown();
+  hbac->shutdown();
   async_processor->stop();
 
   has_shutdown = true;
@@ -339,6 +353,7 @@ int RGWServices::do_init(CephContext *_cct, bool have_cache, bool raw,
   core = _svc.sysobj_core.get();
   user = _svc.user_rados.get();
   role = _svc.role_rados.get();
+  hbac = _svc.hbac.get();
   async_processor = _svc.async_processor.get();
 
   return 0;
@@ -377,6 +392,8 @@ int RGWCtlDef::init(RGWServices& svc, rgw::sal::Driver* driver, const DoutPrefix
 
   meta.user.reset(RGWUserMetaHandlerAllocator::alloc(svc.user));
 
+  //meta.hbac.reset(new RGWMetadataHandler(svc.hbac));
+
   auto sync_module = svc.sync_modules->get_sync_module();
   if (sync_module) {
     meta.bucket.reset(sync_module->alloc_bucket_meta_handler());
@@ -395,6 +412,9 @@ int RGWCtlDef::init(RGWServices& svc, rgw::sal::Driver* driver, const DoutPrefix
                                 svc.bucket_sync,
                                 svc.bi, svc.user));
   otp.reset(new RGWOTPCtl(svc.zone, svc.otp));
+  //hbac.reset(new RGWHBACCtl(svc.zone, svc.hbac));
+
+
 
   RGWBucketMetadataHandlerBase *bucket_meta_handler = static_cast<RGWBucketMetadataHandlerBase *>(meta.bucket.get());
   RGWBucketInstanceMetadataHandlerBase *bi_meta_handler = static_cast<RGWBucketInstanceMetadataHandlerBase *>(meta.bucket_instance.get());
@@ -413,6 +433,8 @@ int RGWCtlDef::init(RGWServices& svc, rgw::sal::Driver* driver, const DoutPrefix
                dpp);
 
   otp->init((RGWOTPMetadataHandler *)meta.otp.get());
+
+  hbac->init(bucket.get());
 
   return 0;
 }

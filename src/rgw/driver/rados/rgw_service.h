@@ -218,7 +218,7 @@ struct RGWCtl {
     RGWMetadataHandler *user{nullptr};
     RGWMetadataHandler *otp{nullptr};
     RGWMetadataHandler *role{nullptr};
-    RWGMetadataHandler *hbac{nullptr};
+    RGWMetadataHandler *hbac{nullptr};
   } meta;
 
   RGWUserCtl *user{nullptr};

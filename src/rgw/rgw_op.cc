@@ -536,6 +536,24 @@ static int read_obj_policy(const DoutPrefixProvider *dpp,
   return ret;
 }
 
+int rgw_build_hbac(const DoutPrefixProvider *dpp, rgw::sal::Driver* driver,
+           req_state* s, optional_yield y)
+{
+  int ret = 0;
+
+  std::unique_ptr<rgw::sal::Hbac> hbac;
+
+  ret = driver->create_hbac(dpp, &hbac, y);
+
+  if (ret < 0)
+  {
+    ldpp_dout(dpp, 0) << "NOTICE: couldn't get HBAC" << dendl;
+    return ret;
+  }
+
+  return ret;
+}
+
 /**
  * Get the AccessControlPolicy for an user, bucket or object off of disk.
  * s: The req_state to draw information from.

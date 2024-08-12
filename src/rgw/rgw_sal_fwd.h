@@ -34,6 +34,7 @@ namespace sal {
   class Driver;
   class User;
   class Bucket;
+  class Hbac;
   class BucketList;
   class Object;
   class MultipartUpload;

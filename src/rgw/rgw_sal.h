@@ -171,7 +171,8 @@ struct RGWObjState {
  * @brief Base abstractions and API for SAL
  */
 
-namespace rgw { namespace sal {
+namespace rgw { 
+  namespace sal {
 
 /**
  * @addtogroup RGWSAL
@@ -274,6 +275,11 @@ class Driver {
      * bucket must still be allocated to support bucket->create(). */
     virtual int load_bucket(const DoutPrefixProvider* dpp, const rgw_bucket& b,
                             std::unique_ptr<Bucket>* bucket, optional_yield y) = 0;
+    /** create hbac */
+    int create_hbac(const DoutPrefixProvider* dpp, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y){
+      
+      return 0;
+    }
     /** For multisite, this driver is the zone's master */
     virtual bool is_meta_master() = 0;
     /** Get zone info for this driver */
@@ -796,6 +802,14 @@ class Bucket {
 
     virtual bool operator==(const Bucket& b) const = 0;
     virtual bool operator!=(const Bucket& b) const = 0;
+};
+
+
+
+class Hbac {
+public:
+  Hbac() = default;
+  virtual ~Hbac() = default;
 };
 
 /**

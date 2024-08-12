@@ -2475,6 +2475,8 @@ extern int rgw_build_object_policies(const DoutPrefixProvider *dpp, rgw::sal::Dr
 				     req_state *s, bool prefetch_data, optional_yield y);
 extern void rgw_build_iam_environment(rgw::sal::Driver* driver,
 				      req_state* s);
+extern int rgw_build_hbac_policies(const DoutPrefixProvider *dpp, rgw::sal::Driver* driver,
+           req_state* s, optional_yield y);
 extern std::vector<rgw::IAM::Policy> get_iam_user_policy_from_attr(CephContext* cct,
                         std::map<std::string, bufferlist>& attrs,
                         const std::string& tenant);

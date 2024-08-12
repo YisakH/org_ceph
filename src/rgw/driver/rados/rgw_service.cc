@@ -434,6 +434,7 @@ int RGWCtlDef::init(RGWServices& svc, rgw::sal::Driver* driver, const DoutPrefix
 
   otp->init((RGWOTPMetadataHandler *)meta.otp.get());
 
+  // TODO: 이 코드가 맞는지 확인해봐야함
   hbac->init(bucket.get());
 
   return 0;

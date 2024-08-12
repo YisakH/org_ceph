@@ -22,8 +22,7 @@ public:
 
   int store_hbac_info(RGWSI_MetaBackend::Context *ctx,
                                 const string& key,
-                                const RGWUserInfo& info,
-                                RGWUserInfo *old_info,
+                                const RGWHbacInfo& info,
                                 RGWObjVersionTracker *objv_tracker,
                                 const real_time& mtime,
                                 bool exclusive,
@@ -33,11 +32,17 @@ public:
 
     int read_hbac_info(RGWSI_MetaBackend::Context *ctx,
                        const string& key,
-                       RGWUserInfo *info,
+                       RGWHbacInfo &info,
                        RGWObjVersionTracker * const objv_tracker,
                        real_time * const pmtime,
                        rgw_cache_entry_info * const cache_info,
                        std::map<std::string, bufferlist> * const pattrs,
                        optional_yield y,
                        const DoutPrefixProvider *dpp);
+
+    int remove_hbac_info(RGWSI_MetaBackend::Context *ctx,
+                         const string& key,
+                         RGWObjVersionTracker *objv_tracker,
+                         optional_yield y,
+                         const DoutPrefixProvider *dpp);
 };

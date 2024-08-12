@@ -552,6 +552,65 @@ struct RGWRateLimitInfo {
 };
 WRITE_CLASS_ENCODER(RGWRateLimitInfo)
 
+struct RGWHbacInfo
+{
+  std::string user;
+  std::string authorizer;
+
+  void encode(bufferlist& bl) const {
+    ENCODE_START(1, 1, bl);
+    encode(user, bl);
+    encode(authorizer, bl);
+    permissions.encode(bl); // PermissionFlags 필드 직렬화
+    ENCODE_FINISH(bl);
+  }
+
+  void decode(bufferlist::const_iterator& bl) {
+    DECODE_START(1, bl);
+    decode(user, bl);
+    decode(authorizer, bl);
+    permissions.decode(bl); // PermissionFlags 필드 디코딩
+    DECODE_FINISH(bl);
+  }
+
+  struct PermissionFlags{
+    bool get;
+    bool put;
+    bool del;
+    bool gra;
+    std::string path;
+    PermissionFlags() : get(false), put(false), del(false), gra(false), path(""){}
+    PermissionFlags(bool get, bool put, bool del, bool gra) : get(get), put(put), del(del), gra(gra) {}
+    PermissionFlags(bool get, bool put, bool del, bool gra, std::string path) : get(get), put(put), del(del), gra(gra), path(path){}
+    bool operator<=(const PermissionFlags &other) const;
+    bool operator<(const PermissionFlags &other) const;
+
+    void encode(bufferlist& bl) const {
+      ENCODE_START(1, 1, bl);
+      encode(get, bl);
+      encode(put, bl);
+      encode(del, bl);
+      encode(gra, bl);
+      encode(path, bl);
+      ENCODE_FINISH(bl);
+    }
+
+    void decode(bufferlist::const_iterator& bl) {
+      DECODE_START(1, bl);
+      decode(get, bl);
+      decode(put, bl);
+      decode(del, bl);
+      decode(gra, bl);
+      decode(path, bl);
+      DECODE_FINISH(bl);
+    }
+  }permissions;//WRITE_CLASS_ENCODER(PermissionFlags)
+
+  RGWHbacInfo() {}
+  RGWHbacInfo(const std::string& _user, const std::string& _authorizer, const PermissionFlags& _permissions)
+    : user(_user), authorizer(_authorizer), permissions(_permissions) {}
+};WRITE_CLASS_ENCODER(RGWHbacInfo)
+
 struct RGWUserInfo
 {
   rgw_user user_id;

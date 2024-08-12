@@ -28,6 +28,7 @@
 #include "rgw_sal.h"
 #include "rgw_sal_rados.h"
 #include "rgw_bucket.h"
+#include "rgw_hbac.h"
 #include "rgw_multi.h"
 #include "rgw_acl.h"
 #include "rgw_acl_s3.h"
@@ -487,6 +488,14 @@ int RadosBucket::remove_bypass_gc(int concurrent_max, bool
     ldpp_dout(dpp, -1) << "ERROR: could not remove bucket " << this << dendl;
     return ret;
   }
+
+  return ret;
+}
+
+int RadosHbac::load_hbac(const DoutPrefixProvider* dpp, optional_yield y)
+{
+  int ret = 0;
+  ret = store->ctl()->hbac->read_hbac(dpp,  y, info);
 
   return ret;
 }
@@ -982,6 +991,12 @@ std::unique_ptr<Bucket> RadosStore::get_bucket(const RGWBucketInfo& i)
 {
   /* Don't need to fetch the bucket info, use the provided one */
   return std::make_unique<RadosBucket>(this, i);
+}
+
+int RadosStore::load_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y)
+{
+  *hbac = std::make_unique<RadosHbac>(this, info);
+  return 0; (*hbac)->load_hbac(dpp, y);
 }
 
 int RadosStore::load_bucket(const DoutPrefixProvider* dpp, const rgw_bucket& b,

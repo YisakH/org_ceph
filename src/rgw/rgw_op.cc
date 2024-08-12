@@ -537,20 +537,17 @@ static int read_obj_policy(const DoutPrefixProvider *dpp,
 }
 
 int rgw_build_hbac(const DoutPrefixProvider *dpp, rgw::sal::Driver* driver,
-           req_state* s, optional_yield y)
+           req_state* s, optional_yield y, rgw_hbac_info& hbac_info)
 {
   int ret = 0;
 
-  std::unique_ptr<rgw::sal::Hbac> hbac;
-
-  ret = driver->create_hbac(dpp, &hbac, y);
+  ret = driver->load_hbac(dpp, hbac_info, &s->hbac, y);
 
   if (ret < 0)
   {
     ldpp_dout(dpp, 0) << "NOTICE: couldn't get HBAC" << dendl;
     return ret;
   }
-
   return ret;
 }
 

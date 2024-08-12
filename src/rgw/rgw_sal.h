@@ -276,10 +276,9 @@ class Driver {
     virtual int load_bucket(const DoutPrefixProvider* dpp, const rgw_bucket& b,
                             std::unique_ptr<Bucket>* bucket, optional_yield y) = 0;
     /** create hbac */
-    int create_hbac(const DoutPrefixProvider* dpp, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y){
-      
+    virtual int load_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y){
       return 0;
-    }
+    };
     /** For multisite, this driver is the zone's master */
     virtual bool is_meta_master() = 0;
     /** Get zone info for this driver */
@@ -808,8 +807,27 @@ class Bucket {
 
 class Hbac {
 public:
+  std::string user;
+  std::string authorizer = "root";
+  std::string path = "/";
+
+  struct PermissionFlags{
+    bool get;
+    bool put;
+    bool del;
+    bool gra;
+    std::string path;
+    PermissionFlags(bool get, bool put, bool del, bool gra) : get(get), put(put), del(del), gra(gra) {}
+    PermissionFlags(bool get, bool put, bool del, bool gra, std::string path) : get(get), put(put), del(del), gra(gra), path(path){}
+    PermissionFlags() : get(false), put(false), del(false), gra(false) {}
+    bool operator<=(const PermissionFlags &other) const;
+    bool operator<(const PermissionFlags &other) const;
+  }permission_flags;
+
   Hbac() = default;
-  virtual ~Hbac() = default;
+  Hbac(const rgw_hbac_info& info) : user(info.user), path(info.path) {}
+  ~Hbac() = default;
+  int load_hbac(const DoutPrefixProvider* dpp, optional_yield y);
 };
 
 /**

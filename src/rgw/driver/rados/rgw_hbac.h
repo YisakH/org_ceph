@@ -14,6 +14,9 @@
 #include "rgw_formats.h"
 #include "rgw_metadata.h"
 #include "rgw_sal_fwd.h"
+#include "rgw_common.h"
+#include "rgw_sal.h"
+#include "svc_hbac_sobj.h"
 
 class RGWHBACCtl{
 
@@ -21,12 +24,6 @@ class RGWHBACCtl{
     RGWSI_Zone *zone{nullptr};
     RGWSI_HBAC_SObj *hbac{nullptr};
   } svc;
-
-  struct Ctl {
-    RGWBucketCtl *bucket{nullptr};
-  } ctl;
-
-  RGWUserMetadataHandler *umhandler;
   RGWSI_MetaBackend_Handler *be_handler{nullptr};
 
 public:
@@ -37,12 +34,12 @@ public:
   }
 
   void init(RGWBucketCtl *bucket_ctl) {
-    ctl.bucket = bucket_ctl;
+    //ctl.bucket = bucket_ctl;
   }
 
-  RGWBucketCtl *get_bucket_ctl() {
-    return ctl.bucket;
-  }
+  //RGWBucketCtl *get_bucket_ctl() {
+    //return ctl.bucket;
+  //}
 
   struct GetParams {
     RGWObjVersionTracker *objv_tracker{nullptr};
@@ -121,14 +118,17 @@ public:
 
   int store_hbac(const DoutPrefixProvider *dpp,
                  optional_yield y,
+                 RGWHbacInfo& info,
                  const PutParams& params = {});
 
   int read_hbac(const DoutPrefixProvider *dpp,
                 optional_yield y,
+                RGWHbacInfo& info,
                 const GetParams& params = {});
   
   int remove_hbac(const DoutPrefixProvider *dpp,
                   optional_yield y,
+                  RGWHbacInfo& info,
                   const RemoveParams& params = {});
 
 };

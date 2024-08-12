@@ -194,6 +194,7 @@ set(librgw_common_srcs
   driver/rados/rgw_trim_mdlog.cc
   driver/rados/rgw_user.cc
   driver/rados/rgw_zone.cc
+  driver/rados/rgw_hbac.cc
   driver/rados/sync_fairness.cc
         rgw_org.h
         rgw_org.cpp

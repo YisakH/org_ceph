@@ -45,6 +45,16 @@ struct rgw_bucket_key {
                                              name(_name) {}
 };
 
+struct rgw_hbac_info{
+  std::string user;
+  std::string path;
+  std::string authorizer;
+
+  rgw_hbac_info(const std::string& _user,
+                const std::string& _path) : user(_user),
+                                             path(_path) {}
+};
+
 struct rgw_bucket {
   std::string tenant;
   std::string name;

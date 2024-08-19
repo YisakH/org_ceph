@@ -4469,6 +4469,7 @@ int RGWPutOrg::verify_permission(optional_yield y)
       return checkAclWrite(authorizer, user, path, authorizer, tier, get, put, del, gra);
     }
   }
+  return 0;
 }
 
 int RGWGetOrg::verify_permission(optional_yield y)
@@ -4953,6 +4954,7 @@ void RGWGetOrg::execute(optional_yield y)
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &path = findValueForKey(s->http_params, "path");
 
+    driver->load_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
     s->rgwOrg = getAcl(user, path);
 
     if(s->rgwOrg == nullptr){

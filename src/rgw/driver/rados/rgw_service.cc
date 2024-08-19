@@ -392,7 +392,7 @@ int RGWCtlDef::init(RGWServices& svc, rgw::sal::Driver* driver, const DoutPrefix
 
   meta.user.reset(RGWUserMetaHandlerAllocator::alloc(svc.user));
 
-  //meta.hbac.reset(new RGWMetadataHandler(svc.hbac));
+  meta.hbac.reset(RGWHbacMetaHandlerAllocator::alloc(svc.hbac));
 
   auto sync_module = svc.sync_modules->get_sync_module();
   if (sync_module) {
@@ -412,7 +412,7 @@ int RGWCtlDef::init(RGWServices& svc, rgw::sal::Driver* driver, const DoutPrefix
                                 svc.bucket_sync,
                                 svc.bi, svc.user));
   otp.reset(new RGWOTPCtl(svc.zone, svc.otp));
-  //hbac.reset(new RGWHBACCtl(svc.zone, svc.hbac));
+  hbac.reset(new RGWHbacCtl(svc.zone, svc.hbac));
 
 
 

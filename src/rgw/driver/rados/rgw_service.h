@@ -177,7 +177,7 @@ class RGWMetadataHandler;
 class RGWUserCtl;
 class RGWBucketCtl;
 class RGWOTPCtl;
-class RGWHBACCtl;
+class RGWHbacCtl;
 
 struct RGWCtlDef {
   struct _meta {
@@ -196,7 +196,7 @@ struct RGWCtlDef {
   std::unique_ptr<RGWUserCtl> user;
   std::unique_ptr<RGWBucketCtl> bucket;
   std::unique_ptr<RGWOTPCtl> otp;
-  std::unique_ptr<RGWHBACCtl> hbac;
+  std::unique_ptr<RGWHbacCtl> hbac;
 
   RGWCtlDef();
   ~RGWCtlDef();
@@ -224,7 +224,7 @@ struct RGWCtl {
   RGWUserCtl *user{nullptr};
   RGWBucketCtl *bucket{nullptr};
   RGWOTPCtl *otp{nullptr};
-  RGWHBACCtl *hbac{nullptr};
+  RGWHbacCtl *hbac{nullptr};
 
   int init(RGWServices *_svc, rgw::sal::Driver* driver, const DoutPrefixProvider *dpp);
 };

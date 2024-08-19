@@ -18,7 +18,7 @@
 #include "rgw_sal.h"
 #include "svc_hbac_sobj.h"
 
-class RGWHBACCtl{
+class RGWHbacCtl{
 
   struct Svc {
     RGWSI_Zone *zone{nullptr};
@@ -27,7 +27,7 @@ class RGWHBACCtl{
   RGWSI_MetaBackend_Handler *be_handler{nullptr};
 
 public:
-  RGWHBACCtl(RGWSI_Zone *zone_svc,
+  RGWHbacCtl(RGWSI_Zone *zone_svc,
              RGWSI_HBAC_SObj *hbac_svc) {
     svc.zone = zone_svc;
     svc.hbac = hbac_svc;
@@ -131,4 +131,17 @@ public:
                   RGWHbacInfo& info,
                   const RemoveParams& params = {});
 
+};
+
+class RGWHbacMetadataHandlerBase : public RGWMetadataHandler_GenericMetaBE{
+public:
+  virtual ~RGWHbacMetadataHandlerBase();
+  virtual void init(RGWSI_HBAC_SObj *hbac_svc,
+                    RGWHbacCtl *hbac_ctl);
+};
+
+
+class RGWHbacMetaHandlerAllocator{
+  public:
+  static RGWMetadataHandler *alloc(RGWSI_HBAC_SObj *hbac);
 };

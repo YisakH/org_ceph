@@ -18,20 +18,21 @@
 #include "rgw_sal.h"
 #include "svc_hbac_sobj.h"
 
-class RGWHbacCtl{
+class RGWHbacMetadataHandler;
 
+class RGWHbacCtl{
   struct Svc {
     RGWSI_Zone *zone{nullptr};
     RGWSI_HBAC_SObj *hbac{nullptr};
   } svc;
+
   RGWSI_MetaBackend_Handler *be_handler{nullptr};
+  RGWHbacMetadataHandler *hmhandler{nullptr};
 
 public:
   RGWHbacCtl(RGWSI_Zone *zone_svc,
-             RGWSI_HBAC_SObj *hbac_svc) {
-    svc.zone = zone_svc;
-    svc.hbac = hbac_svc;
-  }
+            RGWSI_HBAC_SObj *hbac_svc,
+            RGWHbacMetadataHandler *_hmhandler);
 
   void init(RGWBucketCtl *bucket_ctl) {
     //ctl.bucket = bucket_ctl;

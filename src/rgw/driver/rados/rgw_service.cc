@@ -391,8 +391,17 @@ int RGWCtlDef::init(RGWServices& svc, rgw::sal::Driver* driver, const DoutPrefix
   meta.mgr.reset(new RGWMetadataManager(svc.meta));
 
   meta.user.reset(RGWUserMetaHandlerAllocator::alloc(svc.user));
+  // /tmp/hbac_point.log에 svc.hbac이 가리키는 주소 저장
+  std::ofstream ofs("/tmp/hbac_point.log");
+  ofs << svc.hbac << std::endl;
+  ofs.close();
 
   meta.hbac.reset(RGWHbacMetaHandlerAllocator::alloc(svc.hbac));
+  
+  std::ofstream out("/tmp/RGWHbacMetaHandlerAllocator.log");
+  out << svc.hbac->get_be_handler() << std::endl;
+  out.close();
+
 
   auto sync_module = svc.sync_modules->get_sync_module();
   if (sync_module) {
@@ -412,8 +421,15 @@ int RGWCtlDef::init(RGWServices& svc, rgw::sal::Driver* driver, const DoutPrefix
                                 svc.bucket_sync,
                                 svc.bi, svc.user));
   otp.reset(new RGWOTPCtl(svc.zone, svc.otp));
-  hbac.reset(new RGWHbacCtl(svc.zone, svc.hbac));
+  hbac.reset(new RGWHbacCtl(svc.zone, svc.hbac, (RGWHbacMetadataHandler *)meta.hbac.get()));
 
+  std::ofstream ofs2("/tmp/meta_hbac_ctl.log");
+  ofs2 << meta.hbac.get() << std::endl;
+  ofs2.close();
+
+  //std::ofstream ofs3("/tmp/hbac_ctl_be_handler.log");
+  //ofs3 << ((RGWHbacMetadataHandler *)meta.hbac.get())->get_be_handler() << std::endl;
+  //ofs3.close();
 
 
   RGWBucketMetadataHandlerBase *bucket_meta_handler = static_cast<RGWBucketMetadataHandlerBase *>(meta.bucket.get());

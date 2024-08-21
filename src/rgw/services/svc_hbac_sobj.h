@@ -4,8 +4,13 @@
 
 using namespace std;
 
+struct rgw_cache_entry_info;
+template <class T>
+class RGWChainedCacheImpl;
+
 class RGWSI_HBAC_SObj : public RGWSI_User_RADOS
 {
+  RGWSI_MetaBackend_Handler *be_handler;
 public:
 
   struct Svc {
@@ -15,10 +20,37 @@ public:
     RGWSI_Meta *meta{nullptr};
     RGWSI_MetaBackend *meta_be{nullptr};
     RGWSI_SyncModules *sync_modules{nullptr};
+    RGWSI_HBAC_SObj *hbac{nullptr};
   } svc;
 
-    RGWSI_HBAC_SObj(CephContext *cct);
-    ~RGWSI_HBAC_SObj();
+  struct hbac_info_cache_entry {
+    RGWHbacInfo info;
+    RGWObjVersionTracker objv_tracker;
+    real_time mtime;
+  };
+
+  using RGWChainedCacheImpl_hbac_info_cache_entry = RGWChainedCacheImpl<hbac_info_cache_entry>;
+  std::unique_ptr<RGWChainedCacheImpl_hbac_info_cache_entry> hbac_info_cache;
+
+  RGWSI_HBAC_SObj(CephContext *cct);
+  ~RGWSI_HBAC_SObj();
+
+  void init(librados::Rados* rados_,
+                            RGWSI_Zone *_zone_svc, RGWSI_SysObj *_sysobj_svc,
+                            RGWSI_SysObj_Cache *_cache_svc, RGWSI_Meta *_meta_svc,
+                            RGWSI_MetaBackend *_meta_be_svc,
+                            RGWSI_SyncModules *_sync_modules_svc)
+{
+  svc.hbac = this;
+  rados = rados_;
+  svc.zone = _zone_svc;
+  svc.sysobj = _sysobj_svc;
+  svc.cache = _cache_svc;
+  svc.meta = _meta_svc;
+  svc.meta_be = _meta_be_svc;
+  svc.sync_modules = _sync_modules_svc;
+}
+  int do_start(optional_yield y, const DoutPrefixProvider *dpp) override;
 
   int store_hbac_info(RGWSI_MetaBackend::Context *ctx,
                                 const string& key,

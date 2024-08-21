@@ -2585,6 +2585,11 @@ RGWUserCtl::RGWUserCtl(RGWSI_Zone *zone_svc,
   svc.zone = zone_svc;
   svc.user = user_svc;
   be_handler = umhandler->get_be_handler();
+
+  // /tmp/rgwuserctl::rgwuserctl.log 열기
+  std::ofstream log_file("/tmp/rgwuserctl.log");
+  log_file << "be_handler: " << be_handler << std::endl;
+  log_file.close();
 }
 
 template <class T>

@@ -1,6 +1,8 @@
 #include "svc_hbac_sobj.h"
 #include "svc_meta_be_sobj.h"
 #include "svc_zone.h"
+#include "svc_meta.h"
+#include "svc_sys_obj_cache.h"
 
 RGWSI_HBAC_SObj::RGWSI_HBAC_SObj(CephContext *cct): RGWSI_User_RADOS(cct) {
 }
@@ -8,6 +10,20 @@ RGWSI_HBAC_SObj::RGWSI_HBAC_SObj(CephContext *cct): RGWSI_User_RADOS(cct) {
 RGWSI_HBAC_SObj::~RGWSI_HBAC_SObj() {
 }
 
+int RGWSI_HBAC_SObj::do_start(optional_yield y, const DoutPrefixProvider *dpp) {
+  hbac_info_cache.reset(new RGWChainedCacheImpl<hbac_info_cache_entry>);
+  hbac_info_cache->init(svc.cache);
+  
+  int r = svc.meta->create_be_handler(RGWSI_MetaBackend::Type::MDBE_SOBJ, &be_handler);
+  std::ofstream out("/tmp/RGWSI_HBAC_SObj_do_start_log.txt");
+  out << "be_handler value is:" << be_handler << std::endl; // 값 잘 나옴
+  out.close();
+  if (r < 0){
+    ldpp_dout(dpp, 0) << "ERROR: failed to create meta backend handler(RGWSI_HBAC_SObj::do_start()):" << r << dendl;
+    return r;
+  }
+  return 0;
+}
 
 int RGWSI_HBAC_SObj::store_hbac_info(RGWSI_MetaBackend::Context *ctx,
                                 const string& key,

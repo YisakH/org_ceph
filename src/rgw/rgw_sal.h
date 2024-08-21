@@ -826,8 +826,8 @@ public:
 
   Hbac() = default;
   Hbac(const rgw_hbac_info& info) : user(info.user), path(info.path) {}
-  ~Hbac() = default;
-  int load_hbac(const DoutPrefixProvider* dpp, optional_yield y);
+  virtual ~Hbac() = default;
+  virtual int load_hbac(const DoutPrefixProvider* dpp, optional_yield y) {return 0;};
 };
 
 /**

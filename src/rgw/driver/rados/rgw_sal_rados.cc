@@ -996,7 +996,7 @@ std::unique_ptr<Bucket> RadosStore::get_bucket(const RGWBucketInfo& i)
 int RadosStore::load_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y)
 {
   *hbac = std::make_unique<RadosHbac>(this, info);
-  return 0; (*hbac)->load_hbac(dpp, y);
+  return (*hbac)->load_hbac(dpp, y);
 }
 
 int RadosStore::load_bucket(const DoutPrefixProvider* dpp, const rgw_bucket& b,

@@ -2,7 +2,7 @@
 
 #users=("root" "president" "dean1" "dean2" "dean3" "chair1" "chair2" "chair3" "chair4" "chair5" "chair6" "chair7" "student1" "student2" "student3" "student4" "student5" "student6")
 #users=("x" "y" "z" "root" "president" "dean1" "dean2" "dean3" "chair1" "chair2" "chair3" "chair4" "chair5" "student1" "student2" "student3" "student4" "student5")
-users=("root" "president" "dean" "chair")
+users=("root" "president" "dean" "chair" "chair1" "dean1")
 
 BASEDIR="/org_ceph/org_ceph"
 cd $BASEDIR/build

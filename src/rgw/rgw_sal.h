@@ -275,8 +275,12 @@ class Driver {
      * bucket must still be allocated to support bucket->create(). */
     virtual int load_bucket(const DoutPrefixProvider* dpp, const rgw_bucket& b,
                             std::unique_ptr<Bucket>* bucket, optional_yield y) = 0;
-    /** create hbac */
+    /** get hbac */
     virtual int load_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y){
+      return 0;
+    };
+    /** store hbac */
+    virtual int store_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y){
       return 0;
     };
     /** For multisite, this driver is the zone's master */
@@ -828,6 +832,7 @@ public:
   Hbac(const rgw_hbac_info& info) : user(info.user), path(info.path) {}
   virtual ~Hbac() = default;
   virtual int load_hbac(const DoutPrefixProvider* dpp, optional_yield y) {return 0;};
+  virtual int store_hbac(const DoutPrefixProvider* dpp, optional_yield y) {return 0;};
 };
 
 /**

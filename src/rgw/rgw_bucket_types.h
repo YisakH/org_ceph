@@ -49,10 +49,36 @@ struct rgw_hbac_info{
   std::string user;
   std::string path;
   std::string authorizer;
+  struct permission{
+    bool get;
+    bool put;
+    bool del;
+    bool gra;
+
+    permission() : get(false), put(false), del(false), gra(false) {};
+    permission(bool _get, bool _put, bool _del, bool _gra) : get(_get),
+                                                             put(_put),
+                                                             del(_del),
+                                                             gra(_gra) {};
+  }perms;
 
   rgw_hbac_info(const std::string& _user,
                 const std::string& _path) : user(_user),
                                              path(_path) {}
+  
+  rgw_hbac_info(const std::string& _user,
+                const std::string& _path,
+                const std::string& _authorizer) : user(_user),
+                                                  path(_path),
+                                                  authorizer(_authorizer) {}
+  
+  rgw_hbac_info(const std::string& _user,
+                const std::string& _path,
+                const std::string& _authorizer,
+                const permission& _permission) : user(_user),
+                                                 path(_path),
+                                                 authorizer(_authorizer),
+                                                 perms(_permission) {}
 };
 
 struct rgw_bucket {

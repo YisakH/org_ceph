@@ -249,6 +249,7 @@ class RadosStore : public StoreDriver {
     void setUserCtl(RGWUserCtl *_ctl) { user_ctl = _ctl; }
 
     int load_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y) override;
+    int store_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y) override;
 };
 
 class RadosUser : public StoreUser {
@@ -480,6 +481,7 @@ class RadosHbac : public Hbac {
     ~RadosHbac() = default;
 
     int load_hbac(const DoutPrefixProvider* dpp, optional_yield y);
+    int store_hbac(const DoutPrefixProvider* dpp, optional_yield y);
 };
 
 class RadosBucket : public StoreBucket {

@@ -500,6 +500,11 @@ int RadosHbac::load_hbac(const DoutPrefixProvider* dpp, optional_yield y)
   return ret;
 }
 
+int RadosHbac::store_hbac(const DoutPrefixProvider* dpp, optional_yield y)
+{
+  return store->ctl()->hbac->store_hbac(dpp, y, info);
+}
+
 int RadosBucket::load_bucket(const DoutPrefixProvider* dpp, optional_yield y)
 {
   int ret;
@@ -997,6 +1002,12 @@ int RadosStore::load_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std
 {
   *hbac = std::make_unique<RadosHbac>(this, info);
   return (*hbac)->load_hbac(dpp, y);
+}
+
+int RadosStore::store_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y)
+{
+  *hbac = std::make_unique<RadosHbac>(this, info);
+  return (*hbac)->store_hbac(dpp, y);
 }
 
 int RadosStore::load_bucket(const DoutPrefixProvider* dpp, const rgw_bucket& b,

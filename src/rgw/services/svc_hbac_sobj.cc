@@ -89,7 +89,7 @@ int RGWSI_HBAC_SObj::store_hbac_info(RGWSI_MetaBackend::Context *ctx,
 
   RGWSI_MBSObj_PutParams params(bl, attrs, mtime, exclusive);
 
-  int ret = svc.meta_be->put(ctx, key, params, objv_tracker, y, dpp);
+  int ret = svc.meta_be->put(ctx, get_meta_key(info), params, objv_tracker, y, dpp);
   if (ret < 0) {
     return ret;
   }

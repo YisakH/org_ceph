@@ -609,6 +609,10 @@ struct RGWHbacInfo
   RGWHbacInfo() {}
   RGWHbacInfo(const std::string& _user, const std::string& _authorizer, const PermissionFlags& _permissions)
     : user(_user), authorizer(_authorizer), permissions(_permissions) {}
+  
+  std::string to_str() const {
+    return user + ":" + permissions.path;
+  }
 };WRITE_CLASS_ENCODER(RGWHbacInfo)
 
 struct RGWUserInfo

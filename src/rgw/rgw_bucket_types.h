@@ -79,6 +79,11 @@ struct rgw_hbac_info{
                                                  path(_path),
                                                  authorizer(_authorizer),
                                                  perms(_permission) {}
+  std::string to_str() const {
+    std::string s;
+    s = user + "$" + path;
+    return s;
+  }
 };
 
 struct rgw_bucket {

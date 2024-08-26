@@ -43,6 +43,10 @@ public:
     real_time mtime;
   };
 
+  static std::string get_meta_key(const RGWHbacInfo& info){
+    return info.to_str();
+  }
+
   using RGWChainedCacheImpl_hbac_info_cache_entry = RGWChainedCacheImpl<hbac_info_cache_entry>;
   std::unique_ptr<RGWChainedCacheImpl_hbac_info_cache_entry> hbac_info_cache;
 

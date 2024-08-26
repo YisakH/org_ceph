@@ -5044,6 +5044,10 @@ void RGWPutOrg::execute(optional_yield y)
     rgw_hbac_info::permission perms(get, put, del, gra);
 
     ret = driver->store_hbac(this, rgw_hbac_info(user, path, authorizer, perms), &s->hbac, y);
+    // ret의 실행 결과를 /tmp/org_execute.txt에 로그로 남김
+    std::ofstream out("/tmp/org_execute.txt");
+    out << ret << std::endl;
+    out.close();
 
     ret = putAcl(user, path, authorizer, tier, get, put, del, gra);
   }

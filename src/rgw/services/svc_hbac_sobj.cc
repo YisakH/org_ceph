@@ -115,7 +115,7 @@ int RGWSI_HBAC_SObj::read_hbac_info(RGWSI_MetaBackend::Context *ctx,
     params.set_cache_info(cache_info);
 
     // get_entry 호출로 HBAC 정보를 읽어옴
-    int ret = svc.meta_be->get_entry(ctx, key, params, objv_tracker, y, dpp);
+    int ret = svc.meta_be->get_entry(ctx, get_meta_key(info), params, objv_tracker, y, dpp);
     if (ret < 0) {
         // 만약 실패하면, 오류 코드를 반환
         return ret;

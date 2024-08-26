@@ -4954,7 +4954,7 @@ void RGWGetOrg::execute(optional_yield y)
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &path = findValueForKey(s->http_params, "path");
 
-    driver->load_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
+    //driver->load_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
     s->rgwOrg = getAcl(user, path);
 
     if(s->rgwOrg == nullptr){
@@ -5043,7 +5043,7 @@ void RGWPutOrg::execute(optional_yield y)
 
     rgw_hbac_info::permission perms(get, put, del, gra);
 
-    ret = driver->store_hbac(this, rgw_hbac_info(user, path, authorizer, perms), &s->hbac, y);
+    //ret = driver->store_hbac(this, rgw_hbac_info(user, path, authorizer, perms), &s->hbac, y);
 
     ret = putAcl(user, path, authorizer, tier, get, put, del, gra);
   }

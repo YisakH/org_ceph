@@ -4954,7 +4954,7 @@ void RGWGetOrg::execute(optional_yield y)
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &path = findValueForKey(s->http_params, "path");
 
-    driver->load_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
+    //driver->load_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
     s->rgwOrg = getAcl(user, path);
 
     if(s->rgwOrg == nullptr){

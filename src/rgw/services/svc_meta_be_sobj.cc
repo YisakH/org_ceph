@@ -109,6 +109,10 @@ int RGWSI_MetaBackend_SObj::call(std::optional<RGWSI_MetaBackend_CtxParams> opt,
 void RGWSI_MetaBackend_SObj::Context_SObj::init(RGWSI_MetaBackend_Handler *h)
 {
   RGWSI_MetaBackend_Handler_SObj *handler = static_cast<RGWSI_MetaBackend_Handler_SObj *>(h);
+  std::ofstream out("/tmp/RGWSI_MetaBackend_SObj_Context_SObj_init_log.txt");
+  out << "handler value: " << handler << std::endl;
+  out << "handler module value: " << handler->module << std::endl;
+  out.close();
   module = handler->module;
 }
 

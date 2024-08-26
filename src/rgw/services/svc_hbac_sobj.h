@@ -1,17 +1,31 @@
 #pragma once
 
-#include "svc_user_rados.h"
+#include "rgw_service.h"
+#include "svc_meta_be.h"
+
+#define RGW_BUCKETS_OBJ_SUFFIX ".buckets"
 
 using namespace std;
+
+
 
 struct rgw_cache_entry_info;
 template <class T>
 class RGWChainedCacheImpl;
+class RGWSI_Zone;
+class RGWSI_SysObj;
+class RGWSI_SysObj_Cache;
+class RGWSI_Meta;
+class RGWSI_SyncModules;
+class RGWSI_MetaBackend_Handler;
+class RGWSI_MBSObj_Handler_Module;
 
-class RGWSI_HBAC_SObj : public RGWSI_User_RADOS
+class RGWSI_HBAC_SObj : public RGWServiceInstance
 {
   RGWSI_MetaBackend_Handler *be_handler;
+  std::unique_ptr<RGWSI_MetaBackend::Module> be_module;
 public:
+    librados::Rados* rados{nullptr};
 
   struct Svc {
     RGWSI_Zone *zone{nullptr};
@@ -50,6 +64,9 @@ public:
   svc.meta_be = _meta_be_svc;
   svc.sync_modules = _sync_modules_svc;
 }
+    RGWSI_MetaBackend_Handler *get_be_handler(){
+        return be_handler;
+    }
   int do_start(optional_yield y, const DoutPrefixProvider *dpp) override;
 
   int store_hbac_info(RGWSI_MetaBackend::Context *ctx,
@@ -77,4 +94,6 @@ public:
                          RGWObjVersionTracker *objv_tracker,
                          optional_yield y,
                          const DoutPrefixProvider *dpp);
+
+
 };

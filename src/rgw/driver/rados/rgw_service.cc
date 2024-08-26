@@ -127,7 +127,7 @@ int RGWServices_Def::init(CephContext *cct,
 
   hbac->init(rados, zone.get(), sysobj.get(), sysobj_cache.get(),
              meta.get(), meta_be_sobj.get(), sync_modules.get());
-
+  
   can_shutdown = true;
 
   int r = finisher->start(y, dpp);
@@ -264,6 +264,9 @@ int RGWServices_Def::init(CephContext *cct,
       ldout(cct, 0) << "ERROR: failed to start hbac service (" << cpp_strerror(-r) << dendl;
       return r;
     }
+    std::ofstream out("/tmp/hbac_start_result.log");
+    out << hbac->get_be_handler() << std::endl;
+    out.close();
 
   }
 

@@ -1,10 +1,53 @@
 #include "svc_hbac_sobj.h"
-#include "svc_meta_be_sobj.h"
 #include "svc_zone.h"
-#include "svc_meta.h"
+#include "svc_sys_obj.h"
 #include "svc_sys_obj_cache.h"
+#include "svc_meta.h"
+#include "svc_meta_be_sobj.h"
+#include "svc_sync_modules.h"
 
-RGWSI_HBAC_SObj::RGWSI_HBAC_SObj(CephContext *cct): RGWSI_User_RADOS(cct) {
+#include "rgw_user.h"
+#include "rgw_bucket.h"
+#include "rgw_tools.h"
+#include "rgw_zone.h"
+#include "rgw_rados.h"
+
+
+class RGWSI_Hbac_Module : public RGWSI_MBSObj_Handler_Module {
+  RGWSI_HBAC_SObj::Svc& svc;
+  const string prefix;
+public:
+  RGWSI_Hbac_Module(RGWSI_HBAC_SObj::Svc& _svc) : RGWSI_MBSObj_Handler_Module("hbac"),
+                                                   svc(_svc) {}
+  void get_pool_and_oid(const string& key, rgw_pool *pool, string *oid) override {
+    if (pool) {
+      *pool = svc.zone->get_zone_params().user_uid_pool;
+    }
+    if (oid) {
+      *oid = key;
+    }
+  }
+
+  const string& get_oid_prefix() override {
+    return prefix;
+  }
+
+  bool is_valid_oid(const string& oid) override {
+    // filter out the user.buckets objects
+    return !boost::algorithm::ends_with(oid, RGW_BUCKETS_OBJ_SUFFIX);
+  }
+
+  string key_to_oid(const string& key) override {
+    return key;
+  }
+
+  string oid_to_key(const string& oid) override {
+    return oid;
+  }
+};
+
+
+RGWSI_HBAC_SObj::RGWSI_HBAC_SObj(CephContext *cct): RGWServiceInstance(cct) {
 }
 
 RGWSI_HBAC_SObj::~RGWSI_HBAC_SObj() {
@@ -22,6 +65,12 @@ int RGWSI_HBAC_SObj::do_start(optional_yield y, const DoutPrefixProvider *dpp) {
     ldpp_dout(dpp, 0) << "ERROR: failed to create meta backend handler(RGWSI_HBAC_SObj::do_start()):" << r << dendl;
     return r;
   }
+
+  RGWSI_MetaBackend_Handler_SObj *bh = static_cast<RGWSI_MetaBackend_Handler_SObj *>(be_handler);
+
+  auto module = new RGWSI_Hbac_Module(svc);
+  be_module.reset(module);
+  bh->set_module(module);
   return 0;
 }
 

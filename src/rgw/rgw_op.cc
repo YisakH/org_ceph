@@ -4858,7 +4858,9 @@ void RGWDeleteOrg::execute(optional_yield y)
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &path = findValueForKey(s->http_params, "path");
     const auto &key = user + ":" + path;
+    
     ret = deleteAcl(request_user, user, path);
+    ret = driver->remove_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
   }else if(s->decoded_uri == "/admin/org/user"){
     const auto &user = findValueForKey(s->http_params, "user");
     ret = RGWOrgUser::deleteUser(user);
@@ -4954,8 +4956,11 @@ void RGWGetOrg::execute(optional_yield y)
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &path = findValueForKey(s->http_params, "path");
 
-    //driver->load_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
+    ret = driver->load_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
     s->rgwOrg = getAcl(user, path);
+
+    std::string tmp = s->hbac->user;
+    bool get = s->hbac->permission_flags.get;
 
     if(s->rgwOrg == nullptr){
       response_bl.append("there are no request user");

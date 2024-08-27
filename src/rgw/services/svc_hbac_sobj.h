@@ -95,6 +95,7 @@ public:
 
     int remove_hbac_info(RGWSI_MetaBackend::Context *ctx,
                          const string& key,
+                        RGWHbacInfo &info,
                          RGWObjVersionTracker *objv_tracker,
                          optional_yield y,
                          const DoutPrefixProvider *dpp);

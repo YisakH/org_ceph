@@ -283,6 +283,9 @@ class Driver {
     virtual int store_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y){
       return 0;
     };
+    virtual int remove_hbac(const DoutPrefixProvider* dpp, rgw_hbac_info info, std::unique_ptr<rgw::sal::Hbac>* hbac, optional_yield y){
+      return 0;
+    };
     /** For multisite, this driver is the zone's master */
     virtual bool is_meta_master() = 0;
     /** Get zone info for this driver */
@@ -829,10 +832,16 @@ public:
   }permission_flags;
 
   Hbac() = default;
-  Hbac(const rgw_hbac_info& info) : user(info.user), path(info.path) {}
+  Hbac(const rgw_hbac_info& info) : user(info.user), authorizer(info.authorizer), path(info.path){
+    permission_flags.get = info.perms.get;
+    permission_flags.put = info.perms.put;
+    permission_flags.del = info.perms.del;
+    permission_flags.gra = info.perms.gra;
+  }
   virtual ~Hbac() = default;
   virtual int load_hbac(const DoutPrefixProvider* dpp, optional_yield y) {return 0;};
   virtual int store_hbac(const DoutPrefixProvider* dpp, optional_yield y) {return 0;};
+  virtual int remove_hbac(const DoutPrefixProvider* dpp, optional_yield y) {return 0;};
 };
 
 /**

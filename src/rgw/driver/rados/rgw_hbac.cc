@@ -35,6 +35,20 @@ int RGWHbacCtl::read_hbac(const DoutPrefixProvider *dpp,
   });
 }
 
+int RGWHbacCtl::remove_hbac(const DoutPrefixProvider *dpp,
+                  optional_yield y,
+                  RGWHbacInfo& info,
+                  const RemoveParams& params)
+{
+  return be_handler->call([&](RGWSI_MetaBackend_Handler::Op *op) {
+    return svc.hbac->remove_hbac_info(op->ctx(), "key",
+                                      info,
+                                      params.objv_tracker,
+                                      y,
+                                      dpp);
+  });
+}
+
 class RGWHbacMetadataHandler : public RGWMetadataHandler_GenericMetaBE{
   public:
   struct Svc {

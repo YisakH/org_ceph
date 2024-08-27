@@ -139,6 +139,7 @@ int RGWSI_HBAC_SObj::read_hbac_info(RGWSI_MetaBackend::Context *ctx,
 
 int RGWSI_HBAC_SObj::remove_hbac_info(RGWSI_MetaBackend::Context *ctx,
                                       const string& key,
+                                      RGWHbacInfo &info,
                                       RGWObjVersionTracker *objv_tracker,
                                       optional_yield y,
                                       const DoutPrefixProvider *dpp)
@@ -146,7 +147,7 @@ int RGWSI_HBAC_SObj::remove_hbac_info(RGWSI_MetaBackend::Context *ctx,
     // HBAC 정보를 삭제하기 위해 remove_entry 호출
 
     RGWSI_MBSObj_RemoveParams remove_params;
-    int ret = svc.meta_be->remove_entry(dpp, ctx, key, remove_params, objv_tracker, y);
+    int ret = svc.meta_be->remove_entry(dpp, ctx, get_meta_key(info), remove_params, objv_tracker, y);
     if (ret < 0) {
         // 만약 실패하면, 오류 코드를 반환
         return ret;

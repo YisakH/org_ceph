@@ -609,6 +609,15 @@ struct RGWHbacInfo
   RGWHbacInfo() {}
   RGWHbacInfo(const std::string& _user, const std::string& _authorizer, const PermissionFlags& _permissions)
     : user(_user), authorizer(_authorizer), permissions(_permissions) {}
+  RGWHbacInfo(const rgw_hbac_info& info) {
+    user = info.user;
+    authorizer = info.authorizer;
+    permissions.get = info.perms.get;
+    permissions.put = info.perms.put;
+    permissions.del = info.perms.del;
+    permissions.gra = info.perms.gra;
+    permissions.path = info.path;
+  }
   
   std::string to_str() const {
     return user + ":" + permissions.path;

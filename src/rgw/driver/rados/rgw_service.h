@@ -3,9 +3,9 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 #include "common/async/yield_context.h"
 
@@ -13,8 +13,7 @@
 
 struct RGWServices_Def;
 
-class RGWServiceInstance
-{
+class RGWServiceInstance {
   friend struct RGWServices_Def;
 
 protected:
@@ -30,18 +29,15 @@ protected:
   virtual int do_start(optional_yield, const DoutPrefixProvider *dpp) {
     return 0;
   }
+
 public:
   RGWServiceInstance(CephContext *_cct) : cct(_cct) {}
   virtual ~RGWServiceInstance();
 
   int start(optional_yield y, const DoutPrefixProvider *dpp);
-  bool is_started() {
-    return (start_state == StateStarted);
-  }
+  bool is_started() { return (start_state == StateStarted); }
 
-  CephContext *ctx() {
-    return cct;
-  }
+  CephContext *ctx() { return cct; }
 };
 
 class RGWSI_Finisher;
@@ -76,8 +72,7 @@ class RGWSI_Role_RADOS;
 class RGWSI_HBAC_SObj;
 class RGWAsyncRadosProcessor;
 
-struct RGWServices_Def
-{
+struct RGWServices_Def {
   bool can_shutdown{false};
   bool has_shutdown{false};
 
@@ -111,14 +106,12 @@ struct RGWServices_Def
   ~RGWServices_Def();
 
   int init(CephContext *cct, bool have_cache, bool raw_storage, bool run_sync,
-	   librados::Rados* rados, optional_yield y,
-	   const DoutPrefixProvider *dpp);
+           librados::Rados *rados, optional_yield y,
+           const DoutPrefixProvider *dpp);
   void shutdown();
 };
 
-
-struct RGWServices
-{
+struct RGWServices {
   RGWServices_Def _svc;
 
   CephContext *cct;
@@ -151,25 +144,23 @@ struct RGWServices
   RGWSI_User *user{nullptr};
   RGWSI_Role_RADOS *role{nullptr};
   RGWSI_HBAC_SObj *hbac{nullptr};
-  RGWAsyncRadosProcessor* async_processor;
+  RGWAsyncRadosProcessor *async_processor;
 
   int do_init(CephContext *cct, bool have_cache, bool raw_storage,
-	      bool run_sync, librados::Rados* rados, optional_yield y,
-	      const DoutPrefixProvider *dpp);
+              bool run_sync, librados::Rados *rados, optional_yield y,
+              const DoutPrefixProvider *dpp);
 
   int init(CephContext *cct, bool have_cache, bool run_sync,
-	   librados::Rados* rados, optional_yield y,
-	   const DoutPrefixProvider *dpp) {
+           librados::Rados *rados, optional_yield y,
+           const DoutPrefixProvider *dpp) {
     return do_init(cct, have_cache, false, run_sync, rados, y, dpp);
   }
 
-  int init_raw(CephContext *cct, bool have_cache, librados::Rados* rados,
-	       optional_yield y, const DoutPrefixProvider *dpp) {
+  int init_raw(CephContext *cct, bool have_cache, librados::Rados *rados,
+               optional_yield y, const DoutPrefixProvider *dpp) {
     return do_init(cct, have_cache, true, false, rados, y, dpp);
   }
-  void shutdown() {
-    _svc.shutdown();
-  }
+  void shutdown() { _svc.shutdown(); }
 };
 
 class RGWMetadataManager;
@@ -201,7 +192,8 @@ struct RGWCtlDef {
   RGWCtlDef();
   ~RGWCtlDef();
 
-  int init(RGWServices& svc, rgw::sal::Driver* driver, const DoutPrefixProvider *dpp);
+  int init(RGWServices &svc, rgw::sal::Driver *driver,
+           const DoutPrefixProvider *dpp);
 };
 
 struct RGWCtl {
@@ -226,5 +218,6 @@ struct RGWCtl {
   RGWOTPCtl *otp{nullptr};
   RGWHbacCtl *hbac{nullptr};
 
-  int init(RGWServices *_svc, rgw::sal::Driver* driver, const DoutPrefixProvider *dpp);
+  int init(RGWServices *_svc, rgw::sal::Driver *driver,
+           const DoutPrefixProvider *dpp);
 };

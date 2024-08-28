@@ -1,8 +1,8 @@
 #pragma once
 
-#include <string>
-#include <boost/algorithm/string.hpp>
 #include "include/ceph_assert.h"
+#include <boost/algorithm/string.hpp>
+#include <string>
 
 #include "include/types.h"
 #include "rgw_common.h"
@@ -11,16 +11,16 @@
 #include "rgw_string.h"
 
 #include "common/Formatter.h"
+#include "rgw_common.h"
 #include "rgw_formats.h"
 #include "rgw_metadata.h"
-#include "rgw_sal_fwd.h"
-#include "rgw_common.h"
 #include "rgw_sal.h"
+#include "rgw_sal_fwd.h"
 #include "svc_hbac_sobj.h"
 
 class RGWHbacMetadataHandler;
 
-class RGWHbacCtl{
+class RGWHbacCtl {
   struct Svc {
     RGWSI_Zone *zone{nullptr};
     RGWSI_HBAC_SObj *hbac{nullptr};
@@ -30,16 +30,15 @@ class RGWHbacCtl{
   RGWHbacMetadataHandler *hmhandler{nullptr};
 
 public:
-  RGWHbacCtl(RGWSI_Zone *zone_svc,
-            RGWSI_HBAC_SObj *hbac_svc,
-            RGWHbacMetadataHandler *_hmhandler);
+  RGWHbacCtl(RGWSI_Zone *zone_svc, RGWSI_HBAC_SObj *hbac_svc,
+             RGWHbacMetadataHandler *_hmhandler);
 
   void init(RGWBucketCtl *bucket_ctl) {
-    //ctl.bucket = bucket_ctl;
+    // ctl.bucket = bucket_ctl;
   }
 
-  //RGWBucketCtl *get_bucket_ctl() {
-    //return ctl.bucket;
+  // RGWBucketCtl *get_bucket_ctl() {
+  // return ctl.bucket;
   //}
 
   struct GetParams {
@@ -50,22 +49,22 @@ public:
 
     GetParams() {}
 
-    GetParams& set_objv_tracker(RGWObjVersionTracker *_objv_tracker) {
+    GetParams &set_objv_tracker(RGWObjVersionTracker *_objv_tracker) {
       objv_tracker = _objv_tracker;
       return *this;
     }
 
-    GetParams& set_mtime(ceph::real_time *_mtime) {
+    GetParams &set_mtime(ceph::real_time *_mtime) {
       mtime = _mtime;
       return *this;
     }
 
-    GetParams& set_cache_info(rgw_cache_entry_info *_cache_info) {
+    GetParams &set_cache_info(rgw_cache_entry_info *_cache_info) {
       cache_info = _cache_info;
       return *this;
     }
 
-    GetParams& set_attrs(std::map<std::string, bufferlist> *_attrs) {
+    GetParams &set_attrs(std::map<std::string, bufferlist> *_attrs) {
       attrs = _attrs;
       return *this;
     }
@@ -80,27 +79,27 @@ public:
 
     PutParams() {}
 
-    PutParams& set_old_info(RGWUserInfo *_info) {
+    PutParams &set_old_info(RGWUserInfo *_info) {
       old_info = _info;
       return *this;
     }
 
-    PutParams& set_objv_tracker(RGWObjVersionTracker *_objv_tracker) {
+    PutParams &set_objv_tracker(RGWObjVersionTracker *_objv_tracker) {
       objv_tracker = _objv_tracker;
       return *this;
     }
 
-    PutParams& set_mtime(const ceph::real_time& _mtime) {
+    PutParams &set_mtime(const ceph::real_time &_mtime) {
       mtime = _mtime;
       return *this;
     }
 
-    PutParams& set_exclusive(bool _exclusive) {
+    PutParams &set_exclusive(bool _exclusive) {
       exclusive = _exclusive;
       return *this;
     }
 
-    PutParams& set_attrs(std::map<std::string, bufferlist> *_attrs) {
+    PutParams &set_attrs(std::map<std::string, bufferlist> *_attrs) {
       attrs = _attrs;
       return *this;
     }
@@ -111,38 +110,37 @@ public:
 
     RemoveParams() {}
 
-    RemoveParams& set_objv_tracker(RGWObjVersionTracker *_objv_tracker) {
+    RemoveParams &set_objv_tracker(RGWObjVersionTracker *_objv_tracker) {
       objv_tracker = _objv_tracker;
       return *this;
     }
   };
 
-  int store_hbac(const DoutPrefixProvider *dpp,
-                 optional_yield y,
-                 RGWHbacInfo& info,
-                 const PutParams& params = {});
+  int store_hbac(const DoutPrefixProvider *dpp, optional_yield y,
+                 RGWHbacInfo &info, const PutParams &params = {});
 
-  int read_hbac(const DoutPrefixProvider *dpp,
-                optional_yield y,
-                RGWHbacInfo& info,
-                const GetParams& params = {});
-  
-  int remove_hbac(const DoutPrefixProvider *dpp,
-                  optional_yield y,
-                  RGWHbacInfo& info,
-                  const RemoveParams& params = {});
+  int read_hbac(const DoutPrefixProvider *dpp, optional_yield y,
+                RGWHbacInfo &info, const GetParams &params = {});
 
+  int remove_hbac(const DoutPrefixProvider *dpp, optional_yield y,
+                  RGWHbacInfo &info, const RemoveParams &params = {});
+
+  int store_user_hierarchy(const DoutPrefixProvider *dpp, optional_yield y,
+                           RGWHbacUserHierarchy &hierarchy,
+                           const PutParams &params = {});
+
+  int read_user_hierarchy(const DoutPrefixProvider *dpp, optional_yield y,
+                          RGWHbacUserHierarchy &hierarchy,
+                          const GetParams &params = {});
 };
 
-class RGWHbacMetadataHandlerBase : public RGWMetadataHandler_GenericMetaBE{
+class RGWHbacMetadataHandlerBase : public RGWMetadataHandler_GenericMetaBE {
 public:
   virtual ~RGWHbacMetadataHandlerBase();
-  virtual void init(RGWSI_HBAC_SObj *hbac_svc,
-                    RGWHbacCtl *hbac_ctl);
+  virtual void init(RGWSI_HBAC_SObj *hbac_svc, RGWHbacCtl *hbac_ctl);
 };
 
-
-class RGWHbacMetaHandlerAllocator{
-  public:
+class RGWHbacMetaHandlerAllocator {
+public:
   static RGWMetadataHandler *alloc(RGWSI_HBAC_SObj *hbac);
 };

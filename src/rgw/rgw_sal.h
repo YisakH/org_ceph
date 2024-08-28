@@ -903,6 +903,7 @@ public:
 
 class Hbac {
 public:
+  RGWHbacUserHierarchy user_hierarchy;
   /*
   std::string user;
   std::string authorizer = "root";

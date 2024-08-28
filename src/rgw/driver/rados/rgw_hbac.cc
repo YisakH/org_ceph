@@ -84,19 +84,27 @@ public:
 
   int do_get(RGWSI_MetaBackend_Handler::Op *op, string &entry,
              RGWMetadataObject **obj, optional_yield y,
-             const DoutPrefixProvider *dpp) override{};
+             const DoutPrefixProvider *dpp) override {
+    return 0;
+  };
 
   RGWMetadataObject *get_meta_obj(JSONObj *jo, const obj_version &objv,
-                                  const ceph::real_time &mtime) override{};
+                                  const ceph::real_time &mtime) override {
+    return 0;
+  };
 
   int do_put(RGWSI_MetaBackend_Handler::Op *op, string &entry,
              RGWMetadataObject *obj, RGWObjVersionTracker &objv_tracker,
              optional_yield y, const DoutPrefixProvider *dpp,
-             RGWMDLogSyncType type, bool from_remote_zone) override{};
+             RGWMDLogSyncType type, bool from_remote_zone) override {
+    return 0;
+  };
 
   int do_remove(RGWSI_MetaBackend_Handler::Op *op, string &entry,
                 RGWObjVersionTracker &objv_tracker, optional_yield y,
-                const DoutPrefixProvider *dpp) override{};
+                const DoutPrefixProvider *dpp) override {
+    return 0;
+  };
 };
 
 RGWMetadataHandler *RGWHbacMetaHandlerAllocator::alloc(RGWSI_HBAC_SObj *hbac) {

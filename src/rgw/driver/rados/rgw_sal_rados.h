@@ -564,7 +564,6 @@ class RadosHbac : public Hbac {
 private:
   RadosStore *store;
   RGWHbacInfo info;
-  RGWHbacUserHierarchy user_hierarchy;
 
 public:
   RadosHbac(RadosStore *_store) : store(_store) {}

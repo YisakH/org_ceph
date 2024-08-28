@@ -571,6 +571,8 @@ struct RGWHbacUserHierarchy {
     HierarchyInfo(const std::string &_parent,
                   const std::vector<std::string> &_sons, int _tier)
         : parent(_parent), sons(_sons), tier(_tier) {}
+    HierarchyInfo(const std::vector<std::string> &_sons, int _tier)
+        : sons(_sons), tier(_tier) {}
 
     void encode(bufferlist &bl) const {
       ENCODE_START(1, 1, bl);
@@ -587,12 +589,45 @@ struct RGWHbacUserHierarchy {
       DECODE_FINISH(bl);
     }
   };
-  WRITE_CLASS_ENCODER(HierarchyInfo)
 
-  map<std::string, HierarchyInfo> hierarchy_map;
+  std::map<std::string, HierarchyInfo> hierarchy_map;
+
+  std::vector<std::string> str_split_to_vec(const std::string &s) {
+    std::vector<std::string> result;
+    std::istringstream iss(s);
+    std::string token;
+    while (std::getline(iss, token, ',')) {
+      result.push_back(token);
+    }
+    return result;
+  }
+
+  int add_user(const std::string &user, const std::string &parent,
+               const std::string &sons) {
+    return add_user(user, parent, str_split_to_vec(sons));
+  }
+
+  int add_user(const std::string &user, const std::vector<std::string> &sons) {
+    hierarchy_map[user] = HierarchyInfo(sons, 0);
+    for (const auto &son : sons) {
+      hierarchy_map[son] = HierarchyInfo(user, {}, 1);
+    }
+    return 0;
+  }
 
   int add_user(const std::string &user, const std::string &parent,
                const std::vector<std::string> &sons) {
+    std::ofstream out("/tmp/add_user_log.txt");
+    out << "this pointer: " << this << std::endl;
+    out << "hierarchy_map size: " << hierarchy_map.size() << std::endl;
+    out.close();
+    // 기존 user가 이미 존재할경우 예외처리
+    if (hierarchy_map.find(user) != hierarchy_map.end()) {
+      return RGW_HBAC_USER_EXIST;
+    }
+    if (parent == "") {
+      return add_user(user, sons);
+    }
     // parent가 없을 경우에 대한 예외처리
     if (hierarchy_map.find(parent) == hierarchy_map.end()) {
       return RGW_HBAC_PARAM_ERROR;
@@ -633,15 +668,59 @@ struct RGWHbacUserHierarchy {
     return 0; // 성공적으로 제거되었음을 반환
   }
 
+  nlohmann::json to_json_object(const std::string &user) const {
+    const HierarchyInfo &info = hierarchy_map.at(user);
+    nlohmann::json j;
+    j["user"] = user;
+    j["sons"] = nlohmann::json::array();
+
+    for (const auto &son : info.sons) {
+      j["sons"].push_back(to_json_object(son));
+    }
+
+    return j;
+  }
+
+  std::string to_json() const {
+    nlohmann::json j = nlohmann::json::array();
+
+    for (const auto &[user, info] : hierarchy_map) {
+      if (info.parent.empty()) {
+        j.push_back(to_json_object(user));
+      }
+    }
+
+    return j.dump();
+  }
+
   void encode(bufferlist &bl) const {
     ENCODE_START(1, 1, bl);
-    encode(hierarchy_map, bl);
+
+    // hierarchy_map 인코딩
+    encode(hierarchy_map.size(), bl); // 맵의 크기 인코딩
+    for (const auto &entry : hierarchy_map) {
+      encode(entry.first, bl); // 키 (user) 인코딩
+      entry.second.encode(bl); // 값 (HierarchyInfo) 인코딩
+    }
+
     ENCODE_FINISH(bl);
   }
-  void decode(bufferlist::const_iterator &bl) {
-    DECODE_START(1, bl);
-    decode(hierarchy_map, bl);
-    DECODE_FINISH(bl);
+
+  void decode(bufferlist::const_iterator &p) {
+    DECODE_START(1, p);
+
+    // hierarchy_map 디코딩
+    size_t map_size;
+    decode(map_size, p); // 맵의 크기 디코딩
+    for (size_t i = 0; i < map_size; ++i) {
+      std::string user;
+      HierarchyInfo info;
+      decode(user, p); // 키 (user) 디코딩
+      info.decode(p);  // 값 (HierarchyInfo) 디코딩
+      hierarchy_map[user] = info;
+    }
+
+    DECODE_FINISH(p);
   }
 };
 WRITE_CLASS_ENCODER(RGWHbacUserHierarchy)

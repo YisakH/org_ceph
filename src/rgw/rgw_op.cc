@@ -4477,6 +4477,14 @@ void RGWGetOrg::execute(optional_yield y) {
     }
     ret = 0;
     response_bl.append(return_str.c_str());
+  } else if (s->decoded_uri == "/admin/org/hierarchy") {
+    const auto &user = findValueForKey(s->http_params, "user");
+
+    s->hbac->load_hierarchy(this, y);
+    std::string json = s->hbac->user_hierarchy.to_json();
+
+    response_bl.append(json.c_str());
+
   } else {
     dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : wrong uri" << dendl;
   }
@@ -4543,6 +4551,8 @@ void RGWPutOrg::execute(optional_yield y) {
     const auto &dec_list = findValueForKey(s->http_params, "dec_list");
 
     ret = RGWOrgUser::putUser(user, anc, dec_list);
+
+    ret = s->hbac->user_hierarchy.add_user(user, anc, dec_list);
   } else {
     dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : wrong uri" << dendl;
     response_bl.append("wrong uri");

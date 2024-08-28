@@ -20,6 +20,7 @@
 #define RGW_HBAC_NO_PERMISSION 30006
 #define RGW_UNKNOWN_ERROR 30001
 #define RGW_HBAC_PARAM_ERROR 30007
+#define RGW_HBAC_USER_EXIST 30008
 
 namespace rocksdb {
 class DB;

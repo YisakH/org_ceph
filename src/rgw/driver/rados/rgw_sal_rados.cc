@@ -538,6 +538,11 @@ int RadosHbac::load_hierarchy(const DoutPrefixProvider *dpp, optional_yield y) {
   return ret;
 }
 
+int RadosHbac::store_hierarchy(const DoutPrefixProvider *dpp,
+                               optional_yield y) {
+  return store->ctl()->hbac->store_user_hierarchy(dpp, y, user_hierarchy);
+}
+
 int RadosBucket::load_bucket(const DoutPrefixProvider *dpp, optional_yield y) {
   int ret;
 

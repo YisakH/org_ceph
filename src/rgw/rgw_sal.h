@@ -814,6 +814,7 @@ class Bucket {
 
 class Hbac {
 public:
+  /*
   std::string user;
   std::string authorizer = "root";
   std::string path = "/";
@@ -829,19 +830,20 @@ public:
     PermissionFlags() : get(false), put(false), del(false), gra(false) {}
     bool operator<=(const PermissionFlags &other) const;
     bool operator<(const PermissionFlags &other) const;
-  }permission_flags;
+  }permission_flags;*/
 
   Hbac() = default;
-  Hbac(const rgw_hbac_info& info) : user(info.user), authorizer(info.authorizer), path(info.path){
+  /*Hbac(const rgw_hbac_info& info) : user(info.user), authorizer(info.authorizer), path(info.path){
     permission_flags.get = info.perms.get;
     permission_flags.put = info.perms.put;
     permission_flags.del = info.perms.del;
     permission_flags.gra = info.perms.gra;
-  }
+  }**/
   virtual ~Hbac() = default;
   virtual int load_hbac(const DoutPrefixProvider* dpp, optional_yield y) {return 0;};
   virtual int store_hbac(const DoutPrefixProvider* dpp, optional_yield y) {return 0;};
   virtual int remove_hbac(const DoutPrefixProvider* dpp, optional_yield y) {return 0;};
+  virtual std::string to_str() {return "";};
 };
 
 /**

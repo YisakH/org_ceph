@@ -7,7 +7,7 @@ int RGWHbacCtl::store_hbac(const DoutPrefixProvider *dpp,
                  const PutParams& params)
 {
   return be_handler->call([&](RGWSI_MetaBackend_Handler::Op *op) {
-    return svc.hbac->store_hbac_info(op->ctx(), "key",
+    return svc.hbac->store_hbac_info(op->ctx(),
                                       info,
                                      params.objv_tracker,
                                      params.mtime,
@@ -24,7 +24,7 @@ int RGWHbacCtl::read_hbac(const DoutPrefixProvider *dpp,
                 const GetParams& params)
 {
   return be_handler->call([&](RGWSI_MetaBackend_Handler::Op *op) {
-    return svc.hbac->read_hbac_info(op->ctx(), "key",
+    return svc.hbac->read_hbac_info(op->ctx(),
                                     info,
                                     params.objv_tracker,
                                     params.mtime,
@@ -41,7 +41,7 @@ int RGWHbacCtl::remove_hbac(const DoutPrefixProvider *dpp,
                   const RemoveParams& params)
 {
   return be_handler->call([&](RGWSI_MetaBackend_Handler::Op *op) {
-    return svc.hbac->remove_hbac_info(op->ctx(), "key",
+    return svc.hbac->remove_hbac_info(op->ctx(),
                                       info,
                                       params.objv_tracker,
                                       y,

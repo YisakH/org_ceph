@@ -475,6 +475,7 @@ class RadosHbac : public Hbac {
   private:
     RadosStore* store;
     RGWHbacInfo info;
+    RGWHbacUserHierarchy user_hierarchy;
   public:
     RadosHbac(RadosStore* _store) : store(_store) {}
     RadosHbac(RadosStore *_st, const rgw_hbac_info& _h)
@@ -484,6 +485,7 @@ class RadosHbac : public Hbac {
     int load_hbac(const DoutPrefixProvider* dpp, optional_yield y);
     int store_hbac(const DoutPrefixProvider* dpp, optional_yield y);
     int remove_hbac(const DoutPrefixProvider* dpp, optional_yield y);
+    virtual std::string to_str() override;
 };
 
 class RadosBucket : public StoreBucket {

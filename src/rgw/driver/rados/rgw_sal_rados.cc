@@ -492,6 +492,11 @@ int RadosBucket::remove_bypass_gc(int concurrent_max, bool
   return ret;
 }
 
+std::string RadosHbac::to_str()
+{
+  return info.make_response();
+}
+
 int RadosHbac::load_hbac(const DoutPrefixProvider* dpp, optional_yield y)
 {
   int ret = 0;

@@ -74,7 +74,6 @@ public:
   int do_start(optional_yield y, const DoutPrefixProvider *dpp) override;
 
   int store_hbac_info(RGWSI_MetaBackend::Context *ctx,
-                                const string& key,
                                 const RGWHbacInfo& info,
                                 RGWObjVersionTracker *objv_tracker,
                                 const real_time& mtime,
@@ -84,7 +83,6 @@ public:
                                 const DoutPrefixProvider *dpp);
 
     int read_hbac_info(RGWSI_MetaBackend::Context *ctx,
-                       const string& key,
                        RGWHbacInfo &info,
                        RGWObjVersionTracker * const objv_tracker,
                        real_time * const pmtime,
@@ -94,7 +92,6 @@ public:
                        const DoutPrefixProvider *dpp);
 
     int remove_hbac_info(RGWSI_MetaBackend::Context *ctx,
-                         const string& key,
                         RGWHbacInfo &info,
                          RGWObjVersionTracker *objv_tracker,
                          optional_yield y,

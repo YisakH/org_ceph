@@ -75,7 +75,6 @@ int RGWSI_HBAC_SObj::do_start(optional_yield y, const DoutPrefixProvider *dpp) {
 }
 
 int RGWSI_HBAC_SObj::store_hbac_info(RGWSI_MetaBackend::Context *ctx,
-                                const string& key,
                                 const RGWHbacInfo& info,
                                 RGWObjVersionTracker *objv_tracker,
                                 const real_time& mtime,
@@ -99,7 +98,6 @@ int RGWSI_HBAC_SObj::store_hbac_info(RGWSI_MetaBackend::Context *ctx,
 
 
 int RGWSI_HBAC_SObj::read_hbac_info(RGWSI_MetaBackend::Context *ctx,
-                                    const string& key,
                                     RGWHbacInfo &info,
                                     RGWObjVersionTracker * const objv_tracker,
                                     real_time * const pmtime,
@@ -115,7 +113,7 @@ int RGWSI_HBAC_SObj::read_hbac_info(RGWSI_MetaBackend::Context *ctx,
     params.set_cache_info(cache_info);
 
     // get_entry 호출로 HBAC 정보를 읽어옴
-    int ret = svc.meta_be->get_entry(ctx, get_meta_key(info), params, objv_tracker, y, dpp);
+    int ret = svc.meta_be->get(ctx, get_meta_key(info), params, objv_tracker, y, dpp);
     if (ret < 0) {
         // 만약 실패하면, 오류 코드를 반환
         return ret;
@@ -138,7 +136,6 @@ int RGWSI_HBAC_SObj::read_hbac_info(RGWSI_MetaBackend::Context *ctx,
 }
 
 int RGWSI_HBAC_SObj::remove_hbac_info(RGWSI_MetaBackend::Context *ctx,
-                                      const string& key,
                                       RGWHbacInfo &info,
                                       RGWObjVersionTracker *objv_tracker,
                                       optional_yield y,
@@ -147,7 +144,7 @@ int RGWSI_HBAC_SObj::remove_hbac_info(RGWSI_MetaBackend::Context *ctx,
     // HBAC 정보를 삭제하기 위해 remove_entry 호출
 
     RGWSI_MBSObj_RemoveParams remove_params;
-    int ret = svc.meta_be->remove_entry(dpp, ctx, get_meta_key(info), remove_params, objv_tracker, y);
+    int ret = svc.meta_be->remove(ctx, get_meta_key(info), remove_params, objv_tracker, y, dpp);
     if (ret < 0) {
         // 만약 실패하면, 오류 코드를 반환
         return ret;

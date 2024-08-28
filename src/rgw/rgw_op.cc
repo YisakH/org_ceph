@@ -4425,10 +4425,10 @@ int RGWDeleteOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_regis
 
 int RGWGetOrg::verify_requester(const rgw::auth::StrategyRegistry &auth_registry, optional_yield y)
 {
-  for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it)
+  /*for (auto it = s->info.env->get_map().begin(); it != s->info.env->get_map().end(); ++it)
   {
     dout(0) << "socks : rgw_op.cc : Key: " << it->first << ", Value: " << it->second << dendl;
-  }
+  }*/
 
   int ret = RGWOp::verify_requester(auth_registry, y);
   dout(0) << "socks : rgw_op.cc : RGWGetOrg : verify requester return : " << ret << dendl;
@@ -4957,10 +4957,17 @@ void RGWGetOrg::execute(optional_yield y)
     const auto &path = findValueForKey(s->http_params, "path");
 
     ret = driver->load_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
+
+    if(ret >= 0){
+      response_bl.append(s->hbac->to_str());
+    }else{
+      response_bl.append("driver->load_hbac error");
+    }
+
     s->rgwOrg = getAcl(user, path);
 
-    std::string tmp = s->hbac->user;
-    bool get = s->hbac->permission_flags.get;
+    //std::string tmp = s->hbac->user;
+    //bool get = s->hbac->permission_flags.get;
 
     if(s->rgwOrg == nullptr){
       response_bl.append("there are no request user");

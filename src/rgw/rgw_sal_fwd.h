@@ -20,39 +20,39 @@
 
 namespace rgw {
 using AccessListFilter =
-  std::function<bool(const std::string&, std::string&)>;
+    std::function<bool(const std::string &, std::string &)>;
 
 inline auto AccessListFilterPrefix(std::string prefix) {
-  return [prefix = std::move(prefix)](const std::string& name,
-				      std::string& key) {
-    return (prefix.compare(key.substr(0, prefix.size())) == 0);
-  };
+  return
+      [prefix = std::move(prefix)](const std::string &name, std::string &key) {
+        return (prefix.compare(key.substr(0, prefix.size())) == 0);
+      };
 }
 
 namespace sal {
+class Driver;
+class User;
+class Bucket;
+class Hbac;
+class BucketList;
+class Object;
+class MultipartUpload;
+class Lifecycle;
+class Notification;
+class Writer;
+class PlacementTier;
+class ZoneGroup;
+class Zone;
+class LuaManager;
+struct RGWRoleInfo;
+class DataProcessor;
+class ObjectProcessor;
+class ReadStatsCB;
 
-  class Driver;
-  class User;
-  class Bucket;
-  class Hbac;
-  class BucketList;
-  class Object;
-  class MultipartUpload;
-  class Lifecycle;
-  class Notification;
-  class Writer;
-  class PlacementTier;
-  class ZoneGroup;
-  class Zone;
-  class LuaManager;
-  struct RGWRoleInfo;
-  class DataProcessor;
-  class ObjectProcessor;
-  class ReadStatsCB;
+class ConfigStore;
+class RealmWriter;
+class ZoneGroupWriter;
+class ZoneWriter;
 
-  class ConfigStore;
-  class RealmWriter;
-  class ZoneGroupWriter;
-  class ZoneWriter;
-
-} } // namespace rgw::sal
+} // namespace sal
+} // namespace rgw

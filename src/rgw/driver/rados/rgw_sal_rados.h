@@ -319,6 +319,12 @@ public:
   int remove_hbac(const DoutPrefixProvider *dpp, rgw_hbac_info info,
                   std::unique_ptr<rgw::sal::Hbac> *hbac,
                   optional_yield y) override;
+  int load_hierarchy(const DoutPrefixProvider *dpp,
+                     std::unique_ptr<rgw::sal::Hbac> *hbac,
+                     HbacUserHierarchy &hierarchy, optional_yield y) override;
+  int store_hierarchy(const DoutPrefixProvider *dpp,
+                      std::unique_ptr<rgw::sal::Hbac> *hbac,
+                      HbacUserHierarchy &hierarchy, optional_yield y) override;
 };
 
 class RadosUser : public StoreUser {
@@ -573,8 +579,10 @@ public:
   int load_hbac(const DoutPrefixProvider *dpp, optional_yield y);
   int store_hbac(const DoutPrefixProvider *dpp, optional_yield y);
   int remove_hbac(const DoutPrefixProvider *dpp, optional_yield y);
-  int load_hierarchy(const DoutPrefixProvider *dpp, optional_yield y);
-  int store_hierarchy(const DoutPrefixProvider *dpp, optional_yield y);
+  int load_hierarchy(const DoutPrefixProvider *dpp,
+                     HbacUserHierarchy &hierarchy, optional_yield y);
+  int store_hierarchy(const DoutPrefixProvider *dpp,
+                      HbacUserHierarchy &hierarchy, optional_yield y);
   virtual std::string to_str() override;
 };
 

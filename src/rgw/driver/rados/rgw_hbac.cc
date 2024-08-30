@@ -29,7 +29,7 @@ int RGWHbacCtl::remove_hbac(const DoutPrefixProvider *dpp, optional_yield y,
 
 int RGWHbacCtl::read_user_hierarchy(const DoutPrefixProvider *dpp,
                                     optional_yield y,
-                                    RGWHbacUserHierarchy &hierarchy,
+                                    HbacUserHierarchy &hierarchy,
                                     const GetParams &params) {
   return be_handler->call([&](RGWSI_MetaBackend_Handler::Op *op) {
     return svc.hbac->read_hierarchy_info(
@@ -40,7 +40,7 @@ int RGWHbacCtl::read_user_hierarchy(const DoutPrefixProvider *dpp,
 
 int RGWHbacCtl::store_user_hierarchy(const DoutPrefixProvider *dpp,
                                      optional_yield y,
-                                     RGWHbacUserHierarchy &hierarchy,
+                                     HbacUserHierarchy &hierarchy,
                                      const PutParams &params) {
   return be_handler->call([&](RGWSI_MetaBackend_Handler::Op *op) {
     return svc.hbac->store_hierarchy_info(

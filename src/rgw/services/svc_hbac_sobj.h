@@ -85,14 +85,14 @@ public:
                        const DoutPrefixProvider *dpp);
 
   int store_hierarchy_info(RGWSI_MetaBackend::Context *ctx,
-                           const RGWHbacUserHierarchy &hierarchy,
+                           const HbacUserHierarchy &hierarchy,
                            RGWObjVersionTracker *objv_tracker,
                            const real_time &mtime, bool exclusive,
                            map<string, bufferlist> *attrs, optional_yield y,
                            const DoutPrefixProvider *dpp);
 
   int read_hierarchy_info(RGWSI_MetaBackend::Context *ctx,
-                          RGWHbacUserHierarchy &hierarchy,
+                          HbacUserHierarchy &hierarchy,
                           RGWObjVersionTracker *const objv_tracker,
                           real_time *const pmtime,
                           rgw_cache_entry_info *const cache_info,
@@ -100,7 +100,7 @@ public:
                           optional_yield y, const DoutPrefixProvider *dpp);
 
   int remove_hierarchy_info(RGWSI_MetaBackend::Context *ctx,
-                            RGWHbacUserHierarchy &hierarchy,
+                            HbacUserHierarchy &hierarchy,
                             RGWObjVersionTracker *objv_tracker,
                             optional_yield y, const DoutPrefixProvider *dpp);
 };

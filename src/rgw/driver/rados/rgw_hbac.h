@@ -126,11 +126,11 @@ public:
                   RGWHbacInfo &info, const RemoveParams &params = {});
 
   int store_user_hierarchy(const DoutPrefixProvider *dpp, optional_yield y,
-                           RGWHbacUserHierarchy &hierarchy,
+                           HbacUserHierarchy &hierarchy,
                            const PutParams &params = {});
 
   int read_user_hierarchy(const DoutPrefixProvider *dpp, optional_yield y,
-                          RGWHbacUserHierarchy &hierarchy,
+                          HbacUserHierarchy &hierarchy,
                           const GetParams &params = {});
 };
 

@@ -550,7 +550,7 @@ struct RGWRateLimitInfo {
 };
 WRITE_CLASS_ENCODER(RGWRateLimitInfo)
 
-struct RGWHbacUserHierarchy {
+struct HbacUserHierarchy {
   struct HierarchyInfo {
     std::string parent;
     std::vector<std::string> sons;
@@ -723,7 +723,7 @@ struct RGWHbacUserHierarchy {
     DECODE_FINISH(p);
   }
 };
-WRITE_CLASS_ENCODER(RGWHbacUserHierarchy)
+WRITE_CLASS_ENCODER(HbacUserHierarchy)
 
 struct RGWHbacInfo {
   std::string user;

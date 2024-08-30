@@ -4162,7 +4162,7 @@ int RGWPutObj::verify_permission(optional_yield y) {
           << dendl;
 
   if (hacl_ret != -RGW_ORG_PERMISSION_ALLOWED) {
-    if (hacl_ret == -RGW_ORG_KEY_NOT_FOUND) {
+    if (hacl_ret == -RGW_HBAC_KEY_NOT_FOUND) {
       if (!verify_bucket_permission_no_policy(this, s, RGW_PERM_WRITE)) {
         return -EACCES;
       }
@@ -4408,7 +4408,7 @@ std::string RGWGetOrg::callTreeDec(string user) {
   int ret = RGWOrgDec::getRGWOrgDecTree(user, dec_tree);
   if (ret == -1) {
     return "error occured!";
-  } else if (ret == -RGW_ORG_KEY_NOT_FOUND) {
+  } else if (ret == -RGW_HBAC_KEY_NOT_FOUND) {
     return "there are no dec user";
   } else {
     return dec_tree.dump(2);
@@ -4480,8 +4480,9 @@ void RGWGetOrg::execute(optional_yield y) {
   } else if (s->decoded_uri == "/admin/org/hierarchy") {
     const auto &user = findValueForKey(s->http_params, "user");
 
-    s->hbac->load_hierarchy(this, y);
-    std::string json = s->hbac->user_hierarchy.to_json();
+    HbacUserHierarchy user_hierarchy;
+    driver->load_hierarchy(this, &s->hbac, user_hierarchy, y);
+    std::string json = user_hierarchy.to_json();
 
     response_bl.append(json.c_str());
 
@@ -4551,8 +4552,17 @@ void RGWPutOrg::execute(optional_yield y) {
     const auto &dec_list = findValueForKey(s->http_params, "dec_list");
 
     ret = RGWOrgUser::putUser(user, anc, dec_list);
+    std::ofstream out("/tmp/org_execute.txt");
+    out << s->hbac << std::endl;
+    out.close();
+    HbacUserHierarchy user_hierarchy;
 
-    ret = s->hbac->user_hierarchy.add_user(user, anc, dec_list);
+    driver->load_hierarchy(this, &s->hbac, user_hierarchy, y);
+    user_hierarchy.add_user(user, anc, dec_list);
+    driver->store_hierarchy(this, &s->hbac, user_hierarchy, y);
+    // ret = s->hbac->load_hierarchy(this, y);
+    // ret = s->hbac->get_user_hierarchy()->add_user(user, anc, dec_list);
+    // ret = s->hbac->store_hierarchy(this, y);
   } else {
     dout(0) << "socks : rgw_op.cc : RGWPutOrg::execute : wrong uri" << dendl;
     response_bl.append("wrong uri");

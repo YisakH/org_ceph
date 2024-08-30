@@ -531,16 +531,22 @@ int RadosHbac::remove_hbac(const DoutPrefixProvider *dpp, optional_yield y) {
   return store->ctl()->hbac->remove_hbac(dpp, y, info);
 }
 
-int RadosHbac::load_hierarchy(const DoutPrefixProvider *dpp, optional_yield y) {
+int RadosHbac::load_hierarchy(const DoutPrefixProvider *dpp,
+                              HbacUserHierarchy &hierarchy, optional_yield y) {
   int ret = 0;
-  ret = store->ctl()->hbac->read_user_hierarchy(dpp, y, user_hierarchy);
+  ret = store->ctl()->hbac->read_user_hierarchy(dpp, y, hierarchy);
+
+  if (ret == RGW_HBAC_KEY_NOT_FOUND) {
+    hierarchy = *new HbacUserHierarchy();
+    return 0;
+  }
 
   return ret;
 }
 
 int RadosHbac::store_hierarchy(const DoutPrefixProvider *dpp,
-                               optional_yield y) {
-  return store->ctl()->hbac->store_user_hierarchy(dpp, y, user_hierarchy);
+                               HbacUserHierarchy &hierarchy, optional_yield y) {
+  return store->ctl()->hbac->store_user_hierarchy(dpp, y, hierarchy);
 }
 
 int RadosBucket::load_bucket(const DoutPrefixProvider *dpp, optional_yield y) {
@@ -1054,6 +1060,21 @@ int RadosStore::load_hbac(const DoutPrefixProvider *dpp, rgw_hbac_info info,
                           optional_yield y) {
   *hbac = std::make_unique<RadosHbac>(this, info);
   return (*hbac)->load_hbac(dpp, y);
+}
+
+int RadosStore::load_hierarchy(const DoutPrefixProvider *dpp,
+                               std::unique_ptr<rgw::sal::Hbac> *hbac,
+                               HbacUserHierarchy &hierarchy, optional_yield y) {
+  *hbac = std::make_unique<RadosHbac>(this);
+  return (*hbac)->load_hierarchy(dpp, hierarchy, y);
+}
+
+int RadosStore::store_hierarchy(const DoutPrefixProvider *dpp,
+                                std::unique_ptr<rgw::sal::Hbac> *hbac,
+                                HbacUserHierarchy &hierarchy,
+                                optional_yield y) {
+  *hbac = std::make_unique<RadosHbac>(this);
+  return (*hbac)->store_hierarchy(dpp, hierarchy, y);
 }
 
 int RadosStore::store_hbac(const DoutPrefixProvider *dpp, rgw_hbac_info info,

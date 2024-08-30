@@ -295,11 +295,22 @@ public:
                          optional_yield y) {
     return 0;
   };
+  virtual int load_hierarchy(const DoutPrefixProvider *dpp,
+                             std::unique_ptr<rgw::sal::Hbac> *hbac,
+                             HbacUserHierarchy &hierarchy, optional_yield y) {
+    return 0;
+  };
+  virtual int store_hierarchy(const DoutPrefixProvider *dpp,
+                              std::unique_ptr<rgw::sal::Hbac> *hbac,
+                              HbacUserHierarchy &hierarchy, optional_yield y) {
+    return 0;
+  };
   virtual int remove_hbac(const DoutPrefixProvider *dpp, rgw_hbac_info info,
                           std::unique_ptr<rgw::sal::Hbac> *hbac,
                           optional_yield y) {
     return 0;
   };
+
   /** For multisite, this driver is the zone's master */
   virtual bool is_meta_master() = 0;
   /** Get zone info for this driver */
@@ -903,7 +914,6 @@ public:
 
 class Hbac {
 public:
-  RGWHbacUserHierarchy user_hierarchy;
   /*
   std::string user;
   std::string authorizer = "root";
@@ -938,12 +948,16 @@ public:
   virtual int remove_hbac(const DoutPrefixProvider *dpp, optional_yield y) {
     return 0;
   };
-  virtual int load_hierarchy(const DoutPrefixProvider *dpp, optional_yield y) {
+  virtual int load_hierarchy(const DoutPrefixProvider *dpp,
+                             HbacUserHierarchy &hierarchy, optional_yield y) {
     return 0;
   };
-  virtual int store_hierarchy(const DoutPrefixProvider *dpp, optional_yield y) {
+  virtual int store_hierarchy(const DoutPrefixProvider *dpp,
+                              HbacUserHierarchy &hierarchy, optional_yield y) {
     return 0;
   };
+
+  // virtual HbacUserHierarchy *get_user_hierarchy() { return user_hierarchy; };
 
   virtual std::string to_str() { return ""; };
 };

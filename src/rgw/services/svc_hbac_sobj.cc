@@ -152,7 +152,7 @@ int RGWSI_HBAC_SObj::remove_hbac_info(RGWSI_MetaBackend::Context *ctx,
 }
 
 int RGWSI_HBAC_SObj::read_hierarchy_info(
-    RGWSI_MetaBackend::Context *ctx, RGWHbacUserHierarchy &hierarchy,
+    RGWSI_MetaBackend::Context *ctx, HbacUserHierarchy &hierarchy,
     RGWObjVersionTracker *const objv_tracker, real_time *const pmtime,
     rgw_cache_entry_info *const cache_info,
     std::map<std::string, bufferlist> *const pattrs, optional_yield y,
@@ -166,7 +166,7 @@ int RGWSI_HBAC_SObj::read_hierarchy_info(
                              y, dpp);
 
   if (ret < 0) {
-    return ret;
+    return RGW_HBAC_KEY_NOT_FOUND;
   }
 
   auto iter = bl.cbegin();
@@ -181,7 +181,7 @@ int RGWSI_HBAC_SObj::read_hierarchy_info(
 }
 
 int RGWSI_HBAC_SObj::store_hierarchy_info(
-    RGWSI_MetaBackend::Context *ctx, const RGWHbacUserHierarchy &hierarchy,
+    RGWSI_MetaBackend::Context *ctx, const HbacUserHierarchy &hierarchy,
     RGWObjVersionTracker *objv_tracker, const real_time &mtime, bool exclusive,
     map<string, bufferlist> *attrs, optional_yield y,
     const DoutPrefixProvider *dpp) {

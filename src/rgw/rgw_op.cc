@@ -3959,7 +3959,7 @@ int RGWPutOrg::verify_requester(
 }
 
 int RGWPutOrg::verify_permission(optional_yield y) {
-  if (s->decoded_uri == "/admin/org/acl") {
+  if (s->decoded_uri == "/admin/hbac/acl") {
     const auto &user = findValueForKey(s->http_params, "user");
     const string &authorizer = s->user->get_id().id;
     int tier;
@@ -4344,7 +4344,7 @@ void RGWDeleteOrg::execute(optional_yield y) {
 
   int ret = -1;
 
-  if (s->decoded_uri == "/admin/org/acl") {
+  if (s->decoded_uri == "/admin/hbac/acl") {
     const auto &request_user = s->user->get_id().id;
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &path = findValueForKey(s->http_params, "path");
@@ -4352,7 +4352,7 @@ void RGWDeleteOrg::execute(optional_yield y) {
 
     ret = deleteAcl(request_user, user, path);
     ret = driver->remove_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
-  } else if (s->decoded_uri == "/admin/org/user") {
+  } else if (s->decoded_uri == "/admin/hbac/user") {
     const auto &user = findValueForKey(s->http_params, "user");
     ret = RGWOrgUser::deleteUser(user);
   }
@@ -4373,7 +4373,7 @@ void RGWDeleteOrg::pre_exec() { rgw_bucket_object_pre_exec(s); }
 void RGWListOrg::execute(optional_yield y) {
   int ret = -2;
   bufferlist response_bl;
-  if (s->decoded_uri == "/admin/org/dec") {
+  if (s->decoded_uri == "/admin/hbac/dec") {
     const auto &user = findValueForKey(s->http_params, "user");
     nlohmann::json dec_tree;
 
@@ -4426,7 +4426,7 @@ void RGWGetOrg::execute(optional_yield y) {
   }
   int ret = -2;
   bufferlist response_bl;
-  if (s->decoded_uri == "/admin/org/acl") {
+  if (s->decoded_uri == "/admin/hbac/acl") {
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &path = findValueForKey(s->http_params, "path");
 
@@ -4450,21 +4450,21 @@ void RGWGetOrg::execute(optional_yield y) {
     }
 
     ret = 0;
-  } else if (s->decoded_uri == "/admin/org/tier") {
+  } else if (s->decoded_uri == "/admin/hbac/tier") {
     const auto &user = findValueForKey(s->http_params, "user");
     int tier;
 
     ret = getTier(user, &tier);
 
     response_bl.append(to_string(tier).c_str());
-  } else if (s->decoded_uri == "/admin/org/anc") {
+  } else if (s->decoded_uri == "/admin/hbac/anc") {
     const auto &user = findValueForKey(s->http_params, "user");
 
     std::string anc;
     ret = getAnc(user, &anc);
 
     response_bl.append(anc.c_str());
-  } else if (s->decoded_uri == "/admin/org/dec") {
+  } else if (s->decoded_uri == "/admin/hbac/dec") {
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &json = findValueForKey(s->http_params, "json");
 
@@ -4477,7 +4477,7 @@ void RGWGetOrg::execute(optional_yield y) {
     }
     ret = 0;
     response_bl.append(return_str.c_str());
-  } else if (s->decoded_uri == "/admin/org/hierarchy") {
+  } else if (s->decoded_uri == "/admin/hbac/hierarchy") {
     const auto &user = findValueForKey(s->http_params, "user");
 
     HbacUserHierarchy user_hierarchy;
@@ -4509,7 +4509,7 @@ void RGWPutOrg::execute(optional_yield y) {
   int ret = -1;
   bufferlist response_bl;
 
-  if (s->decoded_uri == "/admin/org/acl") {
+  if (s->decoded_uri == "/admin/hbac/acl") {
 
     const auto &user = findValueForKey(s->http_params, "user");
     const string &authorizer = s->user->get_id().id;
@@ -4537,16 +4537,16 @@ void RGWPutOrg::execute(optional_yield y) {
     out.close();
 
     ret = putAcl(user, path, authorizer, tier, get, put, del, gra);
-  } else if (s->decoded_uri == "/admin/org/tier") {
+  } else if (s->decoded_uri == "/admin/hbac/tier") {
     const auto &user = findValueForKey(s->http_params, "user");
     const int &tier = stoi(findValueForKey(s->http_params, "tier"));
 
     ret = putTier(user, tier);
-  } else if (s->decoded_uri == "/admin/org/anc") {
+  } else if (s->decoded_uri == "/admin/hbac/anc") {
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &anc = findValueForKey(s->http_params, "anc");
     ret = putAnc(user, anc);
-  } else if (s->decoded_uri == "/admin/org/user") {
+  } else if (s->decoded_uri == "/admin/hbac/user") {
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &anc = findValueForKey(s->http_params, "anc");
     const auto &dec_list = findValueForKey(s->http_params, "dec_list");

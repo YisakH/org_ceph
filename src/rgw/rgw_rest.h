@@ -5,34 +5,33 @@
 
 #define TIME_BUF_SIZE 128
 
-#include <string_view>
-#include <boost/container/flat_set.hpp>
-#include "common/sstring.hh"
 #include "common/ceph_json.h"
+#include "common/sstring.hh"
 #include "include/ceph_assert.h" /* needed because of common/ceph_json.h */
-#include "rgw_op.h"
-#include "rgw_formats.h"
 #include "rgw_client_io.h"
+#include "rgw_formats.h"
 #include "rgw_lua_background.h"
+#include "rgw_op.h"
+#include <boost/container/flat_set.hpp>
+#include <string_view>
 
 extern std::map<std::string, std::string> rgw_to_http_attrs;
 
-extern void rgw_rest_init(CephContext *cct, const rgw::sal::ZoneGroup& zone_group);
+extern void rgw_rest_init(CephContext *cct,
+                          const rgw::sal::ZoneGroup &zone_group);
 
 extern void rgw_flush_formatter_and_reset(req_state *s,
-					 ceph::Formatter *formatter);
+                                          ceph::Formatter *formatter);
 
-extern void rgw_flush_formatter(req_state *s,
-				ceph::Formatter *formatter);
+extern void rgw_flush_formatter(req_state *s, ceph::Formatter *formatter);
 
-inline std::string_view rgw_sanitized_hdrval(ceph::buffer::list& raw)
-{
+inline std::string_view rgw_sanitized_hdrval(ceph::buffer::list &raw) {
   /* std::string and thus std::string_view ARE OBLIGED to carry multiple
    * 0x00 and count them to the length of a string. We need to take that
    * into consideration and sanitize the size of a ceph::buffer::list used
    * to store metadata values (x-amz-meta-*, X-Container-Meta-*, etags).
    * Otherwise we might send 0x00 to clients. */
-  const char* const data = raw.c_str();
+  const char *const data = raw.c_str();
   size_t len = raw.length();
 
   if (len && data[len - 1] == '\0') {
@@ -46,8 +45,9 @@ inline std::string_view rgw_sanitized_hdrval(ceph::buffer::list& raw)
 }
 
 template <class T>
-std::tuple<int, bufferlist > rgw_rest_get_json_input_keep_data(CephContext *cct, req_state *s, T& out, uint64_t max_len)
-{
+std::tuple<int, bufferlist>
+rgw_rest_get_json_input_keep_data(CephContext *cct, req_state *s, T &out,
+                                  uint64_t max_len) {
   int rv = 0;
   bufferlist data;
   std::tie(rv, data) = rgw_rest_read_all_input(s, max_len);
@@ -67,7 +67,7 @@ std::tuple<int, bufferlist > rgw_rest_get_json_input_keep_data(CephContext *cct,
 
   try {
     decode_json_obj(out, &parser);
-  } catch (JSONDecoder::err& e) {
+  } catch (JSONDecoder::err &e) {
     return std::make_tuple(-EINVAL, std::move(data));
   }
 
@@ -76,36 +76,37 @@ std::tuple<int, bufferlist > rgw_rest_get_json_input_keep_data(CephContext *cct,
 
 class RESTArgs {
 public:
-  static int get_string(req_state *s, const std::string& name,
-			const std::string& def_val, std::string *val,
-			bool *existed = NULL);
-  static int get_uint64(req_state *s, const std::string& name,
-			uint64_t def_val, uint64_t *val, bool *existed = NULL);
-  static int get_int64(req_state *s, const std::string& name,
-		       int64_t def_val, int64_t *val, bool *existed = NULL);
-  static int get_uint32(req_state *s, const std::string& name,
-			uint32_t def_val, uint32_t *val, bool *existed = NULL);
-  static int get_int32(req_state *s, const std::string& name,
-		       int32_t def_val, int32_t *val, bool *existed = NULL);
-  static int get_time(req_state *s, const std::string& name,
-		      const utime_t& def_val, utime_t *val,
-		      bool *existed = NULL);
-  static int get_epoch(req_state *s, const std::string& name,
-		       uint64_t def_val, uint64_t *epoch,
-		       bool *existed = NULL);
-  static int get_bool(req_state *s, const std::string& name, bool def_val,
-		      bool *val, bool *existed = NULL);
+  static int get_string(req_state *s, const std::string &name,
+                        const std::string &def_val, std::string *val,
+                        bool *existed = NULL);
+  static int get_uint64(req_state *s, const std::string &name, uint64_t def_val,
+                        uint64_t *val, bool *existed = NULL);
+  static int get_int64(req_state *s, const std::string &name, int64_t def_val,
+                       int64_t *val, bool *existed = NULL);
+  static int get_uint32(req_state *s, const std::string &name, uint32_t def_val,
+                        uint32_t *val, bool *existed = NULL);
+  static int get_int32(req_state *s, const std::string &name, int32_t def_val,
+                       int32_t *val, bool *existed = NULL);
+  static int get_time(req_state *s, const std::string &name,
+                      const utime_t &def_val, utime_t *val,
+                      bool *existed = NULL);
+  static int get_epoch(req_state *s, const std::string &name, uint64_t def_val,
+                       uint64_t *epoch, bool *existed = NULL);
+  static int get_bool(req_state *s, const std::string &name, bool def_val,
+                      bool *val, bool *existed = NULL);
 };
 
 class RGWRESTFlusher : public RGWFormatterFlusher {
   req_state *s;
   RGWOp *op;
+
 protected:
   void do_flush() override;
   void do_start(int ret) override;
+
 public:
-  RGWRESTFlusher(req_state *_s, RGWOp *_op) :
-    RGWFormatterFlusher(_s->formatter), s(_s), op(_op) {}
+  RGWRESTFlusher(req_state *_s, RGWOp *_op)
+      : RGWFormatterFlusher(_s->formatter), s(_s), op(_op) {}
   RGWRESTFlusher() : RGWFormatterFlusher(NULL), s(NULL), op(NULL) {}
 
   void init(req_state *_s, RGWOp *_op) {
@@ -115,29 +116,29 @@ public:
   }
 };
 
-class RGWDeleteOrg_ObjStore : public RGWDeleteOrg
-{
-  protected:
-    bool sent_header;
-  public:
-    RGWDeleteOrg_ObjStore() : sent_header(false) {}
-
-    void init(rgw::sal::Driver* driver, req_state *s, RGWHandler *h) override {
-      RGWDeleteOrg::init(driver, s, h);
-      sent_header = false;
-    }
-
-    int get_params(optional_yield y) override;
-};
-
-class RGWGetOrg_ObjStore : public RGWGetOrg
-{
+class RGWDeleteOrg_ObjStore : public RGWDeleteOrg {
 protected:
   bool sent_header;
+
+public:
+  RGWDeleteOrg_ObjStore() : sent_header(false) {}
+
+  void init(rgw::sal::Driver *driver, req_state *s, RGWHandler *h) override {
+    RGWDeleteOrg::init(driver, s, h);
+    sent_header = false;
+  }
+
+  int get_params(optional_yield y) override;
+};
+
+class RGWGetOrg_ObjStore : public RGWGetOrg {
+protected:
+  bool sent_header;
+
 public:
   RGWGetOrg_ObjStore() : sent_header(false) {}
 
-  void init(rgw::sal::Driver* driver, req_state *s, RGWHandler *h) override {
+  void init(rgw::sal::Driver *driver, req_state *s, RGWHandler *h) override {
     RGWGetOrg::init(driver, s, h);
     sent_header = false;
   }
@@ -145,14 +146,14 @@ public:
   int get_params(optional_yield y) override;
 };
 
-class RGWGetObj_ObjStore : public RGWGetObj
-{
+class RGWGetObj_ObjStore : public RGWGetObj {
 protected:
   bool sent_header;
+
 public:
   RGWGetObj_ObjStore() : sent_header(false) {}
 
-  void init(rgw::sal::Driver* driver, req_state *s, RGWHandler *h) override {
+  void init(rgw::sal::Driver *driver, req_state *s, RGWHandler *h) override {
     RGWGetObj::init(driver, s, h);
     sent_header = false;
   }
@@ -162,14 +163,14 @@ public:
 
 class RGWGetObjTags_ObjStore : public RGWGetObjTags {
 public:
-  RGWGetObjTags_ObjStore() {};
-  ~RGWGetObjTags_ObjStore() {};
+  RGWGetObjTags_ObjStore(){};
+  ~RGWGetObjTags_ObjStore(){};
 };
 
-class RGWPutObjTags_ObjStore: public RGWPutObjTags {
+class RGWPutObjTags_ObjStore : public RGWPutObjTags {
 public:
-  RGWPutObjTags_ObjStore() {};
-  ~RGWPutObjTags_ObjStore() {};
+  RGWPutObjTags_ObjStore(){};
+  ~RGWPutObjTags_ObjStore(){};
 };
 
 class RGWGetBucketTags_ObjStore : public RGWGetBucketTags {
@@ -178,7 +179,7 @@ public:
   virtual ~RGWGetBucketTags_ObjStore() = default;
 };
 
-class RGWPutBucketTags_ObjStore: public RGWPutBucketTags {
+class RGWPutBucketTags_ObjStore : public RGWPutBucketTags {
 public:
   RGWPutBucketTags_ObjStore() = default;
   virtual ~RGWPutBucketTags_ObjStore() = default;
@@ -186,17 +187,17 @@ public:
 
 class RGWGetBucketReplication_ObjStore : public RGWGetBucketReplication {
 public:
-  RGWGetBucketReplication_ObjStore() {};
-  ~RGWGetBucketReplication_ObjStore() {};
+  RGWGetBucketReplication_ObjStore(){};
+  ~RGWGetBucketReplication_ObjStore(){};
 };
 
-class RGWPutBucketReplication_ObjStore: public RGWPutBucketReplication {
+class RGWPutBucketReplication_ObjStore : public RGWPutBucketReplication {
 public:
   RGWPutBucketReplication_ObjStore() = default;
   virtual ~RGWPutBucketReplication_ObjStore() = default;
 };
 
-class RGWDeleteBucketReplication_ObjStore: public RGWDeleteBucketReplication {
+class RGWDeleteBucketReplication_ObjStore : public RGWDeleteBucketReplication {
 public:
   RGWDeleteBucketReplication_ObjStore() = default;
   virtual ~RGWDeleteBucketReplication_ObjStore() = default;
@@ -251,20 +252,17 @@ public:
   int get_params(optional_yield y) override;
 };
 
-
-class RGWPutObj_ObjStore : public RGWPutObj
-{
+class RGWPutObj_ObjStore : public RGWPutObj {
 public:
   RGWPutObj_ObjStore() {}
   ~RGWPutObj_ObjStore() override {}
 
   int verify_params() override;
   int get_params(optional_yield y) override;
-  int get_data(bufferlist& bl) override;
+  int get_data(bufferlist &bl) override;
 };
 
-class RGWPostObj_ObjStore : public RGWPostObj
-{
+class RGWPostObj_ObjStore : public RGWPostObj {
   std::string boundary;
 
 public:
@@ -280,50 +278,41 @@ public:
   };
 
 protected:
-  using parts_collection_t = \
-    std::map<std::string, post_form_part, const ltstr_nocase>;
+  using parts_collection_t =
+      std::map<std::string, post_form_part, const ltstr_nocase>;
 
   std::string err_msg;
   ceph::bufferlist in_data;
 
-  int read_with_boundary(ceph::bufferlist& bl,
-                         uint64_t max,
-                         bool check_eol,
-                         bool& reached_boundary,
-                         bool& done);
+  int read_with_boundary(ceph::bufferlist &bl, uint64_t max, bool check_eol,
+                         bool &reached_boundary, bool &done);
 
-  int read_line(ceph::bufferlist& bl,
-                uint64_t max,
-                bool& reached_boundary,
-                bool& done);
+  int read_line(ceph::bufferlist &bl, uint64_t max, bool &reached_boundary,
+                bool &done);
 
-  int read_data(ceph::bufferlist& bl,
-                uint64_t max,
-                bool& reached_boundary,
-                bool& done);
+  int read_data(ceph::bufferlist &bl, uint64_t max, bool &reached_boundary,
+                bool &done);
 
-  int read_form_part_header(struct post_form_part *part, bool& done);
+  int read_form_part_header(struct post_form_part *part, bool &done);
 
   int get_params(optional_yield y) override;
 
-  static int parse_part_field(const std::string& line,
-                              std::string& field_name, /* out */
-                              post_part_field& field); /* out */
+  static int parse_part_field(const std::string &line,
+                              std::string &field_name, /* out */
+                              post_part_field &field); /* out */
 
-  static void parse_boundary_params(const std::string& params_str,
-                                    std::string& first,
-                                    std::map<std::string, std::string>& params);
+  static void parse_boundary_params(const std::string &params_str,
+                                    std::string &first,
+                                    std::map<std::string, std::string> &params);
 
-  static bool part_str(parts_collection_t& parts,
-                       const std::string& name,
+  static bool part_str(parts_collection_t &parts, const std::string &name,
                        std::string *val);
 
-  static std::string get_part_str(parts_collection_t& parts,
-                                  const std::string& name,
-                                  const std::string& def_val = std::string());
+  static std::string get_part_str(parts_collection_t &parts,
+                                  const std::string &name,
+                                  const std::string &def_val = std::string());
 
-  static bool part_bl(parts_collection_t& parts,
-                      const std::string& name,
+  static bool part_bl(parts_collection_t &parts, const std::string &name,
                       ceph::bufferlist *pbl);
 
 public:
@@ -333,23 +322,19 @@ public:
   int verify_params() override;
 };
 
-
-class RGWPutMetadataAccount_ObjStore : public RGWPutMetadataAccount
-{
+class RGWPutMetadataAccount_ObjStore : public RGWPutMetadataAccount {
 public:
   RGWPutMetadataAccount_ObjStore() {}
   ~RGWPutMetadataAccount_ObjStore() override {}
 };
 
-class RGWPutMetadataBucket_ObjStore : public RGWPutMetadataBucket
-{
+class RGWPutMetadataBucket_ObjStore : public RGWPutMetadataBucket {
 public:
   RGWPutMetadataBucket_ObjStore() {}
   ~RGWPutMetadataBucket_ObjStore() override {}
 };
 
-class RGWPutMetadataObject_ObjStore : public RGWPutMetadataObject
-{
+class RGWPutMetadataObject_ObjStore : public RGWPutMetadataObject {
 public:
   RGWPutMetadataObject_ObjStore() {}
   ~RGWPutMetadataObject_ObjStore() override {}
@@ -361,13 +346,13 @@ public:
   ~RGWDeleteObj_ObjStore() override {}
 };
 
-class  RGWGetCrossDomainPolicy_ObjStore : public RGWGetCrossDomainPolicy {
+class RGWGetCrossDomainPolicy_ObjStore : public RGWGetCrossDomainPolicy {
 public:
   RGWGetCrossDomainPolicy_ObjStore() = default;
   ~RGWGetCrossDomainPolicy_ObjStore() override = default;
 };
 
-class  RGWGetHealthCheck_ObjStore : public RGWGetHealthCheck {
+class RGWGetHealthCheck_ObjStore : public RGWGetHealthCheck {
 public:
   RGWGetHealthCheck_ObjStore() = default;
   ~RGWGetHealthCheck_ObjStore() override = default;
@@ -411,7 +396,6 @@ class RGWDeleteLC_ObjStore : public RGWDeleteLC {
 public:
   RGWDeleteLC_ObjStore() {}
   ~RGWDeleteLC_ObjStore() override {}
-
 };
 
 class RGWGetCORS_ObjStore : public RGWGetCORS {
@@ -520,8 +504,8 @@ public:
 
 class RGWInfo_ObjStore : public RGWInfo {
 public:
-    RGWInfo_ObjStore() = default;
-    ~RGWInfo_ObjStore() override = default;
+  RGWInfo_ObjStore() = default;
+  ~RGWInfo_ObjStore() override = default;
 };
 
 class RGWPutBucketObjectLock_ObjStore : public RGWPutBucketObjectLock {
@@ -567,21 +551,21 @@ protected:
   RGWRESTFlusher flusher;
 
 public:
-  void init(rgw::sal::Driver* driver, req_state *s,
+  void init(rgw::sal::Driver *driver, req_state *s,
             RGWHandler *dialect_handler) override {
     RGWOp::init(driver, s, dialect_handler);
     flusher.init(s, this);
   }
   void send_response() override;
-  virtual int check_caps(const RGWUserCaps& caps)
-    { return -EPERM; } /* should to be implemented! */
+  virtual int check_caps(const RGWUserCaps &caps) {
+    return -EPERM;
+  } /* should to be implemented! */
   int verify_permission(optional_yield y) override;
   dmc::client_id dmclock_client() override { return dmc::client_id::admin; }
 };
 
 class RGWHandler_REST : public RGWHandler {
 protected:
-
   virtual bool is_obj_update_op() const { return false; }
   virtual RGWOp *op_get() { return NULL; }
   virtual RGWOp *op_put() { return NULL; }
@@ -593,7 +577,7 @@ protected:
 
 public:
   static int allocate_formatter(req_state *s, RGWFormat default_formatter,
-				bool configurable);
+                                bool configurable);
 
   static constexpr int MAX_BUCKET_NAME_LEN = 255;
   static constexpr int MAX_OBJ_NAME_LEN = 1024;
@@ -601,15 +585,15 @@ public:
   RGWHandler_REST() {}
   ~RGWHandler_REST() override {}
 
-  static int validate_bucket_name(const std::string& bucket);
-  static int validate_object_name(const std::string& object);
+  static int validate_bucket_name(const std::string &bucket);
+  static int validate_object_name(const std::string &object);
   static int reallocate_formatter(req_state *s, RGWFormat type);
 
-  int init_permissions(RGWOp* op, optional_yield y) override;
-  int read_permissions(RGWOp* op, optional_yield y) override;
+  int init_permissions(RGWOp *op, optional_yield y) override;
+  int read_permissions(RGWOp *op, optional_yield y) override;
 
-  virtual RGWOp* get_op(void);
-  virtual void put_op(RGWOp* op);
+  virtual RGWOp *get_op(void);
+  virtual void put_op(RGWOp *op);
 };
 
 class RGWHandler_REST_SWIFT;
@@ -626,64 +610,53 @@ class RGWRESTMgr {
   bool should_log;
 
 protected:
-  std::map<std::string, RGWRESTMgr*> resource_mgrs;
+  std::map<std::string, RGWRESTMgr *> resource_mgrs;
   std::multimap<size_t, std::string> resources_by_size;
-  RGWRESTMgr* default_mgr;
+  RGWRESTMgr *default_mgr;
 
-  virtual RGWRESTMgr* get_resource_mgr(req_state* s,
-                                       const std::string& uri,
-                                       std::string* out_uri);
+  virtual RGWRESTMgr *get_resource_mgr(req_state *s, const std::string &uri,
+                                       std::string *out_uri);
 
-  virtual RGWRESTMgr* get_resource_mgr_as_default(req_state* const s,
-                                                  const std::string& uri,
-                                                  std::string* our_uri) {
+  virtual RGWRESTMgr *get_resource_mgr_as_default(req_state *const s,
+                                                  const std::string &uri,
+                                                  std::string *our_uri) {
     return this;
   }
 
 public:
-  RGWRESTMgr()
-    : should_log(false),
-      default_mgr(nullptr) {
-  }
+  RGWRESTMgr() : should_log(false), default_mgr(nullptr) {}
   virtual ~RGWRESTMgr();
 
-  void register_resource(std::string resource, RGWRESTMgr* mgr);
-  void register_default_mgr(RGWRESTMgr* mgr);
+  void register_resource(std::string resource, RGWRESTMgr *mgr);
+  void register_default_mgr(RGWRESTMgr *mgr);
 
-  virtual RGWRESTMgr* get_manager(req_state* const s,
+  virtual RGWRESTMgr *get_manager(req_state *const s,
                                   /* Prefix to be concatenated with @uri
                                    * during the lookup. */
-                                  const std::string& frontend_prefix,
-                                  const std::string& uri,
-                                  std::string* out_uri) final {
+                                  const std::string &frontend_prefix,
+                                  const std::string &uri,
+                                  std::string *out_uri) final {
     return get_resource_mgr(s, frontend_prefix + uri, out_uri);
   }
 
-  virtual RGWHandler_REST* get_handler(
-    rgw::sal::Driver* driver,
-    req_state* const s,
-    const rgw::auth::StrategyRegistry& auth_registry,
-    const std::string& frontend_prefix
-  ) {
+  virtual RGWHandler_REST *
+  get_handler(rgw::sal::Driver *driver, req_state *const s,
+              const rgw::auth::StrategyRegistry &auth_registry,
+              const std::string &frontend_prefix) {
     // TODO: 이렇게 수정해도 되는지 확인 필요
     // 혹은 override get_handler()를 사용하는 것이 더 나을수도
-    //if (strncmp(s->decoded_uri.c_str(), "/admin/org", strlen("/admin/org")) == 0){
+    // if (strncmp(s->decoded_uri.c_str(), "/admin/hbac", strlen("/admin/hbac"))
+    // == 0){
     //    return new RGWHandler_REST_Org_S3(auth_registry);
     //}
     return nullptr;
   }
 
-  virtual void put_handler(RGWHandler_REST* const handler) {
-    delete handler;
-  }
+  virtual void put_handler(RGWHandler_REST *const handler) { delete handler; }
 
-  void set_logging(bool _should_log) {
-    should_log = _should_log;
-  }
+  void set_logging(bool _should_log) { should_log = _should_log; }
 
-  bool get_logging() const {
-    return should_log;
-  }
+  bool get_logging() const { return should_log; }
 };
 
 class RGWLibIO;
@@ -694,15 +667,14 @@ class RGWREST {
   boost::container::flat_set<x_header> x_headers;
   RGWRESTMgr mgr;
 
-  static int preprocess(req_state *s, rgw::io::BasicClient* rio);
+  static int preprocess(req_state *s, rgw::io::BasicClient *rio);
+
 public:
   RGWREST() {}
-  RGWHandler_REST *get_handler(rgw::sal::Driver* driver,
-                               req_state *s,
-                               const rgw::auth::StrategyRegistry& auth_registry,
-                               const std::string& frontend_prefix,
-                               RGWRestfulIO *rio,
-                               RGWRESTMgr **pmgr,
+  RGWHandler_REST *get_handler(rgw::sal::Driver *driver, req_state *s,
+                               const rgw::auth::StrategyRegistry &auth_registry,
+                               const std::string &frontend_prefix,
+                               RGWRestfulIO *rio, RGWRESTMgr **pmgr,
                                int *init_error);
 #if 0
   RGWHandler *get_handler(RGWRados *driver, req_state *s,
@@ -710,29 +682,23 @@ public:
 			  int *init_error);
 #endif
 
-  void put_handler(RGWHandler_REST *handler) {
-    mgr.put_handler(handler);
-  }
+  void put_handler(RGWHandler_REST *handler) { mgr.put_handler(handler); }
 
   void register_resource(std::string resource, RGWRESTMgr *m,
-			 bool register_empty = false) {
+                         bool register_empty = false) {
     if (!register_empty && resource.empty())
       return;
 
     mgr.register_resource(resource, m);
   }
 
-  void register_default_mgr(RGWRESTMgr *m) {
-    mgr.register_default_mgr(m);
-  }
+  void register_default_mgr(RGWRESTMgr *m) { mgr.register_default_mgr(m); }
 
-  void register_x_headers(const std::string& headers);
+  void register_x_headers(const std::string &headers);
 
-  bool log_x_headers(void) {
-    return (x_headers.size() > 0);
-  }
+  bool log_x_headers(void) { return (x_headers.size() > 0); }
 
-  bool log_x_header(const std::string& header) {
+  bool log_x_header(const std::string &header) {
     return (x_headers.find(header) != x_headers.end());
   }
 };
@@ -740,71 +706,58 @@ public:
 static constexpr int64_t NO_CONTENT_LENGTH = -1;
 static constexpr int64_t CHUNKED_TRANSFER_ENCODING = -2;
 
-extern void dump_errno(int http_ret, std::string& out);
-extern void dump_errno(const struct rgw_err &err, std::string& out);
+extern void dump_errno(int http_ret, std::string &out);
+extern void dump_errno(const struct rgw_err &err, std::string &out);
 extern void dump_errno(req_state *s);
 extern void dump_errno(req_state *s, int http_ret);
-extern void end_header(req_state *s,
-                       RGWOp* op = nullptr,
-                       const char *content_type = nullptr,
-                       const int64_t proposed_content_length =
-		       NO_CONTENT_LENGTH,
-		       bool force_content_type = false,
-		       bool force_no_error = false);
+extern void
+end_header(req_state *s, RGWOp *op = nullptr,
+           const char *content_type = nullptr,
+           const int64_t proposed_content_length = NO_CONTENT_LENGTH,
+           bool force_content_type = false, bool force_no_error = false);
 extern void dump_start(req_state *s);
 extern void list_all_buckets_start(req_state *s);
-extern void dump_owner(req_state *s, const rgw_user& id,
-                       const std::string& name, const char *section = NULL);
-extern void dump_header(req_state* s,
-                        const std::string_view& name,
-                        const std::string_view& val);
-extern void dump_header(req_state* s,
-                        const std::string_view& name,
-                        ceph::buffer::list& bl);
-extern void dump_header(req_state* s,
-                        const std::string_view& name,
+extern void dump_owner(req_state *s, const rgw_user &id,
+                       const std::string &name, const char *section = NULL);
+extern void dump_header(req_state *s, const std::string_view &name,
+                        const std::string_view &val);
+extern void dump_header(req_state *s, const std::string_view &name,
+                        ceph::buffer::list &bl);
+extern void dump_header(req_state *s, const std::string_view &name,
                         long long val);
-extern void dump_header(req_state* s,
-                        const std::string_view& name,
-                        const utime_t& val);
+extern void dump_header(req_state *s, const std::string_view &name,
+                        const utime_t &val);
 
 template <class... Args>
-inline void dump_header_prefixed(req_state* s,
-				 const std::string_view& name_prefix,
-				 const std::string_view& name,
-				 Args&&... args) {
+inline void dump_header_prefixed(req_state *s,
+                                 const std::string_view &name_prefix,
+                                 const std::string_view &name, Args &&...args) {
   char full_name_buf[name_prefix.size() + name.size() + 1];
-  const auto len = snprintf(full_name_buf, sizeof(full_name_buf), "%.*s%.*s",
-                            static_cast<int>(name_prefix.length()),
-                            name_prefix.data(),
-                            static_cast<int>(name.length()),
-                            name.data());
+  const auto len =
+      snprintf(full_name_buf, sizeof(full_name_buf), "%.*s%.*s",
+               static_cast<int>(name_prefix.length()), name_prefix.data(),
+               static_cast<int>(name.length()), name.data());
   std::string_view full_name(full_name_buf, len);
   return dump_header(s, std::move(full_name), std::forward<Args>(args)...);
 }
 
 template <class... Args>
-inline void dump_header_infixed(req_state* s,
-				const std::string_view& prefix,
-				const std::string_view& infix,
-				const std::string_view& sufix,
-				Args&&... args) {
+inline void dump_header_infixed(req_state *s, const std::string_view &prefix,
+                                const std::string_view &infix,
+                                const std::string_view &sufix, Args &&...args) {
   char full_name_buf[prefix.size() + infix.size() + sufix.size() + 1];
-  const auto len = snprintf(full_name_buf, sizeof(full_name_buf), "%.*s%.*s%.*s",
-                            static_cast<int>(prefix.length()),
-                            prefix.data(),
-                            static_cast<int>(infix.length()),
-                            infix.data(),
-                            static_cast<int>(sufix.length()),
-                            sufix.data());
+  const auto len =
+      snprintf(full_name_buf, sizeof(full_name_buf), "%.*s%.*s%.*s",
+               static_cast<int>(prefix.length()), prefix.data(),
+               static_cast<int>(infix.length()), infix.data(),
+               static_cast<int>(sufix.length()), sufix.data());
   std::string_view full_name(full_name_buf, len);
   return dump_header(s, std::move(full_name), std::forward<Args>(args)...);
 }
 
 template <class... Args>
-inline void dump_header_quoted(req_state* s,
-			       const std::string_view& name,
-			       const std::string_view& val) {
+inline void dump_header_quoted(req_state *s, const std::string_view &name,
+                               const std::string_view &val) {
   /* We need two extra bytes for quotes. */
   char qvalbuf[val.size() + 2 + 1];
   const auto len = snprintf(qvalbuf, sizeof(qvalbuf), "\"%.*s\"",
@@ -813,20 +766,18 @@ inline void dump_header_quoted(req_state* s,
 }
 
 template <class ValueT>
-inline void dump_header_if_nonempty(req_state* s,
-				    const std::string_view& name,
-				    const ValueT& value) {
+inline void dump_header_if_nonempty(req_state *s, const std::string_view &name,
+                                    const ValueT &value) {
   if (name.length() > 0 && value.length() > 0) {
     return dump_header(s, name, value);
   }
 }
 
 inline std::string compute_domain_uri(const req_state *s) {
-  std::string uri = (!s->info.domain.empty()) ? s->info.domain :
-    [&s]() -> std::string {
+  std::string uri =
+      (!s->info.domain.empty()) ? s->info.domain : [&s]() -> std::string {
     RGWEnv const &env(*(s->info.env));
-    std::string uri =
-    env.get("SERVER_PORT_SECURE") ? "https://" : "http://";
+    std::string uri = env.get("SERVER_PORT_SECURE") ? "https://" : "http://";
     if (env.exists("SERVER_NAME")) {
       uri.append(env.get("SERVER_NAME", "<SERVER_NAME>"));
     } else {
@@ -839,30 +790,28 @@ inline std::string compute_domain_uri(const req_state *s) {
 
 extern void dump_content_length(req_state *s, uint64_t len);
 extern int64_t parse_content_length(const char *content_length);
-extern void dump_etag(req_state *s,
-                      const std::string_view& etag,
+extern void dump_etag(req_state *s, const std::string_view &etag,
                       bool quoted = false);
 extern void dump_epoch_header(req_state *s, const char *name, real_time t);
 extern void dump_time_header(req_state *s, const char *name, real_time t);
 extern void dump_last_modified(req_state *s, real_time t);
-extern void abort_early(req_state* s, RGWOp* op, int err,
-			RGWHandler* handler, optional_yield y);
-extern void dump_range(req_state* s, uint64_t ofs, uint64_t end,
-		       uint64_t total_size);
+extern void abort_early(req_state *s, RGWOp *op, int err, RGWHandler *handler,
+                        optional_yield y);
+extern void dump_range(req_state *s, uint64_t ofs, uint64_t end,
+                       uint64_t total_size);
 extern void dump_continue(req_state *s);
 extern void list_all_buckets_end(req_state *s);
 extern void dump_time(req_state *s, const char *name, real_time t);
-extern std::string dump_time_to_str(const real_time& t);
+extern std::string dump_time_to_str(const real_time &t);
 extern void dump_bucket_from_state(req_state *s);
-extern void dump_redirect(req_state *s, const std::string& redirect);
+extern void dump_redirect(req_state *s, const std::string &redirect);
 extern bool is_valid_url(const char *url);
 extern void dump_access_control(req_state *s, const char *origin,
-				const char *meth,
-				const char *hdr, const char *exp_hdr,
-				uint32_t max_age);
+                                const char *meth, const char *hdr,
+                                const char *exp_hdr, uint32_t max_age);
 extern void dump_access_control(req_state *s, RGWOp *op);
 
-extern int dump_body(req_state* s, const char* buf, size_t len);
-extern int dump_body(req_state* s, /* const */ ceph::buffer::list& bl);
-extern int dump_body(req_state* s, const std::string& str);
-extern int recv_body(req_state* s, char* buf, size_t max);
+extern int dump_body(req_state *s, const char *buf, size_t len);
+extern int dump_body(req_state *s, /* const */ ceph::buffer::list &bl);
+extern int dump_body(req_state *s, const std::string &str);
+extern int recv_body(req_state *s, char *buf, size_t max);

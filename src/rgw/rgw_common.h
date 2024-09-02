@@ -551,46 +551,71 @@ struct RGWRateLimitInfo {
 WRITE_CLASS_ENCODER(RGWRateLimitInfo)
 
 struct HbacUserHierarchy {
-  struct HierarchyInfo {
-    std::string parent;
-    std::vector<std::string> sons;
+  struct Node {
+    std::string name;
+    Node *parent;
+    std::vector<Node *> children;
     int tier;
 
-    void add_son(const std::string &son) { sons.push_back(son); }
-    void add_sons(const std::vector<std::string> &_sons) {
-      sons.insert(sons.end(), _sons.begin(), _sons.end());
-    }
-    void remove_son(const std::string &son) {
-      sons.erase(std::remove(sons.begin(), sons.end(), son), sons.end());
-    }
-    void set_parent(const std::string &_parent) { parent = _parent; }
-    void del_parent() { parent = ""; }
-    void set_tier(int _tier) { tier = _tier; }
+    Node(const std::string &name) : name(name), parent(nullptr), tier(0) {}
 
-    HierarchyInfo() : tier(0) {}
-    HierarchyInfo(const std::string &_parent,
-                  const std::vector<std::string> &_sons, int _tier)
-        : parent(_parent), sons(_sons), tier(_tier) {}
-    HierarchyInfo(const std::vector<std::string> &_sons, int _tier)
-        : sons(_sons), tier(_tier) {}
+    void add_child(Node *child) { children.push_back(child); }
 
+    void remove_child(Node *child) {
+      children.erase(std::remove(children.begin(), children.end(), child),
+                     children.end());
+    }
+
+    void set_parent(Node *p) { parent = p; }
+
+    void set_tier(int t) { tier = t; }
+
+    // Node의 데이터를 인코딩
     void encode(bufferlist &bl) const {
       ENCODE_START(1, 1, bl);
-      encode(parent, bl);
-      encode(sons, bl);
+      encode(name, bl);
+      int parent_present = (parent != nullptr) ? 1 : 0;
+      encode(parent_present, bl);
+      if (parent_present) {
+        encode(parent->name, bl);
+      }
       encode(tier, bl);
+      encode(children.size(), bl);
+      for (const auto *child : children) {
+        encode(child->name, bl);
+      }
       ENCODE_FINISH(bl);
     }
-    void decode(bufferlist::const_iterator &bl) {
-      DECODE_START(1, bl);
-      decode(parent, bl);
-      decode(sons, bl);
-      decode(tier, bl);
-      DECODE_FINISH(bl);
+
+    // Node의 데이터를 디코딩
+    void decode(bufferlist::const_iterator &p,
+                std::unordered_map<std::string, Node *> &node_map) {
+      DECODE_START(1, p);
+      decode(name, p);
+      int parent_present;
+      decode(parent_present, p);
+      if (parent_present) {
+        std::string parent_name;
+        decode(parent_name, p);
+        parent = node_map[parent_name];
+        parent->add_child(this);
+      } else {
+        parent = nullptr;
+      }
+      decode(tier, p);
+      size_t children_count;
+      decode(children_count, p);
+      for (size_t i = 0; i < children_count; ++i) {
+        std::string child_name;
+        decode(child_name, p);
+        Node *child_node = node_map[child_name];
+        children.push_back(child_node);
+      }
+      DECODE_FINISH(p);
     }
   };
 
-  std::map<std::string, HierarchyInfo> hierarchy_map;
+  std::unordered_map<std::string, Node *> node_map;
 
   std::vector<std::string> str_split_to_vec(const std::string &s) {
     std::vector<std::string> result;
@@ -608,10 +633,23 @@ struct HbacUserHierarchy {
   }
 
   int add_user(const std::string &user, const std::vector<std::string> &sons) {
-    hierarchy_map[user] = HierarchyInfo(sons, 0);
-    for (const auto &son : sons) {
-      hierarchy_map[son] = HierarchyInfo(user, {}, 1);
+    if (node_map.find(user) != node_map.end()) {
+      return -1; // RGW_HBAC_USER_EXIST
     }
+
+    Node *userNode = new Node(user);
+    node_map[user] = userNode;
+
+    for (const auto &son : sons) {
+      if (node_map.find(son) == node_map.end()) {
+        node_map[son] = new Node(son);
+      }
+      Node *sonNode = node_map[son];
+      userNode->add_child(sonNode);
+      sonNode->set_parent(userNode);
+      sonNode->set_tier(userNode->tier + 1);
+    }
+
     return 0;
   }
 
@@ -619,63 +657,94 @@ struct HbacUserHierarchy {
                const std::vector<std::string> &sons) {
     // std::ofstream out("/tmp/add_user_log.txt");
     // out << "this pointer: " << this << std::endl;
-    // out << "hierarchy_map size: " << hierarchy_map.size() << std::endl;
+    // out << "node_map size: " << node_map.size() << std::endl;
     // out.close();
-    //  기존 user가 이미 존재할경우 예외처리
-    if (hierarchy_map.find(user) != hierarchy_map.end()) {
-      return RGW_HBAC_USER_EXIST;
+
+    if (node_map.find(user) != node_map.end()) {
+      return -1; // RGW_HBAC_USER_EXIST
     }
+
     if (parent == "") {
       return add_user(user, sons);
     }
-    // parent가 없을 경우에 대한 예외처리
-    if (hierarchy_map.find(parent) == hierarchy_map.end()) {
-      return RGW_HBAC_PARAM_ERROR;
+
+    if (node_map.find(parent) == node_map.end()) {
+      return -2; // RGW_HBAC_PARAM_ERROR
     }
 
-    int parent_tier = hierarchy_map[parent].tier;
-    hierarchy_map[user] = HierarchyInfo(parent, sons, parent_tier + 1);
-    hierarchy_map[parent].add_son(user);
+    Node *parentNode = node_map[parent];
+    Node *userNode = new Node(user);
+    userNode->set_parent(parentNode);
+    userNode->set_tier(parentNode->tier + 1);
+    node_map[user] = userNode;
+
+    parentNode->add_child(userNode);
 
     for (const auto &son : sons) {
-      hierarchy_map[son] = HierarchyInfo(user, {}, parent_tier + 2);
+      if (node_map.find(son) == node_map.end()) {
+        node_map[son] = new Node(son);
+      }
+      Node *sonNode = node_map[son];
+      userNode->add_child(sonNode);
+      sonNode->set_parent(userNode);
+      sonNode->set_tier(userNode->tier + 1);
     }
 
-    return 0; // 성공적으로 추가되었음을 반환
+    return 0;
   }
 
   int remove_user(const std::string &user) {
-    if (hierarchy_map.find(user) == hierarchy_map.end()) {
-      return RGW_HBAC_PARAM_ERROR; // 사용자 존재하지 않을 경우 오류 반환
+    if (node_map.find(user) == node_map.end()) {
+      return -2; // RGW_HBAC_PARAM_ERROR
     }
 
-    std::string parent = hierarchy_map[user].parent;
-    std::vector<std::string> sons = hierarchy_map[user].sons;
-    hierarchy_map.erase(user);
+    Node *userNode = node_map[user];
+    Node *parentNode = userNode->parent;
+    std::vector<Node *> children = userNode->children;
 
-    if (!parent.empty()) {
-      hierarchy_map[parent].remove_son(user);
-      hierarchy_map[parent].add_sons(sons);
-      for (const auto &son : sons) {
-        hierarchy_map[son].set_parent(parent);
-      }
-    } else {
-      for (const auto &son : sons) {
-        hierarchy_map[son].set_parent("");
+    if (parentNode) {
+      parentNode->remove_child(userNode);
+    }
+
+    for (auto *child : children) {
+      child->set_parent(parentNode);
+      if (parentNode) {
+        parentNode->add_child(child);
       }
     }
 
-    return 0; // 성공적으로 제거되었음을 반환
+    node_map.erase(user);
+    delete userNode;
+
+    return 0;
+  }
+
+  bool is_parent_child(const std::string &parent_name,
+                       const std::string &child_name) const {
+    if (node_map.find(parent_name) == node_map.end() ||
+        node_map.find(child_name) == node_map.end()) {
+      return false;
+    }
+
+    Node *child = node_map.at(child_name);
+    while (child != nullptr) {
+      if (child->parent && child->parent->name == parent_name) {
+        return true;
+      }
+      child = child->parent;
+    }
+
+    return false;
   }
 
   nlohmann::json to_json_object(const std::string &user) const {
-    const HierarchyInfo &info = hierarchy_map.at(user);
+    const Node *node = node_map.at(user);
     nlohmann::json j;
     j["user"] = user;
     j["sons"] = nlohmann::json::array();
 
-    for (const auto &son : info.sons) {
-      j["sons"].push_back(to_json_object(son));
+    for (const auto *son : node->children) {
+      j["sons"].push_back(to_json_object(son->name));
     }
 
     return j;
@@ -684,8 +753,8 @@ struct HbacUserHierarchy {
   std::string to_json() const {
     nlohmann::json j = nlohmann::json::array();
 
-    for (const auto &[user, info] : hierarchy_map) {
-      if (info.parent.empty()) {
+    for (const auto &[user, node] : node_map) {
+      if (!node->parent) {
         j.push_back(to_json_object(user));
       }
     }
@@ -696,11 +765,11 @@ struct HbacUserHierarchy {
   void encode(bufferlist &bl) const {
     ENCODE_START(1, 1, bl);
 
-    // hierarchy_map 인코딩
-    encode(hierarchy_map.size(), bl); // 맵의 크기 인코딩
-    for (const auto &entry : hierarchy_map) {
-      encode(entry.first, bl); // 키 (user) 인코딩
-      entry.second.encode(bl); // 값 (HierarchyInfo) 인코딩
+    encode(node_map.size(), bl); // 전체 노드 수 인코딩
+
+    for (const auto &entry : node_map) {
+      encode(entry.first, bl);  // 각 노드 이름 인코딩
+      entry.second->encode(bl); // 각 노드의 데이터 인코딩
     }
 
     ENCODE_FINISH(bl);
@@ -709,18 +778,30 @@ struct HbacUserHierarchy {
   void decode(bufferlist::const_iterator &p) {
     DECODE_START(1, p);
 
-    // hierarchy_map 디코딩
-    size_t map_size;
-    decode(map_size, p); // 맵의 크기 디코딩
-    for (size_t i = 0; i < map_size; ++i) {
-      std::string user;
-      HierarchyInfo info;
-      decode(user, p); // 키 (user) 디코딩
-      info.decode(p);  // 값 (HierarchyInfo) 디코딩
-      hierarchy_map[user] = info;
+    size_t node_count;
+    decode(node_count, p); // 전체 노드 수 디코딩
+
+    // 노드 생성 및 이름 기반으로 노드 맵 채우기
+    for (size_t i = 0; i < node_count; ++i) {
+      std::string node_name;
+      decode(node_name, p);
+      node_map[node_name] = new Node(node_name);
+    }
+
+    // 노드의 자식, 부모, tier 정보를 설정하는 두 번째 패스
+    for (size_t i = 0; i < node_count; ++i) {
+      std::string node_name;
+      decode(node_name, p);
+      node_map[node_name]->decode(p, node_map);
     }
 
     DECODE_FINISH(p);
+  }
+
+  ~HbacUserHierarchy() {
+    for (auto &[_, node] : node_map) {
+      delete node;
+    }
   }
 };
 WRITE_CLASS_ENCODER(HbacUserHierarchy)

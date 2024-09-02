@@ -16,7 +16,7 @@ export class HAclService {
   // 빈 함수 생성
   getDec(userName: string): Observable<HttpResponse<any>> {
     let method = 'GET';
-    let url = "http://localhost:7480/admin/org/dec";
+    let url = "http://localhost:7480/admin/hbac/hierarchy";
     let service = 's3';
     let region = 'us-east-1';
     let accessKey = 'root';

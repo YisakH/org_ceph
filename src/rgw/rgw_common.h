@@ -617,11 +617,11 @@ struct HbacUserHierarchy {
 
   int add_user(const std::string &user, const std::string &parent,
                const std::vector<std::string> &sons) {
-    std::ofstream out("/tmp/add_user_log.txt");
-    out << "this pointer: " << this << std::endl;
-    out << "hierarchy_map size: " << hierarchy_map.size() << std::endl;
-    out.close();
-    // 기존 user가 이미 존재할경우 예외처리
+    // std::ofstream out("/tmp/add_user_log.txt");
+    // out << "this pointer: " << this << std::endl;
+    // out << "hierarchy_map size: " << hierarchy_map.size() << std::endl;
+    // out.close();
+    //  기존 user가 이미 존재할경우 예외처리
     if (hierarchy_map.find(user) != hierarchy_map.end()) {
       return RGW_HBAC_USER_EXIST;
     }

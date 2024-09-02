@@ -7,7 +7,7 @@ import hashlib
 
 
 app = Flask(__name__)
-url = "http://localhost:7480/admin/org/dec"
+url = "http://localhost:7480/admin/hbac/dec"
 
 def sign_request(url, method, service, region, params, access_key, secret_key, session_token=None):
     session = botocore.session.get_session()
@@ -51,7 +51,7 @@ def send_request(url, method, access_key, secret_key, params=None, service='s3',
 
 def get_tree_structure():
     # Example usage
-    url = "http://localhost:7480/admin/org/dec"
+    url = "http://localhost:7480/admin/hbac/dec"
     method = "GET"
     access_key = "qwer"
     secret_key = "qwer"

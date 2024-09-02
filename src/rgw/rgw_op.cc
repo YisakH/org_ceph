@@ -4352,7 +4352,7 @@ void RGWDeleteOrg::execute(optional_yield y) {
 
     ret = deleteAcl(request_user, user, path);
     ret = driver->remove_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
-  } else if (s->decoded_uri == "/admin/hbac/user") {
+  } else if (s->decoded_uri == "/admin/hbac/hierarchy") {
     const auto &user = findValueForKey(s->http_params, "user");
     ret = RGWOrgUser::deleteUser(user);
   }
@@ -4373,7 +4373,7 @@ void RGWDeleteOrg::pre_exec() { rgw_bucket_object_pre_exec(s); }
 void RGWListOrg::execute(optional_yield y) {
   int ret = -2;
   bufferlist response_bl;
-  if (s->decoded_uri == "/admin/hbac/dec") {
+  if (s->decoded_uri == "/admin/hbac/hierarchy") {
     const auto &user = findValueForKey(s->http_params, "user");
     nlohmann::json dec_tree;
 
@@ -4464,7 +4464,7 @@ void RGWGetOrg::execute(optional_yield y) {
     ret = getAnc(user, &anc);
 
     response_bl.append(anc.c_str());
-  } else if (s->decoded_uri == "/admin/hbac/dec") {
+  } else if (s->decoded_uri == "/admin/hbac/deprecated") {
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &json = findValueForKey(s->http_params, "json");
 
@@ -4481,7 +4481,7 @@ void RGWGetOrg::execute(optional_yield y) {
     const auto &user = findValueForKey(s->http_params, "user");
 
     HbacUserHierarchy user_hierarchy;
-    driver->load_hierarchy(this, &s->hbac, user_hierarchy, y);
+    ret = driver->load_hierarchy(this, &s->hbac, user_hierarchy, y);
     std::string json = user_hierarchy.to_json();
 
     response_bl.append(json.c_str());
@@ -4490,10 +4490,12 @@ void RGWGetOrg::execute(optional_yield y) {
     dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : wrong uri" << dendl;
   }
 
-  if (ret != 0) {
+  if (ret < 0) {
     dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : rocksdb get error"
             << dendl;
-    response_bl.append("error occured! maybe there is no such key in rocksdb");
+    response_bl.append(
+        "error occured! maybe there is no such key in rocksdb\n");
+    response_bl.append("ret : " + to_string(ret));
   }
 
   send_response_data(response_bl, 0, response_bl.length());
@@ -4546,7 +4548,7 @@ void RGWPutOrg::execute(optional_yield y) {
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &anc = findValueForKey(s->http_params, "anc");
     ret = putAnc(user, anc);
-  } else if (s->decoded_uri == "/admin/hbac/user") {
+  } else if (s->decoded_uri == "/admin/hbac/hierarchy") {
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &anc = findValueForKey(s->http_params, "anc");
     const auto &dec_list = findValueForKey(s->http_params, "dec_list");

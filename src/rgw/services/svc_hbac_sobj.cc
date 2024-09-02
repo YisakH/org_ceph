@@ -178,6 +178,8 @@ int RGWSI_HBAC_SObj::read_hierarchy_info(
         << dendl;
     return -EIO;
   }
+
+  return ret;
 }
 
 int RGWSI_HBAC_SObj::store_hierarchy_info(

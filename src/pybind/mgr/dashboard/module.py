@@ -151,7 +151,7 @@ class CherryPyConfig(object):
             'tools.json_in.force': True,
             'tools.plugin_hooks_filter_request.on': True,
             # socks: 여기서부터 내가 추가한 cors 처리 로직
-            '/admin/org/dec': {
+            '/admin/hbac/hierarchy': {
             'tools.cors.on': False,
             
             }
@@ -280,7 +280,7 @@ class CherryPyConfig(object):
         f.close()
         
         # socks : 내가 추가한 cors 스킵 코드
-        if cherrypy.request.path_info == '/admin/org/dec':
+        if cherrypy.request.path_info == '/admin/hbac/hierarchy':
             return
 
         # Non-simple CORS preflight request; short-circuit the normal handler.

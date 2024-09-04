@@ -687,7 +687,7 @@ int checkAclWrite(const std::string &request_user,
   ret = getAnc(target_user, &anc_user);
 
   if (anc_user == request_user) {
-    return -RGW_ORG_PERMISSION_ALLOWED;
+    return RGW_ORG_PERMISSION_ALLOWED;
   }
 
   RGWOrg *rgwOrg = getAcl(anc_user, path);
@@ -709,7 +709,7 @@ int checkAclWrite(const std::string &request_user,
     }
   }
 
-  return -RGW_ORG_PERMISSION_ALLOWED;
+  return RGW_ORG_PERMISSION_ALLOWED;
 }
 
 int checkHAclObjRead(const std::string &request_user,

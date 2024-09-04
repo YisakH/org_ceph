@@ -1554,7 +1554,16 @@ static bool validate_cors_rule_method(const DoutPrefixProvider *dpp,
 
   return true;
 }
-
+std::string findValueForKey(
+    const std::vector<std::pair<std::string, std::string>> &keyValuePairs,
+    const std::string &key) {
+  for (const auto &pair : keyValuePairs) {
+    if (pair.first == key) {
+      return pair.second;
+    }
+  }
+  return ""; // Key를 찾지 못한 경우 빈 문자열 반환
+}
 static bool validate_cors_rule_header(const DoutPrefixProvider *dpp,
                                       RGWCORSRule *rule, const char *req_hdrs) {
   if (req_hdrs) {
@@ -2278,6 +2287,36 @@ int RGWGetObj::get_lua_filter(std::unique_ptr<RGWGetObj_Filter> *filter,
     return rc;
   }
   filter->reset(new rgw::lua::RGWGetObjFilter(s, script, cb));
+  return 0;
+}
+
+int RGWGetOrg::get_params(optional_yield y) {
+  const bool get = findValueForKey(s->http_params, "get") == "true";
+  const bool put = findValueForKey(s->http_params, "put") == "true";
+  const bool del = findValueForKey(s->http_params, "del") == "true";
+  const bool gra = findValueForKey(s->http_params, "gra") == "true";
+  const std::string path = findValueForKey(s->http_params, "path");
+  const std::string user = findValueForKey(s->http_params, "user");
+  const std::string authorizer = s->user->get_id().id;
+
+  rgw_hbac_info::permission perms(get, put, del, gra);
+  inputParams = new RGWHbacInfo(rgw_hbac_info(user, path, authorizer, perms));
+
+  return 0;
+}
+
+int RGWPutOrg::get_params(optional_yield y) {
+  const bool get = findValueForKey(s->http_params, "get") == "true";
+  const bool put = findValueForKey(s->http_params, "put") == "true";
+  const bool del = findValueForKey(s->http_params, "del") == "true";
+  const bool gra = findValueForKey(s->http_params, "gra") == "true";
+  const std::string path = findValueForKey(s->http_params, "path");
+  const std::string user = findValueForKey(s->http_params, "user");
+  const std::string authorizer = s->user->get_id().id;
+
+  rgw_hbac_info::permission perms(get, put, del, gra);
+  inputParams = new RGWHbacInfo(rgw_hbac_info(user, path, authorizer, perms));
+
   return 0;
 }
 
@@ -3477,17 +3516,6 @@ static int select_bucket_placement(const DoutPrefixProvider *dpp,
   return 0;
 }
 
-std::string findValueForKey(
-    const std::vector<std::pair<std::string, std::string>> &keyValuePairs,
-    const std::string &key) {
-  for (const auto &pair : keyValuePairs) {
-    if (pair.first == key) {
-      return pair.second;
-    }
-  }
-  return ""; // Key를 찾지 못한 경우 빈 문자열 반환
-}
-
 void RGWCreateBucket::execute(optional_yield y) {
   op_ret = get_params(y);
   if (op_ret < 0)
@@ -3954,16 +3982,80 @@ int RGWGetOrg::verify_requester(
 int RGWPutOrg::verify_requester(
     const rgw::auth::StrategyRegistry &auth_registry, optional_yield y) {
   return RGWOp::verify_requester(auth_registry, y);
-  // dout(0) << "socks : rgw_op.cc : RGWPutOrg::verify_requester() : verify
-  // requester return : " << ret << dendl;
 }
 
 int RGWPutOrg::verify_permission(optional_yield y) {
+  int ret = get_params(y);
+  if (ret < 0) {
+    return ret;
+  }
+  if (inputParams->authorizer == "root") {
+    return RGW_ORG_PERMISSION_ALLOWED;
+  }
+
   if (s->decoded_uri == "/admin/hbac/acl") {
+    HbacUserHierarchy hierarchy;
+    ret = driver->load_hierarchy(this, &s->hbac, hierarchy, y);
+    if (ret < 0) {
+      return ret;
+    }
+
+    /* 권한 부여 대상과 권한 부여자 사이 관계가 부모-자손 관계여야 함*/
+    if (!hierarchy.is_ancestor(inputParams->authorizer, inputParams->user)) {
+      return -RGW_ORG_TIER_NOT_ALLOWED;
+    }
+
+    /* 권한 부여자가 부여하고자 하는 권한을 보유하고 있어야 함*/
+    ret = driver->load_hbac(
+        this,
+        rgw_hbac_info(inputParams->authorizer, inputParams->permissions.path),
+        &s->hbac, y);
+    if (ret < 0) { // authorizer가 권한을 보유하고 있지 않을 경우
+      return -RGW_ORG_PERMISSION_NOT_ALLOWED;
+    }
+    if (!s->hbac->get_hbac()->have_permissions(inputParams->permissions.get,
+                                               inputParams->permissions.put,
+                                               inputParams->permissions.del)) {
+      return -RGW_ORG_PERMISSION_NOT_ALLOWED;
+    }
+
+    /* 권한을 부여할 대상에 대한 권한 검증 작업*/
+    ret = driver->load_hbac(
+        this, rgw_hbac_info(inputParams->user, inputParams->permissions.path),
+        &s->hbac, y);
+    if (ret < 0 && ret != -2) {
+      return ret;
+    } else if (ret >= 0) { // 대상 user가 권한이 존재할 경우
+      std::string &target_authorizer = s->hbac->get_hbac()->authorizer;
+      if (!hierarchy.is_ancestor(inputParams->authorizer, target_authorizer)) {
+        return -RGW_ORG_TIER_NOT_ALLOWED;
+      }
+    }
+
+    /* 권한 부여 대상의 부모가 해당 권한을 보유하고 있어야 함 */
+    std::string parent = hierarchy.get_parent(inputParams->user);
+    if (parent == inputParams->authorizer) {
+      return RGW_ORG_PERMISSION_ALLOWED;
+    }
+
+    ret = driver->load_hbac(
+        this, rgw_hbac_info(parent, inputParams->permissions.path), &s->hbac,
+        y);
+    if (ret < 0) {
+      return -RGW_ORG_PERMISSION_NOT_ALLOWED;
+    }
+    if (!s->hbac->get_hbac()->have_permissions(
+            inputParams->permissions.get, inputParams->permissions.put,
+            inputParams->permissions.del, inputParams->permissions.gra)) {
+      return -RGW_ORG_PERMISSION_NOT_ALLOWED;
+    }
+
+    return RGW_ORG_PERMISSION_ALLOWED;
+
     const auto &user = findValueForKey(s->http_params, "user");
     const string &authorizer = s->user->get_id().id;
     int tier;
-    int ret = getTier(authorizer, &tier);
+    ret = getTier(authorizer, &tier);
     if (ret < 0) {
       tier = 999;
     }
@@ -3977,25 +4069,22 @@ int RGWPutOrg::verify_permission(optional_yield y) {
     // checkAclPermission, checkAclWrite를 통해 권한 검사
     if (authorizer == "root")
       return RGW_ORG_PERMISSION_ALLOWED;
-    else {
-      if ((ret = checkAclPermission(authorizer, get, put, del, gra, path)) <
-          0) {
-        return ret;
-      }
-      return checkAclWrite(authorizer, user, path, authorizer, tier, get, put,
-                           del, gra);
+    if ((ret = checkAclPermission(authorizer, get, put, del, gra, path)) < 0) {
+      return ret;
     }
+    return checkAclWrite(authorizer, user, path, authorizer, tier, get, put,
+                         del, gra);
   }
   return 0;
 }
 
 int RGWGetOrg::verify_permission(optional_yield y) {
-  // TODO: socks 얘도 해야함
-  const auto &request_user = s->user->get_id().id;
-  const auto &target_user = findValueForKey(s->http_params, "user");
+  int ret = get_params(y);
+  if (ret < 0) {
+    return ret;
+  }
 
-  return checkAclRead(request_user, target_user);
-  // return 1;
+  return checkAclRead(inputParams->authorizer, inputParams->user);
 }
 
 // 얘는 put object시 rgw iam 권한 검사하는데 초점을 맞추고 있음.
@@ -4419,11 +4508,6 @@ std::string RGWGetOrg::callTreeDec(string user) {
 }
 
 void RGWGetOrg::execute(optional_yield y) {
-  for (auto it = s->info.env->get_map().begin();
-       it != s->info.env->get_map().end(); ++it) {
-    dout(0) << "socks : rgw_op.cc : Key: " << it->first
-            << ", Value: " << it->second << dendl;
-  }
   int ret = -2;
   bufferlist response_bl;
   if (s->decoded_uri == "/admin/hbac/acl") {
@@ -4434,22 +4518,11 @@ void RGWGetOrg::execute(optional_yield y) {
 
     if (ret >= 0) {
       response_bl.append(s->hbac->to_str());
+    } else if (ret == -2) {
+      response_bl.append("there is no data");
     } else {
       response_bl.append("driver->load_hbac error");
     }
-
-    s->rgwOrg = getAcl(user, path);
-
-    // std::string tmp = s->hbac->user;
-    // bool get = s->hbac->permission_flags.get;
-
-    if (s->rgwOrg == nullptr) {
-      response_bl.append("there are no request user");
-    } else {
-      response_bl.append(s->rgwOrg->toString().c_str());
-    }
-
-    ret = 0;
   } else if (s->decoded_uri == "/admin/hbac/tier") {
     const auto &user = findValueForKey(s->http_params, "user");
     int tier;
@@ -4478,14 +4551,16 @@ void RGWGetOrg::execute(optional_yield y) {
     ret = 0;
     response_bl.append(return_str.c_str());
   } else if (s->decoded_uri == "/admin/hbac/hierarchy") {
-    const auto &user = findValueForKey(s->http_params, "user");
+    const std::string &user = findValueForKey(s->http_params, "user");
 
     HbacUserHierarchy user_hierarchy;
     ret = driver->load_hierarchy(this, &s->hbac, user_hierarchy, y);
-    std::string json = user_hierarchy.to_json();
-
-    response_bl.append(json.c_str());
-
+    if (ret < 0) {
+      response_bl.append("error occured! there is no hierarchy\n");
+    } else {
+      std::string json = user_hierarchy.to_json(user);
+      response_bl.append(json.c_str());
+    }
   } else {
     dout(0) << "socks : rgw_op.cc : RGWGetOrg::execute : wrong uri" << dendl;
   }
@@ -4499,6 +4574,42 @@ void RGWGetOrg::execute(optional_yield y) {
   }
 
   send_response_data(response_bl, 0, response_bl.length());
+}
+
+int RGWPutOrg::put_acl(rgw_hbac_info info, optional_yield y) {
+  if (info.authorizer == info.user) {
+    return RGW_ORG_PERMISSION_ALLOWED;
+  }
+  HbacUserHierarchy hierarchy;
+  int ret = driver->load_hierarchy(this, &s->hbac, hierarchy, y);
+  if (ret < 0) {
+    return ret;
+  }
+
+  std::string parent = hierarchy.get_parent(info.user);
+  ret =
+      put_acl(rgw_hbac_info(parent, info.path, info.authorizer, info.perms), y);
+  if (ret < 0) {
+    return ret;
+  }
+
+  /* 부모가 권한 검증을 완료했을 경우 */
+  ret = driver->load_hbac(this, info, &s->hbac, y);
+  if (ret == -2) {
+    return driver->store_hbac(this, info, &s->hbac, y);
+  } else if (ret < 0) {
+    return ret;
+  }
+
+  if (s->hbac->get_hbac()->have_permissions(
+          inputParams->permissions.get, inputParams->permissions.put,
+          inputParams->permissions.del, inputParams->permissions.gra)) {
+    return RGW_ORG_PERMISSION_ALLOWED;
+  }
+  if (hierarchy.is_ancestor(inputParams->authorizer, inputParams->user)) {
+    return driver->store_hbac(this, info, &s->hbac, y);
+  }
+  return -RGW_ORG_PERMISSION_NOT_ALLOWED;
 }
 
 void RGWPutOrg::execute(optional_yield y) {
@@ -4531,14 +4642,7 @@ void RGWPutOrg::execute(optional_yield y) {
 
     rgw_hbac_info::permission perms(get, put, del, gra);
 
-    ret = driver->store_hbac(this, rgw_hbac_info(user, path, authorizer, perms),
-                             &s->hbac, y);
-    // ret의 실행 결과를 /tmp/org_execute.txt에 로그로 남김
-    std::ofstream out("/tmp/org_execute.txt");
-    out << ret << std::endl;
-    out.close();
-
-    ret = putAcl(user, path, authorizer, tier, get, put, del, gra);
+    ret = put_acl(rgw_hbac_info(user, path, authorizer, perms), y);
   } else if (s->decoded_uri == "/admin/hbac/tier") {
     const auto &user = findValueForKey(s->http_params, "user");
     const int &tier = stoi(findValueForKey(s->http_params, "tier"));
@@ -4560,7 +4664,7 @@ void RGWPutOrg::execute(optional_yield y) {
     HbacUserHierarchy user_hierarchy;
 
     driver->load_hierarchy(this, &s->hbac, user_hierarchy, y);
-    user_hierarchy.add_user(user, anc, dec_list);
+    ret = user_hierarchy.add_user(user, anc, dec_list);
     driver->store_hierarchy(this, &s->hbac, user_hierarchy, y);
     // ret = s->hbac->load_hierarchy(this, y);
     // ret = s->hbac->get_user_hierarchy()->add_user(user, anc, dec_list);
@@ -4712,7 +4816,8 @@ void RGWPutObj::execute(optional_yield y) {
       }
       return;
     }
-    /* upload will go out of scope, so copy the dest placement for later use */
+    /* upload will go out of scope, so copy the dest placement for later use
+     */
     s->dest_placement = *pdest_placement;
     pdest_placement = &s->dest_placement;
     ldpp_dout(this, 20) << "dest_placement for part=" << *pdest_placement
@@ -4802,7 +4907,8 @@ void RGWPutObj::execute(optional_yield y) {
   std::unique_ptr<rgw::sal::DataProcessor> encrypt;
   std::unique_ptr<rgw::sal::DataProcessor> run_lua;
 
-  if (!append) { // compression and encryption only apply to full object uploads
+  if (!append) { // compression and encryption only apply to full object
+                 // uploads
     op_ret = get_encrypt_filter(&encrypt, filter);
     if (op_ret < 0) {
       return;
@@ -4823,15 +4929,16 @@ void RGWPutObj::execute(optional_yield y) {
       } else {
         compressor.emplace(s->cct, plugin, filter);
         filter = &*compressor;
-        // always send incompressible hint when rgw is itself doing compression
+        // always send incompressible hint when rgw is itself doing
+        // compression
         s->object->set_compressed();
       }
     }
     if (torrent = get_torrent_filter(filter); torrent) {
       filter = &*torrent;
     }
-    // run lua script before data is compressed and encrypted - last filter runs
-    // first
+    // run lua script before data is compressed and encrypted - last filter
+    // runs first
     op_ret = get_lua_filter(&run_lua, filter);
     if (op_ret < 0) {
       return;
@@ -5082,8 +5189,8 @@ void RGWPostObj::execute(optional_yield y) {
         return;
       }
       if (princ_type == rgw::IAM::PolicyPrincipal::Role) {
-        // Intersection of session policy and identity policy plus intersection
-        // of session policy and bucket policy
+        // Intersection of session policy and identity policy plus
+        // intersection of session policy and bucket policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             (session_policy_res == Effect::Allow && e == Effect::Allow)) {
@@ -5091,7 +5198,8 @@ void RGWPostObj::execute(optional_yield y) {
           return;
         }
       } else if (princ_type == rgw::IAM::PolicyPrincipal::Session) {
-        // Intersection of session policy and identity policy plus bucket policy
+        // Intersection of session policy and identity policy plus bucket
+        // policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             e == Effect::Allow) {
@@ -5459,9 +5567,9 @@ void RGWPutMetadataBucket::execute(optional_yield y) {
   op_ret = retry_raced_bucket_write(
       this, s->bucket.get(),
       [this] {
-        /* Encode special metadata first as we're using std::map::emplace under
-         * the hood. This method will add the new items only if the map doesn't
-         * contain such keys yet. */
+        /* Encode special metadata first as we're using std::map::emplace
+         * under the hood. This method will add the new items only if the map
+         * doesn't contain such keys yet. */
         if (has_policy) {
           if (s->dialect.compare("swift") == 0) {
             rgw::swift::merge_policy(policy_rw_mask, s->bucket_acl, policy);
@@ -5694,15 +5802,16 @@ int RGWDeleteObj::verify_permission(optional_yield y) {
         return -EACCES;
       }
       if (princ_type == rgw::IAM::PolicyPrincipal::Role) {
-        // Intersection of session policy and identity policy plus intersection
-        // of session policy and bucket policy
+        // Intersection of session policy and identity policy plus
+        // intersection of session policy and bucket policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             (session_policy_res == Effect::Allow && r == Effect::Allow)) {
           return 0;
         }
       } else if (princ_type == rgw::IAM::PolicyPrincipal::Session) {
-        // Intersection of session policy and identity policy plus bucket policy
+        // Intersection of session policy and identity policy plus bucket
+        // policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             r == Effect::Allow) {
@@ -5986,7 +6095,8 @@ int RGWCopyObj::verify_permission(optional_yield y) {
       return op_ret;
     }
 
-    /* follow up on previous checks that required reading source object head */
+    /* follow up on previous checks that required reading source object head
+     */
     if (need_to_check_storage_class) {
       src_placement.inherit_from(src_bucket->get_placement_rule());
 
@@ -6057,7 +6167,8 @@ int RGWCopyObj::verify_permission(optional_yield y) {
             }
           } else if (princ_type ==
                      rgw::IAM::PolicyPrincipal::Other) { // there was no match
-                                                         // in the bucket policy
+                                                         // in the bucket
+                                                         // policy
             if (session_policy_res != Effect::Allow ||
                 identity_policy_res != Effect::Allow) {
               return -EACCES;
@@ -6069,8 +6180,8 @@ int RGWCopyObj::verify_permission(optional_yield y) {
                                        RGW_PERM_READ)) {
           return -EACCES;
         }
-        // remove src object tags as it may interfere with policy evaluation of
-        // destination obj
+        // remove src object tags as it may interfere with policy evaluation
+        // of destination obj
         if (has_s3_existing_tag || has_s3_resource_tag)
           rgw_iam_remove_objtags(this, s, s->src_object.get(),
                                  has_s3_existing_tag, has_s3_resource_tag);
@@ -6148,8 +6259,8 @@ int RGWCopyObj::verify_permission(optional_yield y) {
             return -EACCES;
           }
         } else if (princ_type ==
-                   rgw::IAM::PolicyPrincipal::Other) { // there was no match in
-                                                       // the bucket policy
+                   rgw::IAM::PolicyPrincipal::Other) { // there was no match
+                                                       // in the bucket policy
           if (session_policy_res != Effect::Allow ||
               identity_policy_res != Effect::Allow) {
             return -EACCES;
@@ -6572,10 +6683,10 @@ void RGWPutLC::execute(optional_yield y) {
   RGWXMLParser parser;
   RGWLifecycleConfiguration_S3 new_config(s->cct);
 
-  // amazon says that Content-MD5 is required for this op specifically, but MD5
-  // is not a security primitive and FIPS mode makes it difficult to use. if the
-  // client provides the header we'll try to verify its checksum, but the header
-  // itself is no longer required
+  // amazon says that Content-MD5 is required for this op specifically, but
+  // MD5 is not a security primitive and FIPS mode makes it difficult to use.
+  // if the client provides the header we'll try to verify its checksum, but
+  // the header itself is no longer required
   std::optional<std::string> content_md5_bin;
 
   content_md5 = s->info.env->get("HTTP_CONTENT_MD5");
@@ -6974,15 +7085,16 @@ int RGWInitMultipart::verify_permission(optional_yield y) {
         return -EACCES;
       }
       if (princ_type == rgw::IAM::PolicyPrincipal::Role) {
-        // Intersection of session policy and identity policy plus intersection
-        // of session policy and bucket policy
+        // Intersection of session policy and identity policy plus
+        // intersection of session policy and bucket policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             (session_policy_res == Effect::Allow && e == Effect::Allow)) {
           return 0;
         }
       } else if (princ_type == rgw::IAM::PolicyPrincipal::Session) {
-        // Intersection of session policy and identity policy plus bucket policy
+        // Intersection of session policy and identity policy plus bucket
+        // policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             e == Effect::Allow) {
@@ -7094,15 +7206,16 @@ int RGWCompleteMultipart::verify_permission(optional_yield y) {
         return -EACCES;
       }
       if (princ_type == rgw::IAM::PolicyPrincipal::Role) {
-        // Intersection of session policy and identity policy plus intersection
-        // of session policy and bucket policy
+        // Intersection of session policy and identity policy plus
+        // intersection of session policy and bucket policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             (session_policy_res == Effect::Allow && e == Effect::Allow)) {
           return 0;
         }
       } else if (princ_type == rgw::IAM::PolicyPrincipal::Session) {
-        // Intersection of session policy and identity policy plus bucket policy
+        // Intersection of session policy and identity policy plus bucket
+        // policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             e == Effect::Allow) {
@@ -7167,8 +7280,8 @@ void RGWCompleteMultipart::execute(optional_yield y) {
   parts = static_cast<RGWMultiCompleteUpload *>(
       parser.find_first("CompleteMultipartUpload"));
   if (!parts || parts->parts.empty()) {
-    // CompletedMultipartUpload is incorrect but some versions of some libraries
-    // use it, see PR #41700
+    // CompletedMultipartUpload is incorrect but some versions of some
+    // libraries use it, see PR #41700
     parts = static_cast<RGWMultiCompleteUpload *>(
         parser.find_first("CompletedMultipartUpload"));
   }
@@ -7376,15 +7489,16 @@ int RGWAbortMultipart::verify_permission(optional_yield y) {
         return -EACCES;
       }
       if (princ_type == rgw::IAM::PolicyPrincipal::Role) {
-        // Intersection of session policy and identity policy plus intersection
-        // of session policy and bucket policy
+        // Intersection of session policy and identity policy plus
+        // intersection of session policy and bucket policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             (session_policy_res == Effect::Allow && e == Effect::Allow)) {
           return 0;
         }
       } else if (princ_type == rgw::IAM::PolicyPrincipal::Session) {
-        // Intersection of session policy and identity policy plus bucket policy
+        // Intersection of session policy and identity policy plus bucket
+        // policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             e == Effect::Allow) {
@@ -7607,15 +7721,16 @@ int RGWDeleteMultiObj::verify_permission(optional_yield y) {
         return -EACCES;
       }
       if (princ_type == rgw::IAM::PolicyPrincipal::Role) {
-        // Intersection of session policy and identity policy plus intersection
-        // of session policy and bucket policy
+        // Intersection of session policy and identity policy plus
+        // intersection of session policy and bucket policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             (session_policy_res == Effect::Allow && r == Effect::Allow)) {
           return 0;
         }
       } else if (princ_type == rgw::IAM::PolicyPrincipal::Session) {
-        // Intersection of session policy and identity policy plus bucket policy
+        // Intersection of session policy and identity policy plus bucket
+        // policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             r == Effect::Allow) {
@@ -7716,8 +7831,8 @@ void RGWDeleteMultiObj::handle_individual_object(
         return;
       }
       if (princ_type == rgw::IAM::PolicyPrincipal::Role) {
-        // Intersection of session policy and identity policy plus intersection
-        // of session policy and bucket policy
+        // Intersection of session policy and identity policy plus
+        // intersection of session policy and bucket policy
         if ((session_policy_res != Effect::Allow ||
              identity_policy_res != Effect::Allow) &&
             (session_policy_res != Effect::Allow || e != Effect::Allow)) {
@@ -7725,7 +7840,8 @@ void RGWDeleteMultiObj::handle_individual_object(
           return;
         }
       } else if (princ_type == rgw::IAM::PolicyPrincipal::Session) {
-        // Intersection of session policy and identity policy plus bucket policy
+        // Intersection of session policy and identity policy plus bucket
+        // policy
         if ((session_policy_res != Effect::Allow ||
              identity_policy_res != Effect::Allow) &&
             e != Effect::Allow) {
@@ -8288,15 +8404,16 @@ bool RGWBulkUploadOp::handle_file_verify_permission(
         return false;
       }
       if (princ_type == rgw::IAM::PolicyPrincipal::Role) {
-        // Intersection of session policy and identity policy plus intersection
-        // of session policy and bucket policy
+        // Intersection of session policy and identity policy plus
+        // intersection of session policy and bucket policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             (session_policy_res == Effect::Allow && e == Effect::Allow)) {
           return true;
         }
       } else if (princ_type == rgw::IAM::PolicyPrincipal::Session) {
-        // Intersection of session policy and identity policy plus bucket policy
+        // Intersection of session policy and identity policy plus bucket
+        // policy
         if ((session_policy_res == Effect::Allow &&
              identity_policy_res == Effect::Allow) ||
             e == Effect::Allow) {
@@ -8500,7 +8617,8 @@ void RGWBulkUploadOp::execute(optional_yield y) {
     return;
   }
 
-  /* Handling the $UPLOAD_PATH accordingly to the Swift's Bulk middleware. See:
+  /* Handling the $UPLOAD_PATH accordingly to the Swift's Bulk middleware.
+   * See:
    * https://github.com/openstack/swift/blob/2.13.0/swift/common/middleware/bulk.py#L31-L41
    */
   std::string bucket_path, file_prefix;

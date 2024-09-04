@@ -583,6 +583,8 @@ public:
                      HbacUserHierarchy &hierarchy, optional_yield y);
   int store_hierarchy(const DoutPrefixProvider *dpp,
                       HbacUserHierarchy &hierarchy, optional_yield y);
+
+  RGWHbacInfo *get_hbac() { return &info; };
   virtual std::string to_str() override;
 };
 

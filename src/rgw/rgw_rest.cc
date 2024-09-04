@@ -769,7 +769,7 @@ int recv_body(req_state *const s, char *const buf, const size_t max) {
 }
 int RGWDeleteOrg_ObjStore::get_params(optional_yield y) { return 0; }
 
-int RGWGetOrg_ObjStore::get_params(optional_yield y) { return 0; }
+// int RGWGetOrg_ObjStore::get_params(optional_yield y) { return 0; }
 
 int RGWGetObj_ObjStore::get_params(optional_yield y) {
   range_str = s->info.env->get("HTTP_RANGE");
@@ -2229,4 +2229,4 @@ RGWREST::get_handler(rgw::sal::Driver *const driver, req_state *const s,
   return handler;
 } /* get stream handler */
 
-int RGWPutOrg_ObjStore::get_params(optional_yield y) { return 0; }
+// int RGWPutOrg_ObjStore::get_params(optional_yield y) { return 0; }

@@ -316,14 +316,14 @@ int RGWDeleteOrg_ObjStore_S3::get_params(optional_yield y) {
   return RGWDeleteOrg_ObjStore::get_params(y);
 }
 
-int RGWPutOrg_ObjStore_S3::get_params(optional_yield y) {
-  return RGWPutOrg_ObjStore::get_params(y);
-}
+// int RGWPutOrg_ObjStore_S3::get_params(optional_yield y) {
+//   return RGWPutOrg_ObjStore::get_params(y);
+// }
 
-int RGWGetOrg_ObjStore_S3::get_params(optional_yield y) {
-  dout(0) << "rgw_rest_s3.cc : RGWGetOrg_ObjStore_S3::get_params" << dendl;
-  return RGWGetOrg_ObjStore::get_params(y);
-}
+// int RGWGetOrg_ObjStore_S3::get_params(optional_yield y) {
+//   dout(0) << "rgw_rest_s3.cc : RGWGetOrg_ObjStore_S3::get_params" << dendl;
+//   return RGWGetOrg_ObjStore::get_params(y);
+// }
 
 int RGWGetObj_ObjStore_S3::get_params(optional_yield y) {
   // for multisite sync requests, only read the slo manifest itself, rather than

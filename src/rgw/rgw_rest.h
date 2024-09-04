@@ -143,7 +143,7 @@ public:
     sent_header = false;
   }
 
-  int get_params(optional_yield y) override;
+  // int get_params(optional_yield y) override;
 };
 
 class RGWGetObj_ObjStore : public RGWGetObj {
@@ -249,7 +249,7 @@ class RGWPutOrg_ObjStore : public RGWPutOrg {
 public:
   RGWPutOrg_ObjStore() {}
   ~RGWPutOrg_ObjStore() override {}
-  int get_params(optional_yield y) override;
+  // int get_params(optional_yield y) override;
 };
 
 class RGWPutObj_ObjStore : public RGWPutObj {

@@ -615,6 +615,32 @@ struct HbacUserHierarchy {
     return 0;
   }
 
+  /*
+  int remove_user(const std::string &user) {
+    if (hierarchy_map.find(user) == hierarchy_map.end()) {
+      return -RGW_HBAC_PARAM_ERROR; // 사용자 존재하지 않을 경우 오류 반환
+    }
+
+    std::string parent = hierarchy_map[user].parent;
+    std::vector<std::string> sons = hierarchy_map[user].sons;
+    hierarchy_map.erase(user);
+
+    if (!parent.empty()) {
+      hierarchy_map[parent].remove_son(user);
+      hierarchy_map[parent].add_sons(sons);
+      for (const auto &son : sons) {
+        hierarchy_map[son].set_parent(parent);
+      }
+    } else {
+      for (const auto &son : sons) {
+        hierarchy_map[son].set_parent("");
+      }
+    }
+
+    return 0; // 성공적으로 제거되었음을 반환
+  }
+  */
+
   int add_user(const std::string &user, const std::string &parent,
                const std::vector<std::string> &sons) {
     // std::ofstream out("/tmp/add_user_log.txt");
@@ -622,15 +648,19 @@ struct HbacUserHierarchy {
     // out << "hierarchy_map size: " << hierarchy_map.size() << std::endl;
     // out.close();
     //  기존 user가 이미 존재할경우 예외처리
+    int ret = -1;
     if (hierarchy_map.find(user) != hierarchy_map.end()) {
-      return RGW_HBAC_USER_EXIST;
+      ret = remove_user(user);
+      if (ret < 0) {
+        return ret;
+      }
     }
     if (parent == "") {
       return add_user(user, sons);
     }
     // parent가 없을 경우에 대한 예외처리
     if (hierarchy_map.find(parent) == hierarchy_map.end()) {
-      return RGW_HBAC_PARAM_ERROR;
+      return -RGW_HBAC_PARAM_ERROR;
     }
 
     int parent_tier = hierarchy_map[parent].tier;
@@ -638,7 +668,14 @@ struct HbacUserHierarchy {
     hierarchy_map[parent].add_son(user);
 
     for (const auto &son : sons) {
-      hierarchy_map[son] = HierarchyInfo(user, {}, parent_tier + 2);
+      // son이 이미 존재할 경우 parent만 변경
+      if (hierarchy_map.find(son) != hierarchy_map.end()) {
+        std::string old_parent = hierarchy_map[son].parent;
+        hierarchy_map[old_parent].remove_son(son);
+        hierarchy_map[son].set_parent(user);
+      } else {
+        hierarchy_map[son] = HierarchyInfo(user, {}, parent_tier + 2);
+      }
     }
 
     return 0; // 성공적으로 추가되었음을 반환
@@ -668,6 +705,33 @@ struct HbacUserHierarchy {
     return 0; // 성공적으로 제거되었음을 반환
   }
 
+  bool is_ancestor(const std::string &ancestor,
+                   const std::string &descendant) const {
+    // 먼저 두 노드가 hierarchy_map에 존재하는지 확인합니다.
+    if (hierarchy_map.find(ancestor) == hierarchy_map.end() ||
+        hierarchy_map.find(descendant) == hierarchy_map.end()) {
+      return false; // 두 노드 중 하나라도 존재하지 않으면 조상-후손 관계가 아님
+    }
+
+    // descendant의 조상들을 반복적으로 탐색하면서 ancestor가 있는지 확인합니다.
+    std::string current_node = descendant;
+    while (!current_node.empty()) {
+      if (current_node == ancestor) {
+        return true; // 조상-후손 관계가 성립함
+      }
+      current_node = hierarchy_map.at(current_node).parent; // 상위 노드로 이동
+    }
+
+    return false; // 조상-후손 관계가 아님
+  }
+
+  std::string get_parent(std::string &user) const {
+    if (hierarchy_map.find(user) == hierarchy_map.end()) {
+      return ""; // 사용자가 존재하지 않을 경우 빈 문자열 반환
+    }
+    return hierarchy_map.at(user).parent;
+  }
+
   nlohmann::json to_json_object(const std::string &user) const {
     const HierarchyInfo &info = hierarchy_map.at(user);
     nlohmann::json j;
@@ -679,6 +743,10 @@ struct HbacUserHierarchy {
     }
 
     return j;
+  }
+
+  std::string to_json(const std::string &user) const {
+    return to_json_object(user).dump();
   }
 
   std::string to_json() const {
@@ -803,6 +871,20 @@ struct RGWHbacInfo {
         (permissions.put ? "w" : "") + (permissions.del ? "d" : "") +
         (permissions.gra ? "g" : "");
     return str;
+  }
+  bool have_permissions(bool &get, bool &put, bool &del, bool &gra) const {
+    if ((get && !permissions.get) || (put && !permissions.put) ||
+        (del && !permissions.del) || (gra && !permissions.gra)) {
+      return false;
+    }
+    return true;
+  }
+  bool have_permissions(bool &get, bool &put, bool &del) const {
+    if ((get && !permissions.get) || (put && !permissions.put) ||
+        (del && !permissions.del) || (!permissions.gra)) {
+      return false;
+    }
+    return true;
   }
 };
 WRITE_CLASS_ENCODER(RGWHbacInfo)

@@ -957,7 +957,7 @@ public:
     return 0;
   };
 
-  // virtual HbacUserHierarchy *get_user_hierarchy() { return user_hierarchy; };
+  virtual RGWHbacInfo *get_hbac() { return nullptr; };
 
   virtual std::string to_str() { return ""; };
 };

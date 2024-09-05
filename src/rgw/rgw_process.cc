@@ -1,26 +1,26 @@
 // -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*-
 // vim: ts=8 sw=2 smarttab ft=cpp
 
-#include "common/errno.h"
 #include "common/Throttle.h"
 #include "common/WorkQueue.h"
+#include "common/errno.h"
 #include "include/scope_guard.h"
 
-#include <utility>
 #include "rgw_auth_registry.h"
-#include "rgw_dmclock_scheduler.h"
-#include "rgw_rest.h"
-#include "rgw_frontend.h"
-#include "rgw_request.h"
-#include "rgw_process.h"
-#include "rgw_loadgen.h"
 #include "rgw_client_io.h"
-#include "rgw_opa.h"
-#include "rgw_perf_counters.h"
+#include "rgw_dmclock_scheduler.h"
+#include "rgw_frontend.h"
+#include "rgw_loadgen.h"
 #include "rgw_lua.h"
 #include "rgw_lua_request.h"
-#include "rgw_tracer.h"
+#include "rgw_opa.h"
+#include "rgw_perf_counters.h"
+#include "rgw_process.h"
 #include "rgw_ratelimit.h"
+#include "rgw_request.h"
+#include "rgw_rest.h"
+#include "rgw_tracer.h"
+#include <utility>
 
 #include "services/svc_zone_utils.h"
 
@@ -32,8 +32,7 @@
 using namespace std;
 using rgw::dmclock::Scheduler;
 
-void RGWProcess::RGWWQ::_dump_queue()
-{
+void RGWProcess::RGWWQ::_dump_queue() {
   if (!g_conf()->subsys.should_gather<ceph_subsys_rgw, 20>()) {
     return;
   }
@@ -43,33 +42,31 @@ void RGWProcess::RGWWQ::_dump_queue()
     return;
   }
   dout(20) << "RGWWQ:" << dendl;
-  for (iter = process->m_req_queue.begin();
-       iter != process->m_req_queue.end(); ++iter) {
+  for (iter = process->m_req_queue.begin(); iter != process->m_req_queue.end();
+       ++iter) {
     dout(20) << "req: " << hex << *iter << dec << dendl;
   }
 } /* RGWProcess::RGWWQ::_dump_queue */
 
-auto schedule_request(Scheduler *scheduler, req_state *s, RGWOp *op)
-{
+auto schedule_request(Scheduler *scheduler, req_state *s, RGWOp *op) {
   using rgw::dmclock::SchedulerCompleter;
   if (!scheduler)
-    return std::make_pair(0,SchedulerCompleter{});
+    return std::make_pair(0, SchedulerCompleter{});
 
   const auto client = op->dmclock_client();
   const auto cost = op->dmclock_cost();
   if (s->cct->_conf->subsys.should_gather(ceph_subsys_rgw, 10)) {
-    ldpp_dout(op,10) << "scheduling with "
-		     << s->cct->_conf.get_val<std::string>("rgw_scheduler_type")
-		     << " client=" << static_cast<int>(client)
-		     << " cost=" << cost << dendl;
+    ldpp_dout(op, 10) << "scheduling with "
+                      << s->cct->_conf.get_val<std::string>(
+                             "rgw_scheduler_type")
+                      << " client=" << static_cast<int>(client)
+                      << " cost=" << cost << dendl;
   }
-  return scheduler->schedule_request(client, {},
-                                     req_state::Clock::to_double(s->time),
-                                     cost,
-                                     s->yield);
+  return scheduler->schedule_request(
+      client, {}, req_state::Clock::to_double(s->time), cost, s->yield);
 }
 
-bool RGWProcess::RGWWQ::_enqueue(RGWRequest* req) {
+bool RGWProcess::RGWWQ::_enqueue(RGWRequest *req) {
   process->m_req_queue.push_back(req);
   perfcounter->inc(l_rgw_qlen);
   dout(20) << "enqueued request req=" << hex << req << dec << dendl;
@@ -77,7 +74,7 @@ bool RGWProcess::RGWWQ::_enqueue(RGWRequest* req) {
   return true;
 }
 
-RGWRequest* RGWProcess::RGWWQ::_dequeue() {
+RGWRequest *RGWProcess::RGWWQ::_dequeue() {
   if (process->m_req_queue.empty())
     return NULL;
   RGWRequest *req = process->m_req_queue.front();
@@ -94,38 +91,41 @@ void RGWProcess::RGWWQ::_process(RGWRequest *req, ThreadPool::TPHandle &) {
   process->req_throttle.put(1);
   perfcounter->inc(l_rgw_qactive, -1);
 }
-bool rate_limit(rgw::sal::Driver* driver, req_state* s) {
+bool rate_limit(rgw::sal::Driver *driver, req_state *s) {
   // we dont want to limit health check or system or admin requests
-  const auto& is_admin_or_system = s->user->get_info();
-  if ((s->op_type ==  RGW_OP_GET_HEALTH_CHECK) || is_admin_or_system.admin || is_admin_or_system.system)
+  const auto &is_admin_or_system = s->user->get_info();
+  if ((s->op_type == RGW_OP_GET_HEALTH_CHECK) || is_admin_or_system.admin ||
+      is_admin_or_system.system)
     return false;
   std::string userfind;
   RGWRateLimitInfo global_user;
   RGWRateLimitInfo global_bucket;
   RGWRateLimitInfo global_anon;
-  RGWRateLimitInfo* bucket_ratelimit;
-  RGWRateLimitInfo* user_ratelimit;
+  RGWRateLimitInfo *bucket_ratelimit;
+  RGWRateLimitInfo *user_ratelimit;
   driver->get_ratelimit(global_bucket, global_user, global_anon);
   bucket_ratelimit = &global_bucket;
   user_ratelimit = &global_user;
   s->user->get_id().to_str(userfind);
   userfind = "u" + userfind;
   s->ratelimit_user_name = userfind;
-  std::string bucketfind = !rgw::sal::Bucket::empty(s->bucket.get()) ? "b" + s->bucket->get_marker() : "";
+  std::string bucketfind = !rgw::sal::Bucket::empty(s->bucket.get())
+                               ? "b" + s->bucket->get_marker()
+                               : "";
   s->ratelimit_bucket_marker = bucketfind;
   const char *method = s->info.method;
 
   auto iter = s->user->get_attrs().find(RGW_ATTR_RATELIMIT);
-  if(iter != s->user->get_attrs().end()) {
+  if (iter != s->user->get_attrs().end()) {
     try {
       RGWRateLimitInfo user_ratelimit_temp;
-      bufferlist& bl = iter->second;
+      bufferlist &bl = iter->second;
       auto biter = bl.cbegin();
       decode(user_ratelimit_temp, biter);
       // override global rate limiting only if local rate limiting is enabled
       if (user_ratelimit_temp.enabled)
         *user_ratelimit = user_ratelimit_temp;
-    } catch (buffer::error& err) {
+    } catch (buffer::error &err) {
       ldpp_dout(s, 0) << "ERROR: failed to decode rate limit" << dendl;
       return -EIO;
     }
@@ -134,30 +134,31 @@ bool rate_limit(rgw::sal::Driver* driver, req_state* s) {
     *user_ratelimit = global_anon;
   }
   bool limit_bucket = false;
-  bool limit_user = s->ratelimit_data->should_rate_limit(method, s->ratelimit_user_name, s->time, user_ratelimit);
+  bool limit_user = s->ratelimit_data->should_rate_limit(
+      method, s->ratelimit_user_name, s->time, user_ratelimit);
 
-  if(!rgw::sal::Bucket::empty(s->bucket.get()))
-  {
+  if (!rgw::sal::Bucket::empty(s->bucket.get())) {
     iter = s->bucket->get_attrs().find(RGW_ATTR_RATELIMIT);
-    if(iter != s->bucket->get_attrs().end()) {
+    if (iter != s->bucket->get_attrs().end()) {
       try {
         RGWRateLimitInfo bucket_ratelimit_temp;
-        bufferlist& bl = iter->second;
+        bufferlist &bl = iter->second;
         auto biter = bl.cbegin();
         decode(bucket_ratelimit_temp, biter);
         // override global rate limiting only if local rate limiting is enabled
         if (bucket_ratelimit_temp.enabled)
           *bucket_ratelimit = bucket_ratelimit_temp;
-      } catch (buffer::error& err) {
+      } catch (buffer::error &err) {
         ldpp_dout(s, 0) << "ERROR: failed to decode rate limit" << dendl;
         return -EIO;
       }
     }
     if (!limit_user) {
-      limit_bucket = s->ratelimit_data->should_rate_limit(method, s->ratelimit_bucket_marker, s->time, bucket_ratelimit);
+      limit_bucket = s->ratelimit_data->should_rate_limit(
+          method, s->ratelimit_bucket_marker, s->time, bucket_ratelimit);
     }
   }
-  if(limit_bucket && !limit_user) {
+  if (limit_bucket && !limit_user) {
     s->ratelimit_data->giveback_tokens(method, s->ratelimit_user_name);
   }
   s->user_ratelimit = *user_ratelimit;
@@ -165,29 +166,40 @@ bool rate_limit(rgw::sal::Driver* driver, req_state* s) {
   return (limit_user || limit_bucket);
 }
 
-int rgw_process_authenticated(RGWHandler_REST * const handler,
-                              RGWOp *& op,
-                              RGWRequest * const req,
-                              req_state * const s,
-			                        optional_yield y,
-                              rgw::sal::Driver* driver,
-                              const bool skip_retarget)
-{
-  auto start_time = std::chrono::high_resolution_clock::now();  // 전체 처리 시작 시간 측정
+int rgw_process_authenticated(RGWHandler_REST *const handler, RGWOp *&op,
+                              RGWRequest *const req, req_state *const s,
+                              optional_yield y, rgw::sal::Driver *driver,
+                              const bool skip_retarget) {
+  auto start_time = std::chrono::high_resolution_clock::now();
 
   ldpp_dout(op, 2) << "init permissions" << dendl;
+  auto step_start_time =
+      std::chrono::high_resolution_clock::now(); // 각 단계의 시작 시간
   int ret = handler->init_permissions(op, y);
+  auto step_end_time =
+      std::chrono::high_resolution_clock::now(); // 각 단계의 종료 시간
+  auto step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                           step_end_time - step_start_time)
+                           .count();
+  std::ofstream log_file1("/tmp/benchmark/init_permissions_time.log",
+                          std::ios::app);
+  log_file1 << "init_permissions: " << step_duration << " microseconds\n";
+  log_file1.close();
   if (ret < 0) {
     return ret;
   }
 
-  /**
-   * Only some accesses support website mode, and website mode does NOT apply
-   * if you are using the REST endpoint either (ergo, no authenticated access)
-   */
-  if (! skip_retarget) {
+  if (!skip_retarget) {
     ldpp_dout(op, 2) << "recalculating target" << dendl;
+    step_start_time = std::chrono::high_resolution_clock::now();
     ret = handler->retarget(op, &op, y);
+    step_end_time = std::chrono::high_resolution_clock::now();
+    step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                        step_end_time - step_start_time)
+                        .count();
+    std::ofstream log_file2("/tmp/benchmark/retarget_time.log", std::ios::app);
+    log_file2 << "retarget: " << step_duration << " microseconds\n";
+    log_file2.close();
     if (ret < 0) {
       return ret;
     }
@@ -196,40 +208,82 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
     ldpp_dout(op, 2) << "retargeting skipped because of SubOp mode" << dendl;
   }
 
-  /* If necessary extract object ACL and put them into req_state. */
   ldpp_dout(op, 2) << "reading permissions" << dendl;
+  step_start_time = std::chrono::high_resolution_clock::now();
   ret = handler->read_permissions(op, y);
+  step_end_time = std::chrono::high_resolution_clock::now();
+  step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                      step_end_time - step_start_time)
+                      .count();
+  std::ofstream log_file3("/tmp/benchmark/read_permissions_time.log",
+                          std::ios::app);
+  log_file3 << "read_permissions: " << step_duration << " microseconds\n";
+  log_file3.close();
   if (ret < 0) {
     return ret;
   }
 
   ldpp_dout(op, 2) << "init op" << dendl;
+  step_start_time = std::chrono::high_resolution_clock::now();
   ret = op->init_processing(y);
+  step_end_time = std::chrono::high_resolution_clock::now();
+  step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                      step_end_time - step_start_time)
+                      .count();
+  std::ofstream log_file4("/tmp/benchmark/init_op_time.log", std::ios::app);
+  log_file4 << "init_op: " << step_duration << " microseconds\n";
+  log_file4.close();
   if (ret < 0) {
     return ret;
   }
 
   ldpp_dout(op, 2) << "verifying op mask" << dendl;
+  step_start_time = std::chrono::high_resolution_clock::now();
   ret = op->verify_op_mask();
+  step_end_time = std::chrono::high_resolution_clock::now();
+  step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                      step_end_time - step_start_time)
+                      .count();
+  std::ofstream log_file5("/tmp/benchmark/verify_op_mask_time.log",
+                          std::ios::app);
+  log_file5 << "verify_op_mask: " << step_duration << " microseconds\n";
+  log_file5.close();
   if (ret < 0) {
     return ret;
   }
 
-  /* Check if OPA is used to authorize requests */
   if (s->cct->_conf->rgw_use_opa_authz) {
+    step_start_time = std::chrono::high_resolution_clock::now();
     ret = rgw_opa_authorize(op, s);
+    step_end_time = std::chrono::high_resolution_clock::now();
+    step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                        step_end_time - step_start_time)
+                        .count();
+    std::ofstream log_file6("/tmp/benchmark/opa_authorize_time.log",
+                            std::ios::app);
+    log_file6 << "opa_authorize: " << step_duration << " microseconds\n";
+    log_file6.close();
     if (ret < 0) {
       return ret;
     }
   }
 
   ldpp_dout(op, 2) << "verifying op permissions" << dendl;
+  step_start_time = std::chrono::high_resolution_clock::now();
   {
     auto span = tracing::rgw::tracer.add_span("verify_permission", s->trace);
     std::swap(span, s->trace);
     ret = op->verify_permission(y);
     std::swap(span, s->trace);
   }
+  step_end_time = std::chrono::high_resolution_clock::now();
+  step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                      step_end_time - step_start_time)
+                      .count();
+  std::ofstream log_file7("/tmp/benchmark/verify_permission_time.log",
+                          std::ios::app);
+  log_file7 << "verify_permission: " << step_duration << " microseconds\n";
+  log_file7.close();
   if (ret < 0) {
     if (s->system_request) {
       dout(2) << "overriding permissions due to system operation" << dendl;
@@ -241,85 +295,122 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
   }
 
   ldpp_dout(op, 2) << "verifying op params" << dendl;
+  step_start_time = std::chrono::high_resolution_clock::now();
   ret = op->verify_params();
+  step_end_time = std::chrono::high_resolution_clock::now();
+  step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                      step_end_time - step_start_time)
+                      .count();
+  std::ofstream log_file8("/tmp/benchmark/verify_params_time.log",
+                          std::ios::app);
+  log_file8 << "verify_params: " << step_duration << " microseconds\n";
+  log_file8.close();
   if (ret < 0) {
     return ret;
   }
 
   ldpp_dout(op, 2) << "pre-executing" << dendl;
+  step_start_time = std::chrono::high_resolution_clock::now();
   op->pre_exec();
+  step_end_time = std::chrono::high_resolution_clock::now();
+  step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                      step_end_time - step_start_time)
+                      .count();
+  std::ofstream log_file9("/tmp/benchmark/pre_exec_time.log", std::ios::app);
+  log_file9 << "pre_exec: " << step_duration << " microseconds\n";
+  log_file9.close();
 
   ldpp_dout(op, 2) << "check rate limiting" << dendl;
+  step_start_time = std::chrono::high_resolution_clock::now();
   if (rate_limit(driver, s)) {
+    step_end_time = std::chrono::high_resolution_clock::now();
+    step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                        step_end_time - step_start_time)
+                        .count();
+    std::ofstream log_file10("/tmp/benchmark/rate_limit_time.log",
+                             std::ios::app);
+    log_file10 << "rate_limit: " << step_duration << " microseconds\n";
+    log_file10.close();
     return -ERR_RATE_LIMITED;
   }
 
-
-  auto end_time = std::chrono::high_resolution_clock::now(); // 종료 시간 기록
-
   ldpp_dout(op, 2) << "executing" << dendl;
+  step_start_time = std::chrono::high_resolution_clock::now();
   {
     auto span = tracing::rgw::tracer.add_span("execute", s->trace);
     std::swap(span, s->trace);
     op->execute(y);
     std::swap(span, s->trace);
   }
+  step_end_time = std::chrono::high_resolution_clock::now();
+  step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                      step_end_time - step_start_time)
+                      .count();
+  std::ofstream log_file11("/tmp/benchmark/execute_time.log", std::ios::app);
+  log_file11 << "execute: " << step_duration << " microseconds\n";
+  log_file11.close();
 
   ldpp_dout(op, 2) << "completing" << dendl;
+  step_start_time = std::chrono::high_resolution_clock::now();
   op->complete();
+  step_end_time = std::chrono::high_resolution_clock::now();
+  step_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                      step_end_time - step_start_time)
+                      .count();
+  std::ofstream log_file12("/tmp/benchmark/complete_time.log", std::ios::app);
+  log_file12 << "complete: " << step_duration << " microseconds\n";
+  log_file12.close();
 
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
-
-  std::ofstream log_file("/tmp/time.log", std::ios::app); // 파일 열기
-  log_file << "authenticated Request processing time: " << duration << " milliseconds\n"; // 시간 로깅
-  log_file.close(); // 파일 닫기
-
-
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto total_duration = std::chrono::duration_cast<std::chrono::microseconds>(
+                            end_time - start_time)
+                            .count();
+  std::ofstream log_file_total("/tmp/benchmark/total_processing_time.log",
+                               std::ios::app);
+  log_file_total << "Total authenticated request processing time: "
+                 << total_duration << " microseconds\n";
+  log_file_total.close();
 
   return 0;
 }
 
-std::vector<std::pair<std::string, std::string>> parseStringToVector(const std::string& input) {
-    std::vector<std::pair<std::string, std::string>> result;
-    std::istringstream iss(input);
-    std::string pair;
+std::vector<std::pair<std::string, std::string>>
+parseStringToVector(const std::string &input) {
+  std::vector<std::pair<std::string, std::string>> result;
+  std::istringstream iss(input);
+  std::string pair;
 
-    // '&' 기준으로 문자열을 분리하여 key-value 쌍 추출
-    while (std::getline(iss, pair, '&')) {
-        size_t pos = pair.find('=');
-        if (pos != std::string::npos) {
-            std::string key = pair.substr(0, pos);
-            std::string value = pair.substr(pos + 1);
-            result.emplace_back(key, value);
-        }
+  // '&' 기준으로 문자열을 분리하여 key-value 쌍 추출
+  while (std::getline(iss, pair, '&')) {
+    size_t pos = pair.find('=');
+    if (pos != std::string::npos) {
+      std::string key = pair.substr(0, pos);
+      std::string value = pair.substr(pos + 1);
+      result.emplace_back(key, value);
     }
+  }
 
-    return result;
+  return result;
 }
 
-int process_request(const RGWProcessEnv& penv,
-                    RGWRequest* const req,
-                    const std::string& frontend_prefix,
-                    RGWRestfulIO* const client_io,
-                    optional_yield yield,
-		    rgw::dmclock::Scheduler *scheduler,
-                    string* user,
-                    ceph::coarse_real_clock::duration* latency,
-                    int* http_ret)
-{
+int process_request(const RGWProcessEnv &penv, RGWRequest *const req,
+                    const std::string &frontend_prefix,
+                    RGWRestfulIO *const client_io, optional_yield yield,
+                    rgw::dmclock::Scheduler *scheduler, string *user,
+                    ceph::coarse_real_clock::duration *latency, int *http_ret) {
   int ret = client_io->init(g_ceph_context);
   dout(1) << "====== starting new request req=" << hex << req << dec
-	  << " =====" << dendl;
+          << " =====" << dendl;
   perfcounter->inc(l_rgw_req);
 
-  RGWEnv& rgw_env = client_io->get_env();
+  RGWEnv &rgw_env = client_io->get_env();
 
   req_state rstate(g_ceph_context, penv, &rgw_env, req->id);
   req_state *s = &rstate;
 
   s->ratelimit_data = penv.ratelimiting->get_active();
 
-  rgw::sal::Driver* driver = penv.driver;
+  rgw::sal::Driver *driver = penv.driver;
   std::unique_ptr<rgw::sal::User> u = driver->get_user(rgw_user());
   s->set_user(u);
 
@@ -336,19 +427,18 @@ int process_request(const RGWProcessEnv& penv,
 
   ldpp_dout(s, 2) << "initializing for trans_id = " << s->trans_id << dendl;
 
-  RGWOp* op = nullptr;
+  RGWOp *op = nullptr;
   int init_error = 0;
   bool should_log = false;
-  RGWREST* rest = penv.rest;
+  RGWREST *rest = penv.rest;
   RGWRESTMgr *mgr;
-  RGWHandler_REST *handler = rest->get_handler(driver, s,
-                                               *penv.auth_registry,
-                                               frontend_prefix,
-                                               client_io, &mgr, &init_error);
+  RGWHandler_REST *handler =
+      rest->get_handler(driver, s, *penv.auth_registry, frontend_prefix,
+                        client_io, &mgr, &init_error);
   rgw::dmclock::SchedulerCompleter c;
   string tmp = s->decoded_uri;
   if (init_error != 0) {
-    dout(0) << "socks: init_error occured" <<  dendl;
+    dout(0) << "socks: init_error occured" << dendl;
     abort_early(s, nullptr, init_error, nullptr, yield);
     goto done;
   }
@@ -364,24 +454,29 @@ int process_request(const RGWProcessEnv& penv,
   {
     s->trace_enabled = tracing::rgw::tracer.is_enabled();
     std::string script;
-    auto rc = rgw::lua::read_script(s, penv.lua.manager.get(), s->bucket_tenant, s->yield, rgw::lua::context::preRequest, script);
+    auto rc =
+        rgw::lua::read_script(s, penv.lua.manager.get(), s->bucket_tenant,
+                              s->yield, rgw::lua::context::preRequest, script);
     if (rc == -ENOENT) {
       // no script, nothing to do
     } else if (rc < 0) {
-      ldpp_dout(op, 5) << "WARNING: failed to read pre request script. error: " << rc << dendl;
+      ldpp_dout(op, 5) << "WARNING: failed to read pre request script. error: "
+                       << rc << dendl;
     } else {
       rc = rgw::lua::request::execute(driver, rest, penv.olog, s, op, script);
       if (rc < 0) {
-        ldpp_dout(op, 5) << "WARNING: failed to execute pre request script. error: " << rc << dendl;
+        ldpp_dout(op, 5)
+            << "WARNING: failed to execute pre request script. error: " << rc
+            << dendl;
       }
     }
   }
-  std::tie(ret,c) = schedule_request(scheduler, s, op);
+  std::tie(ret, c) = schedule_request(scheduler, s, op);
   if (ret < 0) {
     if (ret == -EAGAIN) {
       ret = -ERR_RATE_LIMITED;
     }
-    ldpp_dout(op,0) << "Scheduling request failed with " << ret << dendl;
+    ldpp_dout(op, 0) << "Scheduling request failed with " << ret << dendl;
     abort_early(s, op, ret, handler, yield);
     goto done;
   }
@@ -421,7 +516,8 @@ int process_request(const RGWProcessEnv& penv,
     s->http_params = parseStringToVector(s->info.request_params);
 
     for (auto &param : s->http_params) {
-      dout(0) << "socks : param : " << param.first << " : " << param.second << dendl;
+      dout(0) << "socks : param : " << param.first << " : " << param.second
+              << dendl;
     }
 
     s->trace = tracing::rgw::tracer.start_trace(op->name(), s->trace_enabled);
@@ -432,7 +528,7 @@ int process_request(const RGWProcessEnv& penv,
       abort_early(s, op, ret, handler, yield);
       goto done;
     }
-  } catch (const ceph::crypto::DigestException& e) {
+  } catch (const ceph::crypto::DigestException &e) {
     dout(0) << "authentication failed" << e.what() << dendl;
     abort_early(s, op, -ERR_INVALID_SECRET_KEY, handler, yield);
   }
@@ -447,32 +543,38 @@ done:
         s->trace->SetAttribute(tracing::rgw::USER_ID, s->user->get_id().id);
       }
       if (!rgw::sal::Bucket::empty(s->bucket)) {
-        s->trace->SetAttribute(tracing::rgw::BUCKET_NAME, s->bucket->get_name());
+        s->trace->SetAttribute(tracing::rgw::BUCKET_NAME,
+                               s->bucket->get_name());
       }
       if (!rgw::sal::Object::empty(s->object)) {
-        s->trace->SetAttribute(tracing::rgw::OBJECT_NAME, s->object->get_name());
+        s->trace->SetAttribute(tracing::rgw::OBJECT_NAME,
+                               s->object->get_name());
       }
     }
     std::string script;
-    auto rc = rgw::lua::read_script(s, penv.lua.manager.get(), s->bucket_tenant, s->yield, rgw::lua::context::postRequest, script);
+    auto rc =
+        rgw::lua::read_script(s, penv.lua.manager.get(), s->bucket_tenant,
+                              s->yield, rgw::lua::context::postRequest, script);
     if (rc == -ENOENT) {
       // no script, nothing to do
     } else if (rc < 0) {
-      ldpp_dout(op, 5) << "WARNING: failed to read post request script. error: " << rc << dendl;
+      ldpp_dout(op, 5) << "WARNING: failed to read post request script. error: "
+                       << rc << dendl;
     } else {
       rc = rgw::lua::request::execute(driver, rest, penv.olog, s, op, script);
       if (rc < 0) {
-        ldpp_dout(op, 5) << "WARNING: failed to execute post request script. error: " << rc << dendl;
+        ldpp_dout(op, 5)
+            << "WARNING: failed to execute post request script. error: " << rc
+            << dendl;
       }
-
     }
   }
 
   try {
     client_io->complete_request();
-  } catch (rgw::io::Exception& e) {
-    dout(0) << "ERROR: client_io->complete_request() returned "
-            << e.what() << dendl;
+  } catch (rgw::io::Exception &e) {
+    dout(0) << "ERROR: client_io->complete_request() returned " << e.what()
+            << dendl;
   }
   if (should_log) {
     rgw_log_op(rest, s, op, penv.olog);
@@ -503,12 +605,8 @@ done:
     *latency = lat;
   }
   dout(1) << "====== req done req=" << hex << req << dec
-	  << " op status=" << op_ret
-	  << " http_status=" << s->err.http_ret
-	  << " latency=" << lat
-	  << " ======"
-	  << dendl;
+          << " op status=" << op_ret << " http_status=" << s->err.http_ret
+          << " latency=" << lat << " ======" << dendl;
 
   return (ret < 0 ? ret : s->err.ret);
 } /* process_request */
-

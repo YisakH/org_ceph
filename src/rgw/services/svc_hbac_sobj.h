@@ -80,6 +80,13 @@ public:
                      std::map<std::string, bufferlist> *const pattrs,
                      optional_yield y, const DoutPrefixProvider *dpp);
 
+  int read_hbac_list(RGWSI_MetaBackend::Context *ctx,
+                     std::list<RGWHbacInfo> &info_list,
+                     const std::string &prefix,
+                     RGWObjVersionTracker *objv_tracker, real_time *mtime,
+                     bool exclusive, map<string, bufferlist> *attrs,
+                     optional_yield y, const DoutPrefixProvider *dpp);
+
   int remove_hbac_info(RGWSI_MetaBackend::Context *ctx, RGWHbacInfo &info,
                        RGWObjVersionTracker *objv_tracker, optional_yield y,
                        const DoutPrefixProvider *dpp);

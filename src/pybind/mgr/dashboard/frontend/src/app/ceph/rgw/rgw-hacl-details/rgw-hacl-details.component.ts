@@ -69,6 +69,7 @@ export class RgwHaclDetailsComponent implements OnInit {
   selectNode(node: TreeNode) {
     TREE_ACTIONS.TOGGLE_ACTIVE(undefined, node, undefined);
     this.selectedNode = node;
+    let test = this.hAclService.getPermission(node.data.user);
   }
 
   selectAndShowNode(tree: TreeModel, node: TreeNode, $event: any) {
@@ -90,7 +91,7 @@ export class RgwHaclDetailsComponent implements OnInit {
       console.log(this.response_body);
     }, error => {
       console.log(error);
-      console.log(this.response_headers);
+      //console.log(this.response_headers);
     });
   }
 
@@ -100,6 +101,7 @@ export class RgwHaclDetailsComponent implements OnInit {
       if (!Array.isArray(node.children)) {
         node.children = []; // children 필드가 배열이 아니면 빈 배열로 설정
       }
+      node.name = node.user;
       node.children.forEach((child: any) => ensureChildrenArray(child)); // 자식 노드에 대해 재귀적으로 처리
     };
     ensureChildrenArray(data); // 최상위 노드부터 처리 시작

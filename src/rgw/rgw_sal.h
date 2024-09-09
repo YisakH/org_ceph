@@ -960,6 +960,8 @@ public:
   virtual RGWHbacInfo *get_hbac() { return nullptr; };
 
   virtual std::string to_str() { return ""; };
+
+  virtual std::string to_json() { return nlohmann::json{}.dump(); };
 };
 
 /**

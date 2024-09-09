@@ -736,16 +736,30 @@ struct HbacUserHierarchy {
     const HierarchyInfo &info = hierarchy_map.at(user);
     nlohmann::json j;
     j["user"] = user;
-    j["sons"] = nlohmann::json::array();
+    j["children"] = nlohmann::json::array();
 
     for (const auto &son : info.sons) {
-      j["sons"].push_back(to_json_object(son));
+      j["children"].push_back(to_json_object(son));
     }
 
     return j;
   }
 
   std::string to_json(const std::string &user) const {
+    // hierarchy_map의 모든 사용자 탐색하여 출력
+    for (const auto &[user, info] : hierarchy_map) {
+      std::ofstream out("/tmp/to_json_log.txt", std::ios::app);
+      out << "Requested user: " << user << std::endl;
+      out << "socks:: user: " << user << ", parent: " << info.parent
+          << std::endl;
+      out.close();
+    }
+
+    auto it = hierarchy_map.find(user);
+    if (it == hierarchy_map.end()) {
+      return "no user: " + user; // 사용자가 존재하지 않을 경우 빈 문자열 반환
+    }
+
     return to_json_object(user).dump();
   }
 
@@ -865,11 +879,23 @@ struct RGWHbacInfo {
 
   std::string to_str() const { return user + ":" + permissions.path; }
 
+  nlohmann::json to_json() const {
+    nlohmann::json j;
+    j["user"] = user;
+    j["authorizer"] = authorizer;
+    j["permissions"] = permissions.path;
+    j["get"] = permissions.get;
+    j["put"] = permissions.put;
+    j["del"] = permissions.del;
+    j["gra"] = permissions.gra;
+    return j;
+  }
+
   std::string make_response() const {
     std::string str =
-        user + ":" + permissions.path + ":" + (permissions.get ? "r" : "") +
-        (permissions.put ? "w" : "") + (permissions.del ? "d" : "") +
-        (permissions.gra ? "g" : "");
+        user + ":" + permissions.path + ":" + (permissions.get ? "get" : "") +
+        (permissions.put ? "put" : "") + (permissions.del ? "del" : "") +
+        (permissions.gra ? "gra" : "");
     return str;
   }
   bool have_permissions(bool &get, bool &put, bool &del, bool &gra) const {

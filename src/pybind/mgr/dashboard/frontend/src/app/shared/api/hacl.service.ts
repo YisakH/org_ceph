@@ -34,8 +34,26 @@ export class HAclService {
     });
   }
 
-  async getSignedUrl(){
+  getPermission(userName: string): Observable<HttpResponse<any>> {
+    let method = 'GET';
+    let url = "http://localhost:7480/admin/hbac/hierarchy";
+    let service = 's3';
+    let region = 'us-east-1';
+    let accessKey = 'root';
+    let secretKey = 'root';
+    let queryParamsDict = {'user': userName, 'path': ''}; // 변수 이름 수정
 
+    const headers: HttpHeaders = this.awsSignatureService.signRequest(method, url, service, region, accessKey, secretKey, queryParamsDict); // 수정된 변수 이름 사용
+
+    return this.http.get(url, {
+      headers: headers,
+      params: queryParamsDict,
+      observe: 'response',
+      responseType: 'json'
+    });
+  }
+
+  async getSignedUrl(){
     return this.signedUrl;
   }
 

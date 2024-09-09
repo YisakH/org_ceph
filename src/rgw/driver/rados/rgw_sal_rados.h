@@ -586,6 +586,8 @@ public:
 
   RGWHbacInfo *get_hbac() { return &info; };
   virtual std::string to_str() override;
+
+  virtual std::string to_json() override;
 };
 
 class RadosBucket : public StoreBucket {

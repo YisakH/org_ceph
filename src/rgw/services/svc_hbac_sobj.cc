@@ -53,9 +53,7 @@ int RGWSI_HBAC_SObj::do_start(optional_yield y, const DoutPrefixProvider *dpp) {
 
   int r = svc.meta->create_be_handler(RGWSI_MetaBackend::Type::MDBE_SOBJ,
                                       &be_handler);
-  std::ofstream out("/tmp/RGWSI_HBAC_SObj_do_start_log.txt");
-  out << "be_handler value is:" << be_handler << std::endl; // 값 잘 나옴
-  out.close();
+
   if (r < 0) {
     ldpp_dout(dpp, 0) << "ERROR: failed to create meta backend "
                          "handler(RGWSI_HBAC_SObj::do_start()):"
@@ -91,6 +89,49 @@ int RGWSI_HBAC_SObj::store_hbac_info(RGWSI_MetaBackend::Context *ctx,
   }
 
   return ret;
+}
+
+int RGWSI_HBAC_SObj::read_hbac_list(
+    RGWSI_MetaBackend::Context *ctx, std::list<RGWHbacInfo> &info_list,
+    const std::string &prefix, RGWObjVersionTracker *objv_tracker,
+    real_time *mtime, bool exclusive, map<string, bufferlist> *attrs,
+    optional_yield y, const DoutPrefixProvider *dpp) {
+
+  std::list<std::string> keys;
+  bool truncated = false;
+  int ret;
+
+  ret = svc.meta_be->list_init(dpp, ctx, prefix);
+  if (ret < 0) {
+    return ret;
+  }
+
+  do {
+    ret = svc.meta_be->list_next(dpp, ctx, 100, &keys, &truncated);
+    if (ret < 0) {
+      ldpp_dout(dpp, 0) << "ERROR: list_next failed with error code: " << ret
+                        << dendl;
+      return ret;
+    }
+
+    // 3. 가져온 키에 대한 HBAC 정보를 읽어옴
+    for (const auto &key : keys) {
+      RGWHbacInfo info;
+      ret = read_hbac_info(ctx, info, objv_tracker, mtime, nullptr, attrs, y,
+                           dpp);
+      if (ret < 0) {
+        ldpp_dout(dpp, 0) << "ERROR: failed to read HBAC info for key: " << key
+                          << " with error code: " << ret << dendl;
+        return ret;
+      }
+
+      // 4. 정보를 리스트에 추가
+      info_list.push_back(info);
+    }
+
+  } while (truncated); // 만약 리스트가 잘리지 않았다면 반복 종료
+
+  return 0;
 }
 
 int RGWSI_HBAC_SObj::read_hbac_info(RGWSI_MetaBackend::Context *ctx,

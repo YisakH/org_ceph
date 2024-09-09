@@ -61,10 +61,6 @@ public:
 
   RGWHbacMetadataHandler(RGWSI_HBAC_SObj *sobj) {
     base_init(sobj->ctx(), sobj->get_be_handler());
-    std::ofstream out("/tmp/RWGHbacMetadataHandler_constructor_log.txt");
-    out << "hbac_svc be_handler value is:" << sobj->get_be_handler()
-        << std::endl;
-    out.close();
     svc.hbac = sobj;
   };
 
@@ -72,10 +68,6 @@ public:
 
   void init(RGWSI_HBAC_SObj *hbac_svc, RGWHbacCtl *hbac_ctl) {
     base_init(hbac_svc->ctx(), hbac_svc->get_be_handler());
-    std::ofstream out("/tmp/hbac_metadata_handler_log.txt");
-    out << "hbac_svc be_handler value is:" << hbac_svc->get_be_handler()
-        << std::endl; // 호출되지 않음.
-    out.close();
     svc.hbac = hbac_svc;
     ctl.hbac = hbac_ctl;
   }
@@ -118,7 +110,8 @@ RGWHbacCtl::RGWHbacCtl(RGWSI_Zone *zone_svc, RGWSI_HBAC_SObj *hbac_svc,
   svc.hbac = hbac_svc;
   be_handler = hmhandler->get_be_handler();
 
-  std::ofstream out("/tmp/be_handler_log.txt");
+  /*
+  //std::ofstream out("/tmp/be_handler_log.txt");
   // be_handler에 저장된 값이 0x0이거나 0x3인지 검사
   if (be_handler == nullptr) {
     // /tmp에 로그 파일을 만들고 출력
@@ -134,4 +127,5 @@ RGWHbacCtl::RGWHbacCtl(RGWSI_Zone *zone_svc, RGWSI_HBAC_SObj *hbac_svc,
 
   // 로그 닫기
   out.close();
+  */
 }

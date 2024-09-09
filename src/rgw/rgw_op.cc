@@ -1056,18 +1056,63 @@ void rgw_bucket_object_pre_exec(req_state *s) {
 //
 // The called function must return an integer, negative on error. In
 // general, they should just return op_ret.
+void log_retry_info(const std::string &message,
+                    std::chrono::time_point<std::chrono::system_clock> start,
+                    std::chrono::time_point<std::chrono::system_clock> end,
+                    int attempt) {
+  std::ofstream out("/tmp/execute-bench/retry_bench_results.txt",
+                    std::ios_base::app);
+  auto duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+          .count();
+  if (out.is_open()) {
+    out << message << " attempt " << attempt << " took " << duration
+        << " microseconds.\n";
+    out.close();
+  }
+}
+
 namespace {
 template <typename F>
 int retry_raced_bucket_write(const DoutPrefixProvider *dpp, rgw::sal::Bucket *b,
                              const F &f, optional_yield y) {
+  // 첫 번째 시도
+  auto start_time = std::chrono::system_clock::now();
   auto r = f();
+  auto end_time = std::chrono::system_clock::now();
+  log_retry_info("Initial attempt", start_time, end_time, -1);
+
+  int attempts = 0; // 실패 횟수 기록
+
+  // 실패 로그 작성 (첫 번째 시도 기록)
+  if (r == -ECANCELED) {
+    log_retry_info("Initial attempt failed", start_time, end_time, attempts);
+  }
+
+  // 최대 15번까지 재시도
   for (auto i = 0u; i < 15u && r == -ECANCELED; ++i) {
+    // 실패한 횟수 기록
+    attempts++;
+
+    // 다시 시도 전 시간 측정 시작
+    start_time = std::chrono::system_clock::now();
+
+    // 버킷 정보 새로고침
     r = b->try_refresh_info(dpp, nullptr, y);
+
     if (r >= 0) {
+      // f() 다시 호출
       r = f();
     }
+
+    // 시간 측정 끝
+    end_time = std::chrono::system_clock::now();
+
+    // 재시도 시 소요 시간 로그 저장
+    log_retry_info("Retry after failure", start_time, end_time, attempts);
   }
-  return r;
+
+  return r; // 최종 결과 반환
 }
 } // namespace
 
@@ -4051,29 +4096,6 @@ int RGWPutOrg::verify_permission(optional_yield y) {
     }
 
     return RGW_ORG_PERMISSION_ALLOWED;
-
-    const auto &user = findValueForKey(s->http_params, "user");
-    const string &authorizer = s->user->get_id().id;
-    int tier;
-    ret = getTier(authorizer, &tier);
-    if (ret < 0) {
-      tier = 999;
-    }
-    const bool &get = findValueForKey(s->http_params, "get") == "true";
-    const bool &put = findValueForKey(s->http_params, "put") == "true";
-    const bool &del = findValueForKey(s->http_params, "del") == "true";
-    const bool &gra = findValueForKey(s->http_params, "gra") == "true";
-    const auto &path = findValueForKey(s->http_params, "path");
-
-    // authorizer가 root인 경우 정상 반환하지만 그 외의 경우는
-    // checkAclPermission, checkAclWrite를 통해 권한 검사
-    if (authorizer == "root")
-      return RGW_ORG_PERMISSION_ALLOWED;
-    if ((ret = checkAclPermission(authorizer, get, put, del, gra, path)) < 0) {
-      return ret;
-    }
-    return checkAclWrite(authorizer, user, path, authorizer, tier, get, put,
-                         del, gra);
   }
   return 0;
 }
@@ -4517,7 +4539,7 @@ void RGWGetOrg::execute(optional_yield y) {
     ret = driver->load_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
 
     if (ret >= 0) {
-      response_bl.append(s->hbac->to_str());
+      response_bl.append(s->hbac->to_json().c_str());
     } else if (ret == -2) {
       response_bl.append("there is no data");
     } else {
@@ -4658,9 +4680,6 @@ void RGWPutOrg::execute(optional_yield y) {
     const auto &dec_list = findValueForKey(s->http_params, "dec_list");
 
     ret = RGWOrgUser::putUser(user, anc, dec_list);
-    std::ofstream out("/tmp/org_execute.txt");
-    out << s->hbac << std::endl;
-    out.close();
     HbacUserHierarchy user_hierarchy;
 
     driver->load_hierarchy(this, &s->hbac, user_hierarchy, y);
@@ -9016,14 +9035,41 @@ int RGWPutBucketPolicy::get_params(optional_yield y) {
   return op_ret;
 }
 
+void log_execution_time(
+    const std::string &message,
+    std::chrono::time_point<std::chrono::system_clock> start,
+    std::chrono::time_point<std::chrono::system_clock> end) {
+  std::ofstream out("/tmp/execute-bench/bench_results.txt", std::ios_base::app);
+  auto duration =
+      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+          .count();
+  if (out.is_open()) {
+    out << message << " took " << duration << " microseconds.\n";
+    out.close();
+  }
+}
+
 void RGWPutBucketPolicy::execute(optional_yield y) {
+  // 타이머 시작
+  auto overall_start = std::chrono::system_clock::now();
+
+  // 1. get_params 시간 측정
+  auto start = std::chrono::system_clock::now();
   op_ret = get_params(y);
+  auto end = std::chrono::system_clock::now();
+  log_execution_time("get_params", start, end);
+
   if (op_ret < 0) {
     return;
   }
 
+  // 2. rgw_forward_request_to_master 시간 측정
+  start = std::chrono::system_clock::now();
   op_ret = rgw_forward_request_to_master(this, *s->penv.site, s->user->get_id(),
                                          &data, nullptr, s->info, y);
+  end = std::chrono::system_clock::now();
+  log_execution_time("rgw_forward_request_to_master", start, end);
+
   if (op_ret < 0) {
     ldpp_dout(this, 20) << "forward_request_to_master returned ret=" << op_ret
                         << dendl;
@@ -9031,16 +9077,30 @@ void RGWPutBucketPolicy::execute(optional_yield y) {
   }
 
   try {
+    // 3. Policy 생성 시간 측정
+    start = std::chrono::system_clock::now();
     const Policy p(
         s->cct, s->bucket_tenant, data,
         s->cct->_conf.get_val<bool>("rgw_policy_reject_invalid_principals"));
+    end = std::chrono::system_clock::now();
+    log_execution_time("Policy constructor", start, end);
+
     rgw::sal::Attrs attrs(s->bucket_attrs);
+
+    // 4. IAM public check 및 block_public_policy 조건 확인 시간 측정
+    start = std::chrono::system_clock::now();
     if (s->bucket_access_conf && s->bucket_access_conf->block_public_policy() &&
         rgw::IAM::is_public(p)) {
       op_ret = -EACCES;
+      end = std::chrono::system_clock::now();
+      log_execution_time("Public policy check", start, end);
       return;
     }
+    end = std::chrono::system_clock::now();
+    log_execution_time("Public policy check", start, end);
 
+    // 5. retry_raced_bucket_write 시간 측정
+    start = std::chrono::system_clock::now();
     op_ret = retry_raced_bucket_write(
         this, s->bucket.get(),
         [&p, this, &attrs] {
@@ -9050,11 +9110,18 @@ void RGWPutBucketPolicy::execute(optional_yield y) {
           return op_ret;
         },
         y);
+    end = std::chrono::system_clock::now();
+    log_execution_time("retry_raced_bucket_write", start, end);
+
   } catch (rgw::IAM::PolicyParseException &e) {
     ldpp_dout(this, 5) << "failed to parse policy: " << e.what() << dendl;
     op_ret = -EINVAL;
     s->err.message = e.what();
   }
+
+  // 전체 함수 실행 시간 기록
+  auto overall_end = std::chrono::system_clock::now();
+  log_execution_time("Overall execute function", overall_start, overall_end);
 }
 
 void RGWGetBucketPolicy::send_response() {

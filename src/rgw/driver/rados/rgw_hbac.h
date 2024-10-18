@@ -122,6 +122,10 @@ public:
   int read_hbac(const DoutPrefixProvider *dpp, optional_yield y,
                 RGWHbacInfo &info, const GetParams &params = {});
 
+  int read_hbac_list(const DoutPrefixProvider *dpp, optional_yield y,
+                     std::list<RGWHbacInfo> &info_list,
+                     const std::string &prefix, const GetParams &params = {});
+
   int remove_hbac(const DoutPrefixProvider *dpp, optional_yield y,
                   RGWHbacInfo &info, const RemoveParams &params = {});
 

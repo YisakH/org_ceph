@@ -746,15 +746,6 @@ struct HbacUserHierarchy {
   }
 
   std::string to_json(const std::string &user) const {
-    // hierarchy_map의 모든 사용자 탐색하여 출력
-    for (const auto &[user, info] : hierarchy_map) {
-      std::ofstream out("/tmp/to_json_log.txt", std::ios::app);
-      out << "Requested user: " << user << std::endl;
-      out << "socks:: user: " << user << ", parent: " << info.parent
-          << std::endl;
-      out.close();
-    }
-
     auto it = hierarchy_map.find(user);
     if (it == hierarchy_map.end()) {
       return "no user: " + user; // 사용자가 존재하지 않을 경우 빈 문자열 반환
@@ -905,7 +896,7 @@ struct RGWHbacInfo {
     }
     return true;
   }
-  bool have_permissions(bool &get, bool &put, bool &del) const {
+  bool have_permissions(bool get, bool put, bool del) const {
     if ((get && !permissions.get) || (put && !permissions.put) ||
         (del && !permissions.del) || (!permissions.gra)) {
       return false;

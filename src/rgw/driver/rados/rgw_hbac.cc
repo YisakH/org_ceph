@@ -19,6 +19,17 @@ int RGWHbacCtl::read_hbac(const DoutPrefixProvider *dpp, optional_yield y,
   });
 }
 
+int RGWHbacCtl::read_hbac_list(const DoutPrefixProvider *dpp, optional_yield y,
+                               std::list<RGWHbacInfo> &info_list,
+                               const std::string &prefix,
+                               const GetParams &params) {
+  return be_handler->call([&](RGWSI_MetaBackend_Handler::Op *op) {
+    return svc.hbac->read_hbac_list(op->ctx(), info_list, prefix,
+                                    params.objv_tracker, params.mtime,
+                                    params.attrs, y, dpp);
+  });
+}
+
 int RGWHbacCtl::remove_hbac(const DoutPrefixProvider *dpp, optional_yield y,
                             RGWHbacInfo &info, const RemoveParams &params) {
   return be_handler->call([&](RGWSI_MetaBackend_Handler::Op *op) {

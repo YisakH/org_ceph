@@ -570,6 +570,7 @@ class RadosHbac : public Hbac {
 private:
   RadosStore *store;
   RGWHbacInfo info;
+  std::list<RGWHbacInfo> info_list;
 
 public:
   RadosHbac(RadosStore *_store) : store(_store) {}
@@ -577,6 +578,8 @@ public:
   ~RadosHbac() = default;
 
   int load_hbac(const DoutPrefixProvider *dpp, optional_yield y);
+  int load_hbac_list(const DoutPrefixProvider *dpp, optional_yield y,
+                     std::string prefix);
   int store_hbac(const DoutPrefixProvider *dpp, optional_yield y);
   int remove_hbac(const DoutPrefixProvider *dpp, optional_yield y);
   int load_hierarchy(const DoutPrefixProvider *dpp,
@@ -588,6 +591,7 @@ public:
   virtual std::string to_str() override;
 
   virtual std::string to_json() override;
+  virtual std::string get_hbac_list_json() override;
 };
 
 class RadosBucket : public StoreBucket {

@@ -289,6 +289,11 @@ public:
                         optional_yield y) {
     return 0;
   };
+
+  virtual int load_hbac_list(const DoutPrefixProvider *dpp, optional_yield y,
+                             std::string prefix) {
+    return 0;
+  }
   /** store hbac */
   virtual int store_hbac(const DoutPrefixProvider *dpp, rgw_hbac_info info,
                          std::unique_ptr<rgw::sal::Hbac> *hbac,
@@ -962,6 +967,7 @@ public:
   virtual std::string to_str() { return ""; };
 
   virtual std::string to_json() { return nlohmann::json{}.dump(); };
+  virtual std::string get_hbac_list_json() { return {}; };
 };
 
 /**

@@ -69,7 +69,7 @@ export class RgwHaclDetailsComponent implements OnInit {
   selectNode(node: TreeNode) {
     TREE_ACTIONS.TOGGLE_ACTIVE(undefined, node, undefined);
     this.selectedNode = node;
-    let test = this.hAclService.getPermission(node.data.user);
+    //let test = this.hAclService.getPermission(node.data.user);
   }
 
   selectAndShowNode(tree: TreeModel, node: TreeNode, $event: any) {

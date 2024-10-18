@@ -4267,37 +4267,28 @@ int RGWPutObj::verify_permission(optional_yield y) {
     }
   }
 
-  int hacl_ret = checkHAclObjWrite(s->user->get_id().id, s->bucket->get_name(),
-                                   s->object->get_name());
+  ret = driver->load_hbac(
+      this,
+      rgw_hbac_info(s->user->get_id().id,
+                    s->bucket->get_name() + ":" + s->object->get_name()),
+      &s->hbac, y);
+  dout(0) << "socks(putobj::verify_permission): key : "
+          << s->bucket->get_name() + ":" + s->object->get_name() << dendl;
+  int hacl_ret = s->hbac->get_hbac()->have_permissions(false, true, false);
   dout(0) << "socks(putobj::verify_reqeuster): hacl_ret : " << hacl_ret
           << dendl;
 
-  if (hacl_ret != -RGW_ORG_PERMISSION_ALLOWED) {
-    if (hacl_ret == -RGW_HBAC_KEY_NOT_FOUND) {
-      if (!verify_bucket_permission_no_policy(this, s, RGW_PERM_WRITE)) {
-        return -EACCES;
-      }
-    } else { // not allowed
-      return -EACCES;
-    }
+  if (hacl_ret) {
+    return RGW_ORG_PERMISSION_ALLOWED;
   }
 
-  const string user_name = s->user->get_id().id;
-  const string bucket_name = s->bucket->get_name();
-  const string object_name = s->object->get_name();
+  if (verify_bucket_permission_no_policy(this, s, RGW_PERM_WRITE)) {
+    return 0;
+  }
 
-  const string path = bucket_name + "/" + object_name;
-  const bool isAccessable =
-      validateRGWOrgPermission(user_name, path, true, true);
-  dout(0) << "socks : rgw_op.cc : RGWPutObj::verify_permission() : user id : "
-          << user_name << " path : " << path << dendl;
-  dout(0)
-      << "socks : rgw_op.cc : RGWPutObj::verify_permission() : verify result : "
-      << isAccessable << dendl;
+  return -EACCES;
 
-  // return checkHAclObjWrite(user_name, bucket_name, object_name);
-
-  return 0;
+  //* 이 아래로는 실행되지 않음
 }
 
 void RGWPutObj::pre_exec() { rgw_bucket_object_pre_exec(s); }
@@ -4536,6 +4527,16 @@ void RGWGetOrg::execute(optional_yield y) {
     const auto &user = findValueForKey(s->http_params, "user");
     const auto &path = findValueForKey(s->http_params, "path");
 
+    if (path.empty()) {
+      ret = driver->load_hbac_list(this, y, user);
+      if (ret < 0) {
+        response_bl.append("error occured! there is no data");
+        send_response_data(response_bl, 0, response_bl.length());
+        return;
+      }
+      response_bl.append(s->hbac->get_hbac_list_json().c_str());
+      return;
+    }
     ret = driver->load_hbac(this, rgw_hbac_info(user, path), &s->hbac, y);
 
     if (ret >= 0) {

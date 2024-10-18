@@ -518,9 +518,28 @@ std::string RadosHbac::to_str() { return info.make_response(); }
 
 std::string RadosHbac::to_json() { return info.to_json().dump(); }
 
+std::string RadosHbac::get_hbac_list_json() {
+  nlohmann::json hbac_list = nlohmann::json::array();
+
+  for (auto &i : info_list) {
+    hbac_list.push_back(i.to_json());
+  }
+
+  return hbac_list.dump();
+}
+
 int RadosHbac::load_hbac(const DoutPrefixProvider *dpp, optional_yield y) {
   int ret = 0;
   ret = store->ctl()->hbac->read_hbac(dpp, y, info);
+
+  return ret;
+}
+
+int RadosHbac::load_hbac_list(const DoutPrefixProvider *dpp, optional_yield y,
+                              std::string prefix) {
+  int ret = 0;
+  RGWHbacInfo info;
+  ret = store->ctl()->hbac->read_hbac_list(dpp, y, info_list, prefix);
 
   return ret;
 }
